@@ -1,0 +1,181 @@
+body {
+  background-color: #F6F8FB;
+}
+
+.navbar {
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.brand-title {
+  font-weight: 600;
+}
+
+.brand-title span {
+  font-weight: 400;
+  opacity: 0.75;
+  margin-left: 6px;
+}
+
+.page-heading {
+  margin-bottom: 24px;
+}
+
+.page-heading h2 {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.page-heading p {
+  color: #64748B;
+  margin-bottom: 0;
+}
+
+.filter-bar {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 16px 18px 4px 18px;
+  margin-bottom: 20px;
+}
+
+.card {
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.card-header {
+  background: white;
+  border-bottom: 1px solid #EEF1F4;
+  font-weight: 600;
+}
+
+.chart-placeholder {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #94A3B8;
+  text-align: center;
+  gap: 8px;
+}
+
+.placeholder-title {
+  color: #475569;
+  font-weight: 500;
+}
+
+.placeholder-subtitle {
+  font-size: 0.85rem;
+}
+
+.section-label {
+  color: #64748B;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.upload-zone {
+  border: 2px dashed #CBD5E1;
+  border-radius: 14px;
+  padding: 32px 20px;
+  text-align: center;
+  background: #FAFBFC;
+}
+
+.upload-zone h5 {
+  margin-top: 15px;
+}
+
+.upload-zone p {
+  color: #64748B;
+}
+
+.filter-section-title {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: #64748B;
+  margin-bottom: 10px;
+}
+
+.snapshot-heading {
+  margin: 8px 0 14px 0;
+}
+
+.snapshot-heading h4 {
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+.snapshot-heading p {
+  margin-bottom: 0;
+  color: #64748B;
+}
+
+.prototype-note {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #EEF2F7;
+  color: #64748B;
+  font-size: 0.78rem;
+}
+
+.chart-header-layout {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.chart-header-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.chart-header-subtitle {
+  color: #64748B;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.chart-header-control {
+  width: 220px;
+  flex: 0 0 220px;
+}
+
+.chart-header-control .form-group {
+  margin-bottom: 0;
+}
+
+.section-heading-custom {
+  margin: 10px 0 12px 0;
+}
+
+.section-heading-custom h4 {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.section-heading-custom .text-secondary {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 768px) {
+  .chart-header-layout {
+    flex-direction: column;
+  }
+
+  .chart-header-control {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
