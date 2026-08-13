@@ -652,12 +652,301 @@ ui <- page_navbar(
   ),
   
   
-  # PAGE 3 — YEAR DETAIL   ----
+  # PAGE 3 — DETAILED ANALYSIS  ----
+  # Two independent detailed-analysis pages are grouped under one navbar menu.
+  # This avoids adding another layer of tabs inside a single page.
+  
+  nav_menu(
+    "Detailed Analysis",
+    
+    # -----------------------------------------------------------------------
+    # 3A — SITE DETAIL
+    # Source concept: Site Report files
+    # -----------------------------------------------------------------------
+    nav_panel(
+      "Site Detail",
+      
+      div(
+        class = "p-4",
+        
+        div(
+          class = "page-heading",
+          
+          h2("Site Detail"),
+          
+          p(
+            "Explore month-by-month performance for a selected site using the detailed Site Reports."
+          )
+        ),
+        
+        
+        div(
+          class = "filter-bar",
+          
+          div(
+            class = "filter-section-title",
+            "Site report detail"
+          ),
+          
+          layout_columns(
+            
+            selectInput(
+              "site_detail_year",
+              "Year",
+              choices = 2025,
+              selected = 2025
+            ),
+            
+            selectInput(
+              "site_detail_site",
+              "Site",
+              choices = c(
+                "H&F Clayton",
+                "Venues Clayton",
+                "Aquatics Clayton",
+                "Caulfield",
+                "Peninsula",
+                "Participation Programs"
+              ),
+              selected = "H&F Clayton"
+            ),
+            
+            selectInput(
+              "site_detail_area",
+              "Analysis area",
+              choices = c(
+                "Finance",
+                "Direct Visits",
+                "Indirect Visits",
+                "Monthly Highlights"
+              ),
+              selected = "Finance"
+            ),
+            
+            col_widths = c(3, 4, 4)
+          ),
+          
+          tags$small(
+            class = "text-secondary",
+            "Available analysis areas will eventually be detected from the uploaded Site Report."
+          )
+        ),
+        
+        
+        uiOutput("site_detail_focus_heading"),
+        
+        
+        # KPI row changes with the selected analysis area.
+        uiOutput("site_detail_kpis"),
+        
+        br(),
+        
+        
+        card(
+          full_screen = TRUE,
+          
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                uiOutput("site_detail_main_title", inline = TRUE)
+              ),
+              uiOutput("site_detail_main_subtitle")
+            )
+          ),
+          
+          uiOutput("site_detail_main_content")
+        ),
+        
+        
+        layout_columns(
+          
+          card(
+            full_screen = TRUE,
+            
+            card_header(
+              div(
+                div(
+                  class = "chart-header-title",
+                  uiOutput("site_detail_breakdown_title", inline = TRUE)
+                ),
+                uiOutput("site_detail_breakdown_subtitle")
+              )
+            ),
+            
+            uiOutput("site_detail_breakdown_content")
+          ),
+          
+          card(
+            card_header("Context & Notes"),
+            
+            div(
+              class = "p-3",
+              
+              p(
+                class = "text-secondary",
+                "This area can provide context for unusual monthly movements, events, operational changes and reporting notes."
+              ),
+              
+              tags$ul(
+                tags$li("Monthly highlights from the Site Report"),
+                tags$li("Operational or program changes"),
+                tags$li("Potential explanations for unusual peaks or drops")
+              )
+            )
+          ),
+          
+          col_widths = c(8, 4)
+        )
+      )
+    ),
+    
+    
+    # -----------------------------------------------------------------------
+    # 3B — VENUES OPERATIONS
+    # Source concept: Venues Tracking Report files
+    # -----------------------------------------------------------------------
+    nav_panel(
+      "Venues Operations",
+      
+      div(
+        class = "p-4",
+        
+        div(
+          class = "page-heading",
+          
+          h2("Venues Operations"),
+          
+          p(
+            "Explore detailed operational patterns from the Venues Tracking Reports."
+          )
+        ),
+        
+        
+        div(
+          class = "filter-bar",
+          
+          div(
+            class = "filter-section-title",
+            "Operational detail"
+          ),
+          
+          layout_columns(
+            
+            selectInput(
+              "venues_year",
+              "Year",
+              choices = 2022:2025,
+              selected = 2025
+            ),
+            
+            selectInput(
+              "venues_area",
+              "Operational area",
+              choices = c(
+                "Facility Usage & Attendance",
+                "Facility Hire",
+                "Membership",
+                "Online Sales",
+                "Workforce",
+                "Finance",
+                "Customer Operations",
+                "Offers & Targets",
+                "Discounts"
+              ),
+              selected = "Facility Usage & Attendance"
+            ),
+            
+            col_widths = c(3, 5)
+          ),
+          
+          tags$small(
+            class = "text-secondary",
+            "Operational areas will eventually update according to the sheets available in the selected year's Tracking Report."
+          )
+        ),
+        
+        
+        uiOutput("venues_focus_heading"),
+        
+        
+        uiOutput("venues_kpis"),
+        
+        br(),
+        
+        
+        card(
+          full_screen = TRUE,
+          
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Monthly Operational Trend"
+              ),
+              uiOutput("venues_main_subtitle")
+            )
+          ),
+          
+          placeholder_chart(
+            "Month-by-month operational performance"
+          )
+        ),
+        
+        
+        layout_columns(
+          
+          card(
+            full_screen = TRUE,
+            
+            card_header(
+              div(
+                div(
+                  class = "chart-header-title",
+                  "Operational Breakdown"
+                ),
+                uiOutput("venues_breakdown_subtitle")
+              )
+            ),
+            
+            placeholder_chart(
+              "Break down the selected operational area into its main categories"
+            )
+          ),
+          
+          card(
+            full_screen = TRUE,
+            
+            card_header(
+              div(
+                div(
+                  class = "chart-header-title",
+                  "Secondary Analysis"
+                ),
+                div(
+                  class = "chart-header-subtitle",
+                  "Context-specific analysis will appear here"
+                )
+              )
+            ),
+            
+            placeholder_chart(
+              "Additional operational detail"
+            )
+          ),
+          
+          col_widths = c(7, 5)
+        )
+      )
+    )
+  ),
+  
+  
+  # PAGE 4 — FORECASTING  ----
   
   nav_panel(
-    
-    "Year Detail",
-    icon = bs_icon("calendar3"),
+    "Forecasting",
+    icon = bs_icon("graph-up-arrow"),
     
     div(
       class = "p-4",
@@ -665,10 +954,10 @@ ui <- page_navbar(
       div(
         class = "page-heading",
         
-        h2("Year Detail"),
+        h2("Forecasting"),
         
         p(
-          "Explore monthly patterns and investigate performance within a selected year."
+          "Explore forward-looking performance based on validated historical trends."
         )
       ),
       
@@ -676,114 +965,159 @@ ui <- page_navbar(
       div(
         class = "filter-bar",
         
+        div(
+          class = "filter-section-title",
+          "Forecast settings"
+        ),
+        
         layout_columns(
           
           selectInput(
-            "detail_year",
-            "Year",
-            choices = 2021:2025,
-            selected = 2025
+            "forecast_level",
+            "Forecast level",
+            choices = c(
+              "Overall",
+              "Site"
+            ),
+            selected = "Overall"
           ),
           
           selectInput(
-            "detail_site",
-            "Site",
+            "forecast_metric",
+            "Metric",
             choices = c(
-              "All Sites",
-              "H&F Clayton",
-              "Venues Clayton",
-              "Aquatics Clayton",
-              "Caulfield",
-              "Peninsula",
-              "Participation Programs"
-            )
+              "Income",
+              "Expenses",
+              "Net Result"
+            ),
+            selected = "Income"
           ),
           
           selectInput(
-            "detail_metric",
-            "Analysis area",
+            "forecast_horizon",
+            "Forecast horizon",
             choices = c(
-              "Finance",
-              "Visits",
-              "Membership",
-              "Programs"
+              "3 months",
+              "6 months",
+              "12 months"
+            ),
+            selected = "12 months"
+          ),
+          
+          conditionalPanel(
+            condition = "input.forecast_level == 'Site'",
+            
+            selectInput(
+              "forecast_site",
+              "Site",
+              choices = c(
+                "H&F Clayton",
+                "Venues Clayton",
+                "Aquatics Clayton",
+                "Caulfield",
+                "Peninsula",
+                "Participation Programs"
+              ),
+              selected = "H&F Clayton"
             )
           ),
           
-          col_widths = c(3, 4, 4)
+          col_widths = c(3, 3, 3, 3)
         )
       ),
       
       
-      layout_column_wrap(
+      div(
+        class = "snapshot-heading",
         
-        width = 1 / 3,
+        h4("Forecast Prototype"),
         
-        value_box(
-          "YTD Actual",
-          "$1.24M",
-          showcase = bs_icon("graph-up-arrow")
+        p(
+          "Forecasts will only be enabled for metrics with sufficient, continuous and consistently defined historical data."
         ),
         
-        value_box(
-          "YTD Budget",
-          "$1.18M",
-          showcase = bs_icon("clipboard-data")
-        ),
-        
-        value_box(
-          "Variance",
-          "+5.1%",
-          showcase = bs_icon("arrow-up-right")
+        span(
+          class = "prototype-note",
+          "Forecast values below are intentionally left as placeholders until the modelling stage"
         )
       ),
       
+      
+      uiOutput("forecast_kpis"),
       
       br(),
       
       
       card(
         full_screen = TRUE,
-        card_header("Monthly Performance"),
-        placeholder_chart("January – December trend")
+        
+        card_header(
+          div(
+            div(
+              class = "chart-header-title",
+              "Historical Performance & Forecast"
+            ),
+            uiOutput("forecast_main_subtitle")
+          )
+        ),
+        
+        placeholder_chart(
+          "Historical actuals, forecast path and prediction intervals"
+        )
       ),
       
       
       layout_columns(
         
         card(
-          card_header("Monthly Breakdown"),
-          placeholder_chart("Monthly comparison")
-        ),
-        
-        card(
-          card_header("Key Highlights"),
+          full_screen = TRUE,
           
-          div(
-            class = "p-3",
-            
-            h5("March 2025"),
-            
-            p(
-              class = "text-secondary",
-              "Monthly operational notes and important events will appear here."
-            ),
-            
-            tags$ul(
-              tags$li("Major event or operational change"),
-              tags$li("Program or facility update"),
-              tags$li("Reason behind unusual performance")
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Seasonal Pattern"
+              ),
+              div(
+                class = "chart-header-subtitle",
+                "Identify recurring high and low months"
+              )
             )
+          ),
+          
+          placeholder_chart(
+            "Historical monthly seasonality"
           )
         ),
         
-        col_widths = c(8, 4)
+        card(
+          full_screen = TRUE,
+          
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Forecast vs Budget"
+              ),
+              div(
+                class = "chart-header-subtitle",
+                "Planning comparison when future budget data is available"
+              )
+            )
+          ),
+          
+          placeholder_chart(
+            "Compare forecast expectations with planned budget"
+          )
+        ),
+        
+        col_widths = c(6, 6)
       )
     )
   ),
   
   
-  # PAGE 4 — DATA   ----
+  # PAGE 5 — DATA   ----
   
   nav_panel(
     
@@ -1169,11 +1503,428 @@ server <- function(input, output, session) {
     )
   })
   
+  
+  
+  # Detailed analysis — Site Detail prototype logic ----
+  # The available analysis area depends on the selected Site Report.
+  
+  observeEvent(input$site_detail_site, {
+    req(input$site_detail_site)
+    
+    choices <- switch(
+      input$site_detail_site,
+      
+      "H&F Clayton" = c(
+        "Finance",
+        "Direct Visits",
+        "Indirect Visits",
+        "Monthly Highlights"
+      ),
+      
+      "Aquatics Clayton" = c(
+        "Finance",
+        "Direct Visits",
+        "Indirect Visits",
+        "Enrolments",
+        "Monthly Highlights"
+      ),
+      
+      "Participation Programs" = c(
+        "Finance",
+        "Direct Visits",
+        "Indirect Visits",
+        "Enrolments",
+        "Monthly Highlights"
+      ),
+      
+      c(
+        "Finance",
+        "Direct Visits",
+        "Indirect Visits",
+        "Memberships",
+        "Monthly Highlights"
+      )
+    )
+    
+    updateSelectInput(
+      session,
+      "site_detail_area",
+      choices = choices,
+      selected = choices[[1]]
+    )
+  }, ignoreInit = TRUE)
+  
+  
+  output$site_detail_focus_heading <- renderUI({
+    req(input$site_detail_year, input$site_detail_site, input$site_detail_area)
+    
+    div(
+      class = "snapshot-heading",
+      h4(
+        paste0(
+          input$site_detail_year,
+          " · ",
+          input$site_detail_site,
+          " · ",
+          input$site_detail_area
+        )
+      ),
+      p(
+        "Month-by-month detail from the selected Site Report."
+      ),
+      span(
+        class = "prototype-note",
+        "Prototype values are placeholders for layout demonstration only"
+      )
+    )
+  })
+  
+  
+  output$site_detail_kpis <- renderUI({
+    req(input$site_detail_area)
+    
+    area <- input$site_detail_area
+    
+    if (area == "Monthly Highlights") {
+      return(NULL)
+    }
+    
+    boxes <- switch(
+      area,
+      
+      "Finance" = list(
+        c("YTD Actual", "$1.24M", "Current year actual", "graph-up-arrow"),
+        c("YTD Budget", "$1.18M", "Current year budget", "clipboard-data"),
+        c("Variance", "+5.1%", "Actual vs budget", "arrow-up-right")
+      ),
+      
+      "Direct Visits" = list(
+        c("Total Direct Visits", "128K", "Year-to-date", "graph-up-arrow"),
+        c("Student Share", "54%", "Placeholder audience mix", "bar-chart-line"),
+        c("Community Share", "31%", "Placeholder audience mix", "bar-chart-line")
+      ),
+      
+      "Indirect Visits" = list(
+        c("Indirect Visits", "42K", "Year-to-date", "graph-up-arrow"),
+        c("Largest Activity", "—", "Placeholder", "bar-chart-line"),
+        c("Change", "+4.8%", "Placeholder", "arrow-up-right")
+      ),
+      
+      "Memberships" = list(
+        c("Active Members", "4,820", "Placeholder", "graph-up-arrow"),
+        c("New Members", "640", "Placeholder", "clipboard-data"),
+        c("Expiring", "520", "Placeholder", "calendar3")
+      ),
+      
+      "Enrolments" = list(
+        c("Total Enrolments", "6,340", "Placeholder", "clipboard-data"),
+        c("Student", "3,920", "Placeholder", "bar-chart-line"),
+        c("Community", "1,860", "Placeholder", "graph-up-arrow")
+      )
+    )
+    
+    layout_column_wrap(
+      width = 1 / 3,
+      lapply(
+        boxes,
+        function(x) {
+          value_box(
+            title = x[[1]],
+            value = x[[2]],
+            x[[3]],
+            showcase = bs_icon(x[[4]])
+          )
+        }
+      )
+    )
+  })
+  
+  
+  site_detail_titles <- reactive({
+    req(input$site_detail_area)
+    
+    switch(
+      input$site_detail_area,
+      "Finance" = list(
+        main = "Monthly Financial Performance",
+        breakdown = "Budget vs Actual Breakdown",
+        main_placeholder = "January–December financial trend",
+        breakdown_placeholder = "Break down actual and budget performance"
+      ),
+      "Direct Visits" = list(
+        main = "Monthly Direct Visits",
+        breakdown = "Visit Type Breakdown",
+        main_placeholder = "January–December direct visit trend",
+        breakdown_placeholder = "Compare visit categories and audience groups"
+      ),
+      "Indirect Visits" = list(
+        main = "Monthly Indirect Visits",
+        breakdown = "Activity Breakdown",
+        main_placeholder = "January–December indirect visit trend",
+        breakdown_placeholder = "Compare indirect visit activities"
+      ),
+      "Memberships" = list(
+        main = "Monthly Membership Movement",
+        breakdown = "Membership Mix",
+        main_placeholder = "Active, new and expiring membership trends",
+        breakdown_placeholder = "Compare membership categories"
+      ),
+      "Enrolments" = list(
+        main = "Monthly Enrolments",
+        breakdown = "Enrolment Mix",
+        main_placeholder = "January–December enrolment trend",
+        breakdown_placeholder = "Compare enrolment categories"
+      ),
+      "Monthly Highlights" = list(
+        main = "Monthly Highlights Timeline",
+        breakdown = "Highlight Categories",
+        main_placeholder = "Operational highlights across January–December",
+        breakdown_placeholder = "Summarise the types of events and operational notes"
+      )
+    )
+  })
+  
+  
+  output$site_detail_main_title <- renderUI({
+    site_detail_titles()$main
+  })
+  
+  output$site_detail_main_subtitle <- renderUI({
+    req(input$site_detail_year, input$site_detail_site)
+    div(
+      class = "chart-header-subtitle",
+      paste0(input$site_detail_site, " · ", input$site_detail_year)
+    )
+  })
+  
+  output$site_detail_main_content <- renderUI({
+    placeholder_chart(site_detail_titles()$main_placeholder)
+  })
+  
+  output$site_detail_breakdown_title <- renderUI({
+    site_detail_titles()$breakdown
+  })
+  
+  output$site_detail_breakdown_subtitle <- renderUI({
+    req(input$site_detail_area)
+    div(
+      class = "chart-header-subtitle",
+      paste0("Detailed view · ", input$site_detail_area)
+    )
+  })
+  
+  output$site_detail_breakdown_content <- renderUI({
+    placeholder_chart(site_detail_titles()$breakdown_placeholder)
+  })
+  
+  
+  # Detailed analysis — Venues Operations prototype logic ----
+  # Tracking Reports change over time, so the list of operational areas is
+  # updated to demonstrate how future uploaded files can control availability.
+  
+  observeEvent(input$venues_year, {
+    req(input$venues_year)
+    year <- as.integer(input$venues_year)
+    
+    choices <- c(
+      "Facility Usage & Attendance",
+      "Facility Hire",
+      "Membership",
+      "Online Sales",
+      "Workforce",
+      "Finance",
+      "Discounts"
+    )
+    
+    if (year >= 2023) {
+      choices <- c(choices, "Customer Operations")
+    }
+    
+    if (year >= 2024) {
+      choices <- c(choices, "Offers & Targets")
+    }
+    
+    updateSelectInput(
+      session,
+      "venues_area",
+      choices = choices,
+      selected = choices[[1]]
+    )
+  }, ignoreInit = TRUE)
+  
+  
+  output$venues_focus_heading <- renderUI({
+    req(input$venues_year, input$venues_area)
+    
+    div(
+      class = "snapshot-heading",
+      h4(paste0(input$venues_year, " · ", input$venues_area)),
+      p("Operational detail from the selected Venues Tracking Report."),
+      span(
+        class = "prototype-note",
+        "Prototype values are placeholders for layout demonstration only"
+      )
+    )
+  })
+  
+  
+  output$venues_kpis <- renderUI({
+    req(input$venues_area)
+    
+    boxes <- switch(
+      input$venues_area,
+      
+      "Facility Usage & Attendance" = list(
+        c("Total Attendance", "—", "Placeholder", "graph-up-arrow"),
+        c("Usage Hours", "—", "Placeholder", "calendar3"),
+        c("Peak Activity", "—", "Placeholder", "bar-chart-line")
+      ),
+      
+      "Facility Hire" = list(
+        c("Hire Revenue", "—", "Placeholder", "cash-stack"),
+        c("Bookings", "—", "Placeholder", "calendar3"),
+        c("Avg Revenue / Booking", "—", "Placeholder", "receipt")
+      ),
+      
+      "Membership" = list(
+        c("Active Members", "—", "Placeholder", "graph-up-arrow"),
+        c("New Members", "—", "Placeholder", "clipboard-data"),
+        c("Expiring", "—", "Placeholder", "calendar3")
+      ),
+      
+      "Online Sales" = list(
+        c("Online Sales", "—", "Placeholder", "cash-stack"),
+        c("Transactions", "—", "Placeholder", "receipt"),
+        c("Avg Transaction", "—", "Placeholder", "cash-stack")
+      ),
+      
+      "Workforce" = list(
+        c("Casual Hours", "—", "Placeholder", "calendar3"),
+        c("Casual Wages", "—", "Placeholder", "cash-stack"),
+        c("Avg Cost / Hour", "—", "Placeholder", "receipt")
+      ),
+      
+      "Finance" = list(
+        c("YTD Actual", "—", "Placeholder", "graph-up-arrow"),
+        c("YTD Budget", "—", "Placeholder", "clipboard-data"),
+        c("Variance", "—", "Placeholder", "arrow-up-right")
+      ),
+      
+      "Customer Operations" = list(
+        c("Service Desk Calls", "—", "Placeholder", "receipt"),
+        c("Cancellations", "—", "Placeholder", "arrow-up-right"),
+        c("Resolution Rate", "—", "Placeholder", "bullseye")
+      ),
+      
+      "Offers & Targets" = list(
+        c("Active Offers", "—", "Placeholder", "bullseye"),
+        c("Target Achievement", "—", "Placeholder", "graph-up-arrow"),
+        c("Variance", "—", "Placeholder", "arrow-up-right")
+      ),
+      
+      "Discounts" = list(
+        c("Discount Value", "—", "Placeholder", "bullseye"),
+        c("Transactions", "—", "Placeholder", "receipt"),
+        c("Avg Discount", "—", "Placeholder", "cash-stack")
+      )
+    )
+    
+    layout_column_wrap(
+      width = 1 / 3,
+      lapply(
+        boxes,
+        function(x) {
+          value_box(
+            title = x[[1]],
+            value = x[[2]],
+            x[[3]],
+            showcase = bs_icon(x[[4]])
+          )
+        }
+      )
+    )
+  })
+  
+  
+  output$venues_main_subtitle <- renderUI({
+    req(input$venues_year, input$venues_area)
+    div(
+      class = "chart-header-subtitle",
+      paste0(input$venues_area, " · January–December ", input$venues_year)
+    )
+  })
+  
+  
+  output$venues_breakdown_subtitle <- renderUI({
+    req(input$venues_area)
+    div(
+      class = "chart-header-subtitle",
+      paste0("Category-level view · ", input$venues_area)
+    )
+  })
+  
+  
+  # Forecasting prototype logic ----
+  
+  output$forecast_kpis <- renderUI({
+    req(input$forecast_horizon)
+    
+    layout_column_wrap(
+      width = 1 / 3,
+      
+      value_box(
+        title = paste0("Next ", input$forecast_horizon, " Forecast"),
+        value = "—",
+        "Model not connected",
+        showcase = bs_icon("graph-up-arrow")
+      ),
+      
+      value_box(
+        title = "Expected Change",
+        value = "—",
+        "Compared with the latest equivalent period",
+        showcase = bs_icon("arrow-up-right")
+      ),
+      
+      value_box(
+        title = "Forecast Range",
+        value = "—",
+        "Prediction interval will be shown here",
+        showcase = bs_icon("bullseye")
+      )
+    )
+  })
+  
+  
+  output$forecast_main_subtitle <- renderUI({
+    req(input$forecast_level, input$forecast_metric, input$forecast_horizon)
+    
+    location <- if (
+      identical(input$forecast_level, "Site") &&
+      !is.null(input$forecast_site)
+    ) {
+      input$forecast_site
+    } else {
+      "Overall"
+    }
+    
+    div(
+      class = "chart-header-subtitle",
+      paste0(
+        location,
+        " · ",
+        input$forecast_metric,
+        " · ",
+        input$forecast_horizon,
+        " horizon"
+      )
+    )
+  })
+
 }
 
 
 shinyApp(ui, server)
-
 
 
 
