@@ -1,6 +1,7 @@
 library(shiny)
 library(bslib)
 library(bsicons)
+library(readxl)
 
 # -------------------------------------------------------------------------
 # Source project files
