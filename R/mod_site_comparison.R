@@ -160,8 +160,87 @@ mod_site_comparison_ui <- function(id) {
         
         col_widths = c(5, 7)
       ),
+
+      # Section 3: explain where revenue opportunity sits across sites. These
+      # views are intentionally separate from the standard finance metric
+      # selector because discounts are drivers rather than accounting results.
+      div(
+        class = "section-heading-custom mt-4",
+
+        h4(
+          class = "mb-1",
+          "Site Revenue Opportunity"
+        ),
+
+        tags$small(
+          class = "text-secondary",
+          paste(
+            "Compare potential revenue and identify whether student,",
+            "staff or other discounts drive the opportunity gap."
+          )
+        ),
+
+        prototype_note(
+          paste(
+            "These views will activate after the DISCOUNTS",
+            "import is connected"
+          )
+        )
+      ),
+
+      layout_columns(
+
+        card(
+          full_screen = TRUE,
+
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Revenue Opportunity by Site"
+              ),
+
+              uiOutput(
+                ns("site_opportunity_subtitle")
+              )
+            )
+          ),
+
+          placeholder_chart(
+            "Actual income and discount opportunity by site",
+            paste(
+              "Stacked values show potential revenue; sites can be",
+              "ranked by opportunity rate"
+            )
+          )
+        ),
+
+        card(
+          full_screen = TRUE,
+
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Discount Mix by Site"
+              ),
+
+              uiOutput(
+                ns("site_discount_mix_subtitle")
+              )
+            )
+          ),
+
+          placeholder_chart(
+            "Student, staff and other discount composition"
+          )
+        ),
+
+        col_widths = c(7, 5)
+      ),
       
-      # Section 3: drill down from the selected site to its facilities.
+      # Section 4: drill down from the selected site to its facilities and
+      # operational business units.
       # The site selector sits outside the tab card so the dropdown is never
       # clipped by the card's internal scrolling area.
       div(
@@ -175,8 +254,8 @@ mod_site_comparison_ui <- function(id) {
         tags$small(
           class = "text-secondary",
           paste(
-            "Choose a site first, then switch between",
-            "the latest-year ranking and historical trend."
+            "Choose a site first, then explore financial performance,",
+            "discounts and revenue opportunity by facility or business unit."
           )
         )
       ),
@@ -221,49 +300,160 @@ mod_site_comparison_ui <- function(id) {
       # The tabs now contain only analysis content, not input controls.
       navset_card_tab(
         id = ns("facility_view"),
-        selected = "Latest-year ranking",
+        selected = "Financial Performance",
         title = "Facility Analysis",
         full_screen = TRUE,
         
         nav_panel(
-          "Latest-year ranking",
-          
-          div(
-            class = "mb-2",
-            
-            div(
-              class = "chart-header-title",
-              "Latest-year Facility Ranking"
+          "Financial Performance",
+
+          layout_columns(
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Latest-year Facility Ranking"
+                  ),
+
+                  uiOutput(
+                    ns("facility_ranking_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                paste(
+                  "Rank facilities and business units within",
+                  "the selected site"
+                )
+              )
             ),
-            
-            uiOutput(
-              ns("facility_ranking_subtitle")
-            )
-          ),
-          
-          placeholder_chart(
-            "Rank facilities within the selected site in the latest selected year"
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Facility Performance Over Time"
+                  ),
+
+                  uiOutput(
+                    ns("facility_trend_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                paste(
+                  "Compare facility and business-unit performance",
+                  "across the selected year range"
+                )
+              )
+            ),
+
+            col_widths = c(6, 6)
           )
         ),
         
         nav_panel(
-          "Trend over time",
-          
-          div(
-            class = "mb-2",
-            
-            div(
-              class = "chart-header-title",
-              "Facility Performance Over Time"
+          "Discounts",
+
+          layout_columns(
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Latest-year Discount Mix"
+                  ),
+
+                  uiOutput(
+                    ns("facility_discount_mix_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                paste(
+                  "Student, staff and other discount composition",
+                  "by facility"
+                )
+              )
             ),
-            
-            uiOutput(
-              ns("facility_trend_subtitle")
-            )
-          ),
-          
-          placeholder_chart(
-            "Compare facility performance across the selected year range"
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Discount Opportunity Trend"
+                  ),
+
+                  uiOutput(
+                    ns("facility_discount_trend_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                "Track facility-level discount opportunity over time"
+              )
+            ),
+
+            col_widths = c(6, 6)
+          )
+        ),
+
+        nav_panel(
+          "Revenue Opportunity",
+
+          layout_columns(
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Actual vs Potential Revenue"
+                  ),
+
+                  uiOutput(
+                    ns("facility_revenue_gap_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                paste(
+                  "Compare actual income and discount opportunity",
+                  "within the selected site"
+                )
+              )
+            ),
+
+            card(
+              card_header(
+                div(
+                  div(
+                    class = "chart-header-title",
+                    "Revenue Capture Rate"
+                  ),
+
+                  uiOutput(
+                    ns("facility_capture_trend_subtitle")
+                  )
+                )
+              ),
+
+              placeholder_chart(
+                "Track the share of potential revenue captured over time"
+              )
+            ),
+
+            col_widths = c(6, 6)
           )
         )
       )
@@ -447,6 +637,32 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      # Revenue opportunity is fixed to the latest selected year and is not
+      # controlled by the standard Income / Expenses / Net Result selector.
+      output$site_opportunity_subtitle <- renderUI({
+
+        x <- period()
+
+        chart_subtitle(
+          paste0(
+            "Actual income + discount opportunity · ",
+            x$to
+          )
+        )
+      })
+
+      output$site_discount_mix_subtitle <- renderUI({
+
+        x <- period()
+
+        chart_subtitle(
+          paste0(
+            "Student, staff and other discounts · ",
+            x$to
+          )
+        )
+      })
       
       # Facility-level focus stays concise here; each tab gives its own
       # relevant year or period in the subtitle below.
@@ -459,7 +675,8 @@ mod_site_comparison_server <- function(
           paste0(
             input$selected_site,
             " · ",
-            x$metric
+            x$metric,
+            " · Facilities and business units"
           )
         )
       })
@@ -492,6 +709,62 @@ mod_site_comparison_server <- function(
             " · Actual ",
             x$metric,
             " · ",
+            x$label
+          )
+        )
+      })
+
+      output$facility_discount_mix_subtitle <- renderUI({
+
+        x <- period()
+        req(input$selected_site)
+
+        chart_subtitle(
+          paste0(
+            input$selected_site,
+            " · Discount mix · ",
+            x$to
+          )
+        )
+      })
+
+      output$facility_discount_trend_subtitle <- renderUI({
+
+        x <- period()
+        req(input$selected_site)
+
+        chart_subtitle(
+          paste0(
+            input$selected_site,
+            " · Discount opportunity · ",
+            x$label
+          )
+        )
+      })
+
+      output$facility_revenue_gap_subtitle <- renderUI({
+
+        x <- period()
+        req(input$selected_site)
+
+        chart_subtitle(
+          paste0(
+            input$selected_site,
+            " · Actual vs potential revenue · ",
+            x$to
+          )
+        )
+      })
+
+      output$facility_capture_trend_subtitle <- renderUI({
+
+        x <- period()
+        req(input$selected_site)
+
+        chart_subtitle(
+          paste0(
+            input$selected_site,
+            " · Revenue capture rate · ",
             x$label
           )
         )

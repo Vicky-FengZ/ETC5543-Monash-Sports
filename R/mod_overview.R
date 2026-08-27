@@ -165,6 +165,93 @@ mod_overview_ui <- function(id) {
         ),
 
         col_widths = c(7, 5)
+      ),
+
+      # Revenue opportunity keeps the Overview at an organisation-wide level.
+      # Detailed site, facility and discount-type analysis belongs on the
+      # Site Comparison page.
+      div(
+        class = "section-heading-custom mt-4",
+
+        h4(
+          class = "mb-1",
+          "Revenue Opportunity Overview"
+        ),
+
+        p(
+          class = "text-secondary mb-0",
+          paste(
+            "Track the organisation-wide relationship between actual income,",
+            "discount opportunity and potential revenue."
+          )
+        ),
+
+        prototype_note(
+          paste(
+            "Opportunity values will activate after the DISCOUNTS",
+            "import is connected"
+          )
+        )
+      ),
+
+      # Latest-year opportunity snapshot. Actual Income is already shown in
+      # the main KPI row, so these cards focus on the additional insight.
+      layout_column_wrap(
+        width = 1 / 3,
+
+        value_box(
+          title = "Discount Opportunity",
+          value = "—",
+          uiOutput(
+            ns("discount_opportunity_note")
+          ),
+          showcase = bs_icon("percent")
+        ),
+
+        value_box(
+          title = "Potential Revenue",
+          value = "—",
+          uiOutput(
+            ns("potential_revenue_note")
+          ),
+          showcase = bs_icon("cash-coin")
+        ),
+
+        value_box(
+          title = "Revenue Capture Rate",
+          value = "—",
+          uiOutput(
+            ns("capture_rate_note")
+          ),
+          showcase = bs_icon("speedometer2")
+        )
+      ),
+
+      br(),
+
+      card(
+        full_screen = TRUE,
+
+        card_header(
+          div(
+            div(
+              class = "chart-header-title",
+              "Revenue Capture Over Time"
+            ),
+
+            uiOutput(
+              ns("revenue_capture_subtitle")
+            )
+          )
+        ),
+
+        placeholder_chart(
+          "Actual income, discount opportunity and potential revenue",
+          paste(
+            "Annual stacked values with revenue capture rate",
+            "once Discounts are imported"
+          )
+        )
       )
     )
   )
@@ -370,6 +457,52 @@ mod_overview_server <- function(
         chart_subtitle(
           paste0(
             "Comparison across the selected period · ",
+            x$label
+          )
+        )
+      })
+
+      # Revenue opportunity labels use the same reporting period but remain
+      # separate from the standard finance metric selector.
+      output$discount_opportunity_note <- renderUI({
+        x <- period()
+
+        span(
+          paste0(
+            x$to,
+            " · Student, staff and other discounts"
+          )
+        )
+      })
+
+      output$potential_revenue_note <- renderUI({
+        x <- period()
+
+        span(
+          paste0(
+            x$to,
+            " · Actual income + opportunity"
+          )
+        )
+      })
+
+      output$capture_rate_note <- renderUI({
+        x <- period()
+
+        span(
+          paste0(
+            x$to,
+            " · Actual income ÷ potential revenue"
+          )
+        )
+      })
+
+      output$revenue_capture_subtitle <- renderUI({
+        x <- period()
+
+        chart_subtitle(
+          paste0(
+            "Organisation-wide revenue capture · ",
             x$label
           )
         )
