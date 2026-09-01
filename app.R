@@ -46,19 +46,19 @@ ui <- page_navbar(
     )
   ),
 
-  mod_overview_ui("overview"),
+  nav_panel("Overview", mod_overview_ui("overview")),
 
-  mod_site_comparison_ui("site_comparison"),
+  nav_panel("Site Comparison", mod_site_comparison_ui("site_comparison")),
 
   nav_menu(
     "Detailed Analysis",
-    mod_site_detail_ui("site_detail"),
-    mod_venues_operations_ui("venues_operations")
+    nav_panel("Site Detail", mod_site_detail_ui("site_detail")),
+    nav_panel("Venues & Operations", mod_venues_operations_ui("venues_operations"))
   ),
 
-  mod_forecasting_ui("forecasting"),
+  nav_panel("Forecasting", mod_forecasting_ui("forecasting")),
 
-  mod_data_upload_ui("data_upload")
+  nav_panel("Data Upload", mod_data_upload_ui("data_upload"))
 )
 
 
@@ -68,33 +68,32 @@ ui <- page_navbar(
 
 server <- function(input, output, session) {
 
-  # Data upload module will eventually become the central data source.
-  # At the prototype stage it simply returns uploaded-file metadata.
+  # Data upload module returns reactive uploaded data
   dashboard_data <- mod_data_upload_server("data_upload")
 
   mod_overview_server(
     "overview",
-    data = dashboard_data
+    shared_data = dashboard_data
   )
 
   mod_site_comparison_server(
     "site_comparison",
-    data = dashboard_data
+    shared_data = dashboard_data
   )
 
   mod_site_detail_server(
     "site_detail",
-    data = dashboard_data
+    shared_data = dashboard_data
   )
 
   mod_venues_operations_server(
     "venues_operations",
-    data = dashboard_data
+    shared_data = dashboard_data
   )
 
   mod_forecasting_server(
     "forecasting",
-    data = dashboard_data
+    shared_data = dashboard_data
   )
 }
 
