@@ -946,3 +946,26 @@ clean_monthly_site_report_total_revenue <- function(
 
   result
 }
+
+library(dplyr)
+library(janitor)
+
+#' Clean raw data tables and standardize column names
+normalize_schema <- function(df) {
+  if (is.null(df) || nrow(df) == 0) return(df)
+  
+  df %>%
+    janitor::clean_names(case = "title") %>%
+    dplyr::rename_with(~ "Income", matches("(?i)^income$|^revenue$|^sales$")) %>%
+    dplyr::rename_with(~ "Expense", matches("(?i)^expense$|^cost$")) %>%
+    dplyr::rename_with(~ "Discount", matches("(?i)^discount$|^rebate$")) %>%
+    dplyr::rename_with(~ "Category", matches("(?i)^category$|^site$|^facility$")) %>%
+    dplyr::rename_with(~ "Variant", matches("(?i)^variant$|^subcat$")) %>%
+    dplyr::rename_with(~ "Type", matches("(?i)^type$")) %>%
+    dplyr::rename_with(~ "Year", matches("(?i)^year$")) %>%
+    dplyr::rename_with(~ "Month", matches("(?i)^month$")) %>%
+    dplyr::mutate(
+      dplyr::across(dplyr::any_of(c("Income", "Expense", "Discount")), 
+                    ~ as.numeric(gsub("[$,]", "", .)))
+    )
+}
