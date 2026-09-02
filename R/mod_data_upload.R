@@ -239,8 +239,8 @@ mod_data_upload_server <- function(id) {
             class = "text-secondary",
             paste(
               "Files are not imported into the analysis yet.",
-              "The next step is to connect data_import.R,",
-              "data_validation.R and data_cleaning.R."
+              "The next step is to connect the upload inputs to",
+              "the report modules loaded by R/data/load.R."
             )
           )
         )

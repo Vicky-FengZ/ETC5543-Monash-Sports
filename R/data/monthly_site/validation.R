@@ -2,23 +2,6 @@
 # Monthly Site Report validation
 # -------------------------------------------------------------------------
 
-make_import_issue <- function(
-  level,
-  source_file,
-  message,
-  sheet = NA_character_
-) {
-
-  data.frame(
-    level = level,
-    source_file = source_file,
-    sheet = sheet,
-    message = message,
-    stringsAsFactors = FALSE
-  )
-}
-
-
 first_column_labels <- function(raw_sheet) {
 
   if (!is.data.frame(raw_sheet) || ncol(raw_sheet) == 0L) {

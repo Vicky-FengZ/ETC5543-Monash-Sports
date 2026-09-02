@@ -18,15 +18,6 @@ require_monthly_report_packages <- function() {
 }
 
 
-normalise_excel_label <- function(x) {
-
-  x <- as.character(x)
-  x[is.na(x)] <- ""
-  x <- trimws(gsub("[[:space:]]+", " ", x))
-  tolower(x)
-}
-
-
 discover_monthly_site_report_files <- function(
   data_dir = file.path(
     "data",
@@ -232,35 +223,6 @@ read_monthly_site_report_file <- function(
     ),
     class = "monthly_site_report_workbook"
   )
-}
-
-
-empty_import_issue_table <- function() {
-
-  data.frame(
-    level = character(),
-    source_file = character(),
-    sheet = character(),
-    message = character(),
-    stringsAsFactors = FALSE
-  )
-}
-
-
-bind_import_tables <- function(tables, empty_table) {
-
-  tables <- Filter(
-    function(x) is.data.frame(x) && nrow(x) > 0L,
-    tables
-  )
-
-  if (length(tables) == 0L) {
-    return(empty_table)
-  }
-
-  result <- do.call(rbind, tables)
-  rownames(result) <- NULL
-  result
 }
 
 

@@ -10,9 +10,7 @@ library(readxl)
 source("R/config.R")
 source("R/ui_helpers.R")
 
-source("R/data_import.R")
-source("R/data_validation.R")
-source("R/data_cleaning.R")
+source("R/data/load.R")
 source("R/calculations.R")
 source("R/plots.R")
 
