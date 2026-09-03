@@ -3,8 +3,8 @@
 # -------------------------------------------------------------------------
 
 # UI ----------------------------------------------------------------------
-# Builds the Overview page. This module owns only presentation and controls;
-# calculations and plots will later come from calculations.R and plots.R.
+# Builds the Overview page. Calculations and plotting functions live in the
+# shared calculations.R and plots.R files.
 
 mod_overview_ui <- function(id) {
 
@@ -139,8 +139,9 @@ mod_overview_ui <- function(id) {
             )
           ),
 
-          placeholder_chart(
-            "Year-by-year performance"
+          plotOutput(
+            ns("annual_performance_trend"),
+            height = "330px"
           )
         ),
 
@@ -159,8 +160,9 @@ mod_overview_ui <- function(id) {
             )
           ),
 
-          placeholder_chart(
-            "Budget performance"
+          plotOutput(
+            ns("budget_vs_actual"),
+            height = "330px"
           )
         ),
 
@@ -259,8 +261,7 @@ mod_overview_ui <- function(id) {
 
 
 # Server ------------------------------------------------------------------
-# Handles period selection and dynamic labels. The `data` argument is kept
-# ready for the next stage, when real uploaded data replaces placeholders.
+# Handles period selection, Monthly Site Report calculations and plots.
 
 mod_overview_server <- function(
   id,
@@ -270,6 +271,118 @@ mod_overview_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
+
+      monthly_reports <- reactive({
+        if (is.null(data)) {
+          return(NULL)
+        }
+
+        dashboard_data <- if (shiny::is.reactive(data)) {
+          data()
+        } else {
+          data
+        }
+
+        if (inherits(dashboard_data, "monthly_site_report_data")) {
+          return(dashboard_data)
+        }
+
+        if (!is.list(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (!is.null(dashboard_data$monthly_reports)) {
+          return(dashboard_data$monthly_reports)
+        }
+
+        dashboard_data$monthly
+      })
+
+      available_years <- reactive({
+        reports <- monthly_reports()
+
+        if (
+          is.null(reports) ||
+            is.null(reports$finance) ||
+            nrow(reports$finance) == 0L
+        ) {
+          return(integer())
+        }
+
+        years <- sort(unique(as.integer(reports$finance$report_year)))
+        years[!is.na(years)]
+      })
+
+      annual_finance <- reactive({
+        calculate_overview_annual_finance(monthly_reports())
+      })
+
+      duplicate_years <- reactive({
+        overview_duplicate_report_years(monthly_reports())
+      })
+
+      previous_available_years <- reactiveVal(integer())
+
+      observeEvent(
+        available_years(),
+        {
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
+          current_from <- suppressWarnings(as.integer(isolate(input$from_year)))
+          current_to <- suppressWarnings(as.integer(isolate(input$to_year)))
+          previous_years <- previous_available_years()
+
+          was_at_first_year <- length(previous_years) == 0L ||
+            (length(current_from) == 1L && current_from == min(previous_years))
+          was_at_last_year <- length(previous_years) == 0L ||
+            (length(current_to) == 1L && current_to == max(previous_years))
+
+          selected_from <- if (
+            !was_at_first_year &&
+              length(current_from) == 1L &&
+              current_from %in% years
+          ) {
+            current_from
+          } else {
+            min(years)
+          }
+
+          selected_to <- if (
+            !was_at_last_year &&
+              length(current_to) == 1L &&
+              current_to %in% years
+          ) {
+            current_to
+          } else {
+            max(years)
+          }
+
+          if (selected_from > selected_to) {
+            selected_from <- min(years)
+            selected_to <- max(years)
+          }
+
+          updateSelectInput(
+            session,
+            "from_year",
+            choices = years,
+            selected = selected_from
+          )
+          updateSelectInput(
+            session,
+            "to_year",
+            choices = years,
+            selected = selected_to
+          )
+
+          previous_available_years(years)
+        },
+        ignoreInit = FALSE
+      )
 
       # Keep From Year / To Year logically consistent.
       observeEvent(
@@ -289,12 +402,16 @@ mod_overview_server <- function(
             as.integer(input$to_year)
           }
 
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            years <- APP_YEARS
+          }
+
           updateSelectInput(
             session,
             "to_year",
-            choices = APP_YEARS[
-              APP_YEARS >= from_year
-            ],
+            choices = years,
             selected = max(
               from_year,
               current_to
@@ -321,12 +438,16 @@ mod_overview_server <- function(
             as.integer(input$from_year)
           }
 
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            years <- APP_YEARS
+          }
+
           updateSelectInput(
             session,
             "from_year",
-            choices = APP_YEARS[
-              APP_YEARS <= to_year
-            ],
+            choices = years,
             selected = min(
               to_year,
               current_from
@@ -456,11 +577,89 @@ mod_overview_server <- function(
 
         chart_subtitle(
           paste0(
-            "Comparison across the selected period · ",
+            "Net Result comparison · ",
             x$label
           )
         )
       })
+
+      filtered_annual_finance <- reactive({
+        x <- annual_finance()
+        selected_period <- period()
+
+        x[
+          x$report_year >= selected_period$from &
+            x$report_year <= selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      validate_monthly_chart_data <- function(annual_data) {
+        reports <- monthly_reports()
+
+        validate(
+          need(
+            !is.null(reports),
+            "Upload at least one Monthly Site Report on the Data page."
+          ),
+          need(
+            length(duplicate_years()) == 0L,
+            paste0(
+              "More than one Monthly Site Report is active for: ",
+              paste(duplicate_years(), collapse = ", "),
+              ". Delete the superseded file on the Data page."
+            )
+          ),
+          need(
+            nrow(annual_data) > 0L,
+            "No Monthly Site Report data is available for this period."
+          )
+        )
+      }
+
+      output$annual_performance_trend <- renderPlot(
+        {
+          x <- filtered_annual_finance()
+          validate_monthly_chart_data(x)
+
+          metric <- input$metric
+          values <- overview_metric_values(x, metric)
+
+          validate(
+            need(
+              any(is.finite(values)),
+              paste("No", metric, "values are available for this period.")
+            )
+          )
+
+          plot_annual_performance_trend(x, metric)
+        },
+        res = 96,
+        bg = "white"
+      )
+
+      output$budget_vs_actual <- renderPlot(
+        {
+          x <- filtered_annual_finance()
+          validate_monthly_chart_data(x)
+
+          complete <- is.finite(x$net_actual) & is.finite(x$net_budget)
+          validate(
+            need(
+              any(complete),
+              paste(
+                "Complete Budget and Actual values are not available",
+                "for this period."
+              )
+            )
+          )
+
+          plot_budget_vs_actual_net_result(x)
+        },
+        res = 96,
+        bg = "white"
+      )
 
       # Revenue opportunity labels use the same reporting period but remain
       # separate from the standard finance metric selector.
@@ -511,7 +710,12 @@ mod_overview_server <- function(
       invisible(
         list(
           period = period,
-          metric = reactive(input$metric)
+          metric = reactive(input$metric),
+          monthly_reports = monthly_reports,
+          available_years = available_years,
+          annual_finance = annual_finance,
+          filtered_annual_finance = filtered_annual_finance,
+          duplicate_years = duplicate_years
         )
       )
     }
