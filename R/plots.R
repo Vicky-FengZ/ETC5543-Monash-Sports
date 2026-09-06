@@ -26,6 +26,38 @@ format_compact_currency <- function(values, digits = 1L) {
 }
 
 
+format_percentage <- function(values, digits = 1L) {
+  vapply(
+    values,
+    function(value) {
+      if (!is.finite(value)) {
+        return("—")
+      }
+
+      paste0(
+        formatC(100 * value, digits = digits, format = "f"),
+        "%"
+      )
+    },
+    character(1)
+  )
+}
+
+
+format_percentage_change <- function(value, digits = 1L) {
+  if (!is.finite(value)) {
+    return("—")
+  }
+
+  prefix <- if (value > 0) "+" else if (value < 0) "−" else ""
+  paste0(
+    prefix,
+    formatC(abs(100 * value), digits = digits, format = "f"),
+    "%"
+  )
+}
+
+
 overview_plot_limits <- function(values) {
   values <- values[is.finite(values)]
 
@@ -246,6 +278,155 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
     text.col = "#475569",
     inset = c(0, 0),
     xpd = FALSE
+  )
+
+  invisible(NULL)
+}
+
+
+plot_revenue_capture_over_time <- function(annual_revenue) {
+  complete <- is.finite(annual_revenue$actual_income) &
+    is.finite(annual_revenue$discount_opportunity) &
+    is.finite(annual_revenue$capture_rate)
+  annual_revenue <- annual_revenue[complete, , drop = FALSE]
+
+  if (nrow(annual_revenue) == 0L) {
+    stop("No complete revenue opportunity values are available.", call. = FALSE)
+  }
+
+  values <- rbind(
+    "Actual Income" = annual_revenue$actual_income,
+    "Discount Opportunity" = annual_revenue$discount_opportunity
+  )
+  years <- annual_revenue$report_year
+  limits <- overview_plot_limits(colSums(values))
+  rate_limits <- range(c(0, annual_revenue$capture_rate, 1), na.rm = TRUE)
+
+  old_par <- par(
+    mar = c(4, 5.8, 2.3, 5.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+  on.exit(par(old_par), add = TRUE)
+
+  positions <- barplot(
+    values,
+    plot = FALSE,
+    space = 0.75
+  )
+  x_limits <- range(positions) + c(-0.75, 0.75)
+  ticks <- pretty(limits, n = 5)
+  ticks <- ticks[ticks >= limits[[1]] & ticks <= limits[[2]]]
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+  abline(h = ticks, col = "#E2E8F0", lwd = 1)
+  abline(h = 0, col = "#94A3B8", lwd = 1.1)
+  barplot(
+    values,
+    col = c("#2563EB", "#F59E0B"),
+    border = NA,
+    axes = FALSE,
+    axisnames = FALSE,
+    space = 0.75,
+    add = TRUE
+  )
+  axis(
+    1,
+    at = positions,
+    labels = years,
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.9
+  )
+  axis(
+    2,
+    at = ticks,
+    labels = format_compact_currency(ticks),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  potential <- colSums(values)
+  label_offset <- diff(limits) * 0.035
+  text(
+    positions,
+    potential + label_offset,
+    labels = format_compact_currency(potential),
+    cex = 0.76,
+    col = "#334155",
+    xpd = NA
+  )
+
+  par(new = TRUE)
+  plot(
+    positions,
+    annual_revenue$capture_rate,
+    type = "o",
+    pch = 21,
+    lwd = 2.4,
+    cex = 1.15,
+    col = "#0F766E",
+    bg = "white",
+    xlim = x_limits,
+    ylim = rate_limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = ""
+  )
+  rate_ticks <- pretty(rate_limits, n = 5)
+  rate_ticks <- rate_ticks[
+    rate_ticks >= rate_limits[[1]] & rate_ticks <= rate_limits[[2]]
+  ]
+  axis(
+    4,
+    at = rate_ticks,
+    labels = format_percentage(rate_ticks, digits = 0L),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#0F766E",
+    cex.axis = 0.82
+  )
+  text(
+    positions,
+    annual_revenue$capture_rate,
+    labels = format_percentage(annual_revenue$capture_rate),
+    pos = 1,
+    offset = 0.8,
+    cex = 0.72,
+    col = "#0F766E",
+    xpd = NA
+  )
+
+  legend(
+    "top",
+    legend = c("Actual Income", "Discount Opportunity", "Capture Rate"),
+    fill = c("#2563EB", "#F59E0B", NA),
+    border = NA,
+    lty = c(NA, NA, 1),
+    lwd = c(NA, NA, 2.4),
+    pch = c(15, 15, 21),
+    pt.bg = c("#2563EB", "#F59E0B", "white"),
+    col = c("#2563EB", "#F59E0B", "#0F766E"),
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.78,
+    text.col = "#475569",
+    inset = c(0, -0.03),
+    xpd = NA
   )
 
   invisible(NULL)

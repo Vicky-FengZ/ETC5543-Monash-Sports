@@ -215,3 +215,159 @@ overview_metric_values <- function(annual_finance, metric) {
     stop("Unknown Overview metric: ", metric, call. = FALSE)
   )
 }
+
+
+empty_overview_annual_revenue <- function() {
+  data.frame(
+    report_year = integer(),
+    actual_income = double(),
+    discount_opportunity = double(),
+    potential_revenue = double(),
+    reported_total_revenue = double(),
+    validation_difference = double(),
+    validation_status = character(),
+    capture_rate = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_overview_annual_revenue <- function(monthly_reports) {
+  if (is.null(monthly_reports)) {
+    return(empty_overview_annual_revenue())
+  }
+
+  total_revenue <- monthly_reports$total_revenue
+  required_columns <- c(
+    "report_year",
+    "site",
+    "is_summary",
+    "actual_income",
+    "discount_opportunity",
+    "reported_total_revenue",
+    "validation_status"
+  )
+
+  if (
+    is.null(total_revenue) ||
+      !is.data.frame(total_revenue) ||
+      nrow(total_revenue) == 0L
+  ) {
+    return(empty_overview_annual_revenue())
+  }
+
+  missing_columns <- setdiff(required_columns, names(total_revenue))
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly Site Report Total Revenue data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  total_revenue <- total_revenue[
+    total_revenue$is_summary %in% TRUE,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(total_revenue) == 0L) {
+    return(empty_overview_annual_revenue())
+  }
+
+  years <- sort(unique(as.integer(total_revenue$report_year)))
+  years <- years[!is.na(years)]
+  rows <- vector("list", length(years))
+
+  for (index in seq_along(years)) {
+    year <- years[[index]]
+    year_rows <- total_revenue[
+      total_revenue$report_year == year,
+      ,
+      drop = FALSE
+    ]
+    site_key <- trimws(tolower(year_rows$site))
+    organisation_rows <- year_rows[
+      !is.na(site_key) & site_key == "monash sport",
+      ,
+      drop = FALSE
+    ]
+
+    if (nrow(organisation_rows) > 0L) {
+      selected <- organisation_rows
+      aggregation_source <- "Monash Sport YTD Summary"
+    } else {
+      selected <- year_rows[
+        !is.na(site_key) & site_key != "monash sport",
+        ,
+        drop = FALSE
+      ]
+      aggregation_source <- "Sum of Site YTD Summaries"
+    }
+
+    actual_income <- sum_available_finance_values(selected$actual_income)
+    discount_opportunity <- sum_available_finance_values(
+      selected$discount_opportunity
+    )
+    potential_revenue <- if (
+      is.na(actual_income) || is.na(discount_opportunity)
+    ) {
+      NA_real_
+    } else {
+      actual_income + discount_opportunity
+    }
+    reported_total_revenue <- sum_available_finance_values(
+      selected$reported_total_revenue
+    )
+    validation_difference <- if (
+      is.na(potential_revenue) || is.na(reported_total_revenue)
+    ) {
+      NA_real_
+    } else {
+      reported_total_revenue - potential_revenue
+    }
+
+    statuses <- unique(selected$validation_status)
+    statuses <- statuses[!is.na(statuses) & nzchar(statuses)]
+    validation_status <- if (
+      length(statuses) > 0L && all(statuses == "pass")
+    ) {
+      "pass"
+    } else if (any(statuses == "fail")) {
+      "fail"
+    } else {
+      "incomplete"
+    }
+
+    capture_rate <- if (
+      is.na(actual_income) ||
+        is.na(potential_revenue) ||
+        potential_revenue == 0
+    ) {
+      NA_real_
+    } else {
+      actual_income / potential_revenue
+    }
+
+    rows[[index]] <- data.frame(
+      report_year = year,
+      actual_income = actual_income,
+      discount_opportunity = discount_opportunity,
+      potential_revenue = potential_revenue,
+      reported_total_revenue = reported_total_revenue,
+      validation_difference = validation_difference,
+      validation_status = validation_status,
+      capture_rate = capture_rate,
+      aggregation_source = aggregation_source,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  result <- do.call(rbind, rows)
+  rownames(result) <- NULL
+  result
+}

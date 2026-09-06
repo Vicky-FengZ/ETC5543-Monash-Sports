@@ -67,7 +67,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Total Income",
-          value = "$12.4M",
+          value = textOutput(
+            ns("income_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("income_note")
           ),
@@ -76,7 +79,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Total Expenses",
-          value = "$9.8M",
+          value = textOutput(
+            ns("expense_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("expense_note")
           ),
@@ -85,7 +91,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Net Result",
-          value = "$2.6M",
+          value = textOutput(
+            ns("net_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("net_note")
           ),
@@ -94,7 +103,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Budget Variance",
-          value = "+4.2%",
+          value = textOutput(
+            ns("variance_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("variance_note")
           ),
@@ -141,7 +153,7 @@ mod_overview_ui <- function(id) {
 
           plotOutput(
             ns("annual_performance_trend"),
-            height = "330px"
+            height = "480px"
           )
         ),
 
@@ -162,7 +174,7 @@ mod_overview_ui <- function(id) {
 
           plotOutput(
             ns("budget_vs_actual"),
-            height = "330px"
+            height = "480px"
           )
         ),
 
@@ -188,11 +200,8 @@ mod_overview_ui <- function(id) {
           )
         ),
 
-        prototype_note(
-          paste(
-            "Opportunity values will activate after the DISCOUNTS",
-            "import is connected"
-          )
+        uiOutput(
+          ns("revenue_opportunity_status")
         )
       ),
 
@@ -203,7 +212,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Discount Opportunity",
-          value = "—",
+          value = textOutput(
+            ns("discount_opportunity_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("discount_opportunity_note")
           ),
@@ -212,7 +224,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Potential Revenue",
-          value = "—",
+          value = textOutput(
+            ns("potential_revenue_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("potential_revenue_note")
           ),
@@ -221,7 +236,10 @@ mod_overview_ui <- function(id) {
 
         value_box(
           title = "Revenue Capture Rate",
-          value = "—",
+          value = textOutput(
+            ns("capture_rate_value"),
+            inline = TRUE
+          ),
           uiOutput(
             ns("capture_rate_note")
           ),
@@ -247,12 +265,9 @@ mod_overview_ui <- function(id) {
           )
         ),
 
-        placeholder_chart(
-          "Actual income, discount opportunity and potential revenue",
-          paste(
-            "Annual stacked values with revenue capture rate",
-            "once Discounts are imported"
-          )
+        plotOutput(
+          ns("revenue_capture_plot"),
+          height = "520px"
         )
       )
     )
@@ -315,6 +330,10 @@ mod_overview_server <- function(
 
       annual_finance <- reactive({
         calculate_overview_annual_finance(monthly_reports())
+      })
+
+      annual_revenue <- reactive({
+        calculate_overview_annual_revenue(monthly_reports())
       })
 
       duplicate_years <- reactive({
@@ -486,77 +505,190 @@ mod_overview_server <- function(
         )
       })
 
+      snapshot_finance <- reactive({
+        selected_year <- period()$to
+        x <- annual_finance()
+
+        x[x$report_year == selected_year, , drop = FALSE]
+      })
+
+      snapshot_revenue <- reactive({
+        selected_year <- period()$to
+        x <- annual_revenue()
+
+        x[x$report_year == selected_year, , drop = FALSE]
+      })
+
+      render_snapshot_currency <- function(column) {
+        renderText({
+          x <- snapshot_finance()
+
+          if (nrow(x) != 1L || !is.finite(x[[column]][[1L]])) {
+            return("—")
+          }
+
+          format_compact_currency(x[[column]][[1L]])
+        })
+      }
+
+      output$income_value <- render_snapshot_currency("income_actual")
+      output$expense_value <- render_snapshot_currency("expenses_actual")
+      output$net_value <- render_snapshot_currency("net_actual")
+      output$variance_value <- render_snapshot_currency("budget_variance")
+
       # Snapshot heading + KPI notes communicate exactly which year the
       # summary values refer to.
       output$snapshot_heading <- renderUI({
 
-        x <- period()
+        selected_period <- period()
+        snapshot <- snapshot_finance()
+        has_data <- nrow(snapshot) == 1L
 
         div(
           class = "snapshot-heading",
 
           h4(
-            paste0(
-              x$to,
-              " Performance Snapshot"
-            )
+            if (has_data) {
+              paste0(selected_period$to, " Performance Snapshot")
+            } else {
+              "Performance Snapshot"
+            }
           ),
 
           p(
-            paste0(
-              "Latest reporting year within the selected period (",
-              x$label,
-              ")."
-            )
+            if (has_data) {
+              paste0(
+                "Latest reporting year within the selected period (",
+                selected_period$label,
+                ")."
+              )
+            } else {
+              "Upload Monthly Site Reports to display performance values."
+            }
           ),
 
-          prototype_note()
+          span(
+            class = paste(
+              "data-source-note",
+              if (has_data) "ready" else "empty"
+            ),
+            if (has_data) {
+              "Source: Monthly Site Reports"
+            } else {
+              "No Monthly Site Report data loaded"
+            }
+          )
         )
       })
 
-      output$income_note <- renderUI({
-        x <- period()
+      finance_change_note <- function(column) {
+        selected_period <- period()
+        current <- snapshot_finance()
+
+        if (
+          nrow(current) != 1L ||
+            !is.finite(current[[column]][[1L]])
+        ) {
+          return(
+            span(paste0("No data for ", selected_period$to))
+          )
+        }
+
+        history <- annual_finance()
+        history <- history[
+          history$report_year < selected_period$to &
+            is.finite(history[[column]]),
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(history) == 0L) {
+          return(
+            span(
+              paste0(
+                selected_period$to,
+                " · No earlier uploaded year"
+              )
+            )
+          )
+        }
+
+        previous <- history[which.max(history$report_year), , drop = FALSE]
+        previous_value <- previous[[column]][[1L]]
+        change <- if (previous_value == 0) {
+          NA_real_
+        } else {
+          current[[column]][[1L]] / previous_value - 1
+        }
 
         span(
           paste0(
-            x$to,
-            " · ↑ 6.8% vs ",
-            x$previous
+            selected_period$to,
+            " · ",
+            if (is.finite(change)) {
+              paste0(
+                format_percentage_change(change),
+                " vs ",
+                previous$report_year[[1L]]
+              )
+            } else {
+              paste0(
+                "Comparison unavailable vs ",
+                previous$report_year[[1L]]
+              )
+            }
           )
         )
+      }
+
+      output$income_note <- renderUI({
+        finance_change_note("income_actual")
       })
 
       output$expense_note <- renderUI({
-        x <- period()
-
-        span(
-          paste0(
-            x$to,
-            " · ↑ 3.1% vs ",
-            x$previous
-          )
-        )
+        finance_change_note("expenses_actual")
       })
 
       output$net_note <- renderUI({
-        x <- period()
+        selected_period <- period()
+        snapshot <- snapshot_finance()
 
         span(
-          paste0(
-            x$to,
-            " reporting year"
-          )
+          if (
+            nrow(snapshot) == 1L &&
+              is.finite(snapshot$net_actual[[1L]])
+          ) {
+            paste0(
+              selected_period$to,
+              " · Actual Income − Actual Expenses"
+            )
+          } else {
+            paste0("No data for ", selected_period$to)
+          }
         )
       })
 
       output$variance_note <- renderUI({
-        x <- period()
+        selected_period <- period()
+        snapshot <- snapshot_finance()
 
         span(
-          paste0(
-            x$to,
-            " · placeholder variance"
-          )
+          if (
+            nrow(snapshot) == 1L &&
+              is.finite(snapshot$budget_variance[[1L]])
+          ) {
+            paste0(
+              selected_period$to,
+              " · ",
+              if (snapshot$budget_variance[[1L]] >= 0) {
+                "Favourable vs budget"
+              } else {
+                "Unfavourable vs budget"
+              }
+            )
+          } else {
+            paste0("No data for ", selected_period$to)
+          }
         )
       })
 
@@ -585,6 +717,18 @@ mod_overview_server <- function(
 
       filtered_annual_finance <- reactive({
         x <- annual_finance()
+        selected_period <- period()
+
+        x[
+          x$report_year >= selected_period$from &
+            x$report_year <= selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      filtered_annual_revenue <- reactive({
+        x <- annual_revenue()
         selected_period <- period()
 
         x[
@@ -661,38 +805,96 @@ mod_overview_server <- function(
         bg = "white"
       )
 
-      # Revenue opportunity labels use the same reporting period but remain
-      # separate from the standard finance metric selector.
-      output$discount_opportunity_note <- renderUI({
-        x <- period()
+      render_revenue_currency <- function(column) {
+        renderText({
+          x <- snapshot_revenue()
+
+          if (nrow(x) != 1L || !is.finite(x[[column]][[1L]])) {
+            return("—")
+          }
+
+          format_compact_currency(x[[column]][[1L]])
+        })
+      }
+
+      output$discount_opportunity_value <- render_revenue_currency(
+        "discount_opportunity"
+      )
+      output$potential_revenue_value <- render_revenue_currency(
+        "potential_revenue"
+      )
+      output$capture_rate_value <- renderText({
+        x <- snapshot_revenue()
+
+        if (nrow(x) != 1L || !is.finite(x$capture_rate[[1L]])) {
+          return("—")
+        }
+
+        format_percentage(x$capture_rate[[1L]])
+      })
+
+      output$revenue_opportunity_status <- renderUI({
+        x <- filtered_annual_revenue()
+
+        if (nrow(x) == 0L) {
+          return(
+            span(
+              class = "data-source-note empty",
+              "Upload Monthly Site Reports to activate this section"
+            )
+          )
+        }
+
+        failed_years <- x$report_year[x$validation_status != "pass"]
+
+        if (length(failed_years) == 0L) {
+          span(
+            class = "data-source-note ready",
+            paste0(
+              "Total Revenue validation passed · ",
+              nrow(x),
+              if (nrow(x) == 1L) " reporting year" else " reporting years"
+            )
+          )
+        } else {
+          span(
+            class = "data-source-note warning",
+            paste0(
+              "Calculated totals used · review source validation for ",
+              paste(failed_years, collapse = ", ")
+            )
+          )
+        }
+      })
+
+      revenue_snapshot_note <- function(text) {
+        selected_period <- period()
+        x <- snapshot_revenue()
 
         span(
-          paste0(
-            x$to,
-            " · Student, staff and other discounts"
-          )
+          if (nrow(x) == 1L) {
+            paste0(selected_period$to, " · ", text)
+          } else {
+            paste0("No data for ", selected_period$to)
+          }
+        )
+      }
+
+      output$discount_opportunity_note <- renderUI({
+        revenue_snapshot_note(
+          "Student, staff and other discounts"
         )
       })
 
       output$potential_revenue_note <- renderUI({
-        x <- period()
-
-        span(
-          paste0(
-            x$to,
-            " · Actual income + opportunity"
-          )
+        revenue_snapshot_note(
+          "Calculated Actual Income + opportunity"
         )
       })
 
       output$capture_rate_note <- renderUI({
-        x <- period()
-
-        span(
-          paste0(
-            x$to,
-            " · Actual income ÷ potential revenue"
-          )
+        revenue_snapshot_note(
+          "Actual Income ÷ Potential Revenue"
         )
       })
 
@@ -707,6 +909,47 @@ mod_overview_server <- function(
         )
       })
 
+      output$revenue_capture_plot <- renderPlot(
+        {
+          x <- filtered_annual_revenue()
+          reports <- monthly_reports()
+
+          validate(
+            need(
+              !is.null(reports),
+              "Upload at least one Monthly Site Report on the Data page."
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(duplicate_years(), collapse = ", "),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "Revenue opportunity data is not available for",
+                "the selected period."
+              )
+            ),
+            need(
+              any(
+                is.finite(x$actual_income) &
+                  is.finite(x$discount_opportunity) &
+                  is.finite(x$capture_rate)
+              ),
+              "Complete revenue opportunity values are not available."
+            )
+          )
+
+          plot_revenue_capture_over_time(x)
+        },
+        res = 96,
+        bg = "white"
+      )
+
       invisible(
         list(
           period = period,
@@ -714,7 +957,11 @@ mod_overview_server <- function(
           monthly_reports = monthly_reports,
           available_years = available_years,
           annual_finance = annual_finance,
+          annual_revenue = annual_revenue,
           filtered_annual_finance = filtered_annual_finance,
+          filtered_annual_revenue = filtered_annual_revenue,
+          snapshot_finance = snapshot_finance,
+          snapshot_revenue = snapshot_revenue,
           duplicate_years = duplicate_years
         )
       )
