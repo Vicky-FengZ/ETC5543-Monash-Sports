@@ -12,17 +12,20 @@ stopifnot(
     ui_html,
     gregexpr("basic-upload-source-card", ui_html, fixed = TRUE)
   )) == 3L,
+  grepl("data-section-navigation", ui_html, fixed = TRUE),
   grepl("Upload &amp; Manage", ui_html, fixed = TRUE),
-  grepl("Cleaned Data Preview", ui_html, fixed = TRUE),
+  grepl("View Cleaned Data", ui_html, fixed = TRUE),
   grepl("basic-upload-test-preview_report_type", ui_html, fixed = TRUE),
   !grepl("basic-upload-test-preview_table_control", ui_html, fixed = TRUE),
   grepl("basic-upload-test-preview_measure", ui_html, fixed = TRUE),
   grepl("basic-upload-test-preview_value_type", ui_html, fixed = TRUE),
   grepl("basic-upload-test-preview_source_sheet", ui_html, fixed = TRUE),
   grepl("basic-upload-test-preview_sort_column", ui_html, fixed = TRUE),
+  grepl("basic-upload-test-preview_download_ui", ui_html, fixed = TRUE),
   grepl("basic-upload-test-cleaned_data_table", ui_html, fixed = TRUE),
-  grepl("File parsing status", ui_html, fixed = TRUE),
-  grepl("Delete selected file", ui_html, fixed = TRUE),
+  grepl("Uploaded files", ui_html, fixed = TRUE),
+  !grepl("basic-upload-test-selected_file", ui_html, fixed = TRUE),
+  !grepl("basic-upload-test-delete_file", ui_html, fixed = TRUE),
   grepl("Session-only upload", ui_html, fixed = TRUE)
 )
 
@@ -552,6 +555,65 @@ stopifnot(
   identical(last_page$data$row_id, 21:27)
 )
 
+export_fixture <- data.frame(
+  report_year = c(2023L, 2025L, 2025L, 2025L),
+  period_date = as.Date(c(
+    "2023-01-01",
+    "2025-01-01",
+    "2025-02-01",
+    "2025-01-01"
+  )),
+  source_sheet = c(
+    "Aquatics/Clayton:Monthly Results That Exceed Thirty One Characters",
+    "Aquatics/Clayton:Monthly Results That Exceed Thirty One Characters",
+    "Aquatics Clayton Monthly Results That Exceed Thirty One Characters",
+    "Caulfield"
+  ),
+  measure = c("Income", "Income", "Expenses", "Income"),
+  value_type = c("Actual", "Actual", "Budget", "Actual"),
+  value = c(5, 30, 20, 10),
+  stringsAsFactors = FALSE
+)
+export_sheets <- basic_cleaned_export_sheets(
+  export_fixture,
+  source_sheets = c(
+    "Caulfield",
+    "Aquatics/Clayton:Monthly Results That Exceed Thirty One Characters",
+    "Aquatics Clayton Monthly Results That Exceed Thirty One Characters"
+  ),
+  years = "2025",
+  measures = c("Income", "Expenses"),
+  value_types = c("Actual", "Budget"),
+  sort_column = "value",
+  sort_direction = "desc"
+)
+stopifnot(
+  length(export_sheets) == 3L,
+  identical(export_sheets[[1L]]$value, 10),
+  identical(export_sheets[[2L]]$value, 30),
+  identical(export_sheets[[3L]]$value, 20),
+  all(nchar(names(export_sheets)) <= 31L),
+  !anyDuplicated(tolower(names(export_sheets))),
+  inherits(export_sheets[[1L]]$period_date, "Date"),
+  identical(
+    basic_cleaned_export_sheet_names(c("A/B", "A:B", "")),
+    c("A B", "A B (2)", "Cleaned Data")
+  ),
+  identical(
+    basic_cleaned_export_filename("monthly_site", c("2025", "2023")),
+    "cleaned-monthly-site-reports-2023-2025.xlsx"
+  ),
+  length(basic_cleaned_export_sheets(export_fixture, search = "missing")) == 0L
+)
+
+export_path <- tempfile(fileext = ".xlsx")
+writexl::write_xlsx(export_sheets, export_path, format_headers = TRUE)
+stopifnot(
+  file.exists(export_path),
+  identical(readxl::excel_sheets(export_path), names(export_sheets))
+)
+unlink(export_path)
+
 fake_parsers <- list(
   monthly_site = function(path, source_name) {
     stopifnot(file.exists(path))
@@ -642,6 +704,13 @@ shiny::testServer(
       preview_page_state()$pages == 2L,
       nrow(preview_page_state()$data) == 10L
     )
+
+    stopifnot(length(preview_export_sheets()) == 2L)
+    stopifnot(grepl(
+      "Download Excel",
+      paste(as.character(output$preview_download_ui), collapse = ""),
+      fixed = TRUE
+    ))
 
     session$setInputs(
       preview_measure = c("Income", "Expenses"),
@@ -757,7 +826,13 @@ shiny::testServer(
     file_id <- returned_data$uploads$file_id[[1L]]
     stopifnot(file.exists(stored_path))
 
-    session$setInputs(selected_file = file_id, delete_file = 1)
+    status_html <- as.character(output$file_status)
+    stopifnot(
+      any(grepl("basic-upload-remove-button", status_html, fixed = TRUE)),
+      any(grepl(file_id, status_html, fixed = TRUE))
+    )
+
+    session$setInputs(remove_file = file_id)
     session$flushReact()
     after_delete <- session$returned()
     stopifnot(

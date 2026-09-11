@@ -1,4 +1,4 @@
-required <- c("shiny", "bslib", "bsicons", "readxl")
+required <- c("shiny", "bslib", "bsicons", "readxl", "writexl")
 missing <- required[!vapply(required, requireNamespace, logical(1L), quietly = TRUE)]
 
 if (length(missing) > 0L) {

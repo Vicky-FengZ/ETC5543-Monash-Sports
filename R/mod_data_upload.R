@@ -1053,6 +1053,167 @@ paginate_basic_preview_table <- function(data, page = 1L, page_size = 25L) {
 }
 
 
+basic_cleaned_export_sheet_names <- function(labels) {
+  labels <- as.character(labels)
+  labels[is.na(labels)] <- ""
+
+  for (forbidden in c("\\", "/", "?", "*", "[", "]", ":")) {
+    labels <- gsub(forbidden, " ", labels, fixed = TRUE)
+  }
+
+  labels <- trimws(gsub("[[:space:]]+", " ", labels))
+  labels <- sub("^'+", "", labels)
+  labels <- sub("'+$", "", labels)
+  labels[!nzchar(labels)] <- "Cleaned Data"
+
+  result <- character(length(labels))
+
+  for (index in seq_along(labels)) {
+    base_name <- substr(labels[[index]], 1L, 31L)
+    candidate <- base_name
+    copy_number <- 2L
+
+    while (tolower(candidate) %in% tolower(result[seq_len(index - 1L)])) {
+      suffix <- paste0(" (", copy_number, ")")
+      available <- max(1L, 31L - nchar(suffix))
+      candidate <- paste0(substr(base_name, 1L, available), suffix)
+      copy_number <- copy_number + 1L
+    }
+
+    result[[index]] <- candidate
+  }
+
+  result
+}
+
+
+basic_cleaned_export_table <- function(data) {
+  if (!is.data.frame(data)) {
+    return(NULL)
+  }
+
+  result <- data
+
+  if ("source_sheet" %in% names(result)) {
+    result$source_sheet <- basic_preview_sheet_label(result$source_sheet)
+  }
+
+  for (column in names(result)) {
+    values <- result[[column]]
+
+    if (is.factor(values)) {
+      result[[column]] <- as.character(values)
+    } else if (inherits(values, "POSIXlt")) {
+      result[[column]] <- as.POSIXct(values)
+    } else if (is.list(values)) {
+      result[[column]] <- vapply(
+        values,
+        function(value) paste(as.character(value), collapse = ", "),
+        character(1L)
+      )
+    }
+  }
+
+  rownames(result) <- NULL
+  result
+}
+
+
+basic_cleaned_export_sheets <- function(
+  data,
+  source_sheets = character(),
+  years = character(),
+  measures = character(),
+  value_types = character(),
+  search = "",
+  sort_column = "__none__",
+  sort_direction = "asc"
+) {
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    return(list())
+  }
+
+  filtered <- filter_basic_preview_table(
+    data,
+    year = years,
+    source_sheet = BASIC_PREVIEW_ALL_SHEETS,
+    measures = measures,
+    value_types = value_types,
+    search = search
+  )
+
+  if (!is.data.frame(filtered) || nrow(filtered) == 0L) {
+    return(list())
+  }
+
+  available_sheets <- basic_preview_source_sheets(filtered, source_sheets)
+
+  if (length(available_sheets) == 0L) {
+    table <- basic_preview_drop_empty_columns(filtered)
+    table <- sort_basic_preview_table(
+      table,
+      column = sort_column,
+      direction = sort_direction
+    )
+    return(stats::setNames(
+      list(basic_cleaned_export_table(table)),
+      "Cleaned Data"
+    ))
+  }
+
+  tables <- lapply(
+    available_sheets,
+    function(source_sheet) {
+      table <- filter_basic_preview_table(
+        filtered,
+        source_sheet = source_sheet
+      )
+      table <- basic_preview_drop_empty_columns(table)
+      table <- sort_basic_preview_table(
+        table,
+        column = sort_column,
+        direction = sort_direction
+      )
+      basic_cleaned_export_table(table)
+    }
+  )
+  keep <- vapply(
+    tables,
+    function(table) is.data.frame(table) && nrow(table) > 0L,
+    logical(1L)
+  )
+  tables <- tables[keep]
+
+  if (length(tables) == 0L) {
+    return(list())
+  }
+
+  names(tables) <- basic_cleaned_export_sheet_names(available_sheets[keep])
+  tables
+}
+
+
+basic_cleaned_export_filename <- function(report_type, years = character()) {
+  report_label <- unname(BASIC_UPLOAD_REPORT_TYPES[[report_type]])
+
+  if (length(report_label) != 1L || is.na(report_label)) {
+    report_label <- "data"
+  }
+
+  report_slug <- tolower(gsub("[^A-Za-z0-9]+", "-", report_label))
+  report_slug <- gsub("(^-|-$)", "", report_slug)
+  years <- suppressWarnings(as.integer(as.character(years)))
+  years <- sort(unique(years[!is.na(years)]))
+  year_slug <- if (length(years) == 0L) {
+    "all-years"
+  } else {
+    paste(years, collapse = "-")
+  }
+
+  paste0("cleaned-", report_slug, "-", year_slug, ".xlsx")
+}
+
+
 basic_upload_card <- function(
   ns,
   title,
@@ -1108,12 +1269,18 @@ mod_data_upload_ui <- function(id) {
           )
         )
       ),
-      navset_pill(
+      div(
+        class = "data-section-navigation",
+        navset_pill(
         id = ns("data_section"),
+        selected = "upload",
         nav_panel(
-          "Upload & Manage",
+          span(
+            class = "data-section-tab-label",
+            bs_icon("cloud-arrow-up"),
+            tags$span("Upload & Manage")
+          ),
           value = "upload",
-          icon = bs_icon("cloud-arrow-up"),
           div(
             class = "pt-3",
             div(
@@ -1165,45 +1332,32 @@ mod_data_upload_ui <- function(id) {
               col_widths = c(4, 4, 4)
             ),
             br(),
-            layout_columns(
-              card(
-                full_screen = TRUE,
-                card_header("File parsing status"),
-                card_body(uiOutput(ns("file_status")))
-              ),
-              card(
-                card_header("Remove an uploaded file"),
-                card_body(
-                  selectInput(
-                    ns("selected_file"),
-                    "Uploaded file",
-                    choices = character(),
-                    width = "100%"
-                  ),
-                  actionButton(
-                    ns("delete_file"),
-                    "Delete selected file",
-                    icon = bs_icon("trash"),
-                    class = "btn-outline-danger w-100"
-                  ),
-                  p(
-                    class = "text-secondary small mt-3 mb-0",
+            card(
+              class = "basic-upload-status-card",
+              full_screen = TRUE,
+              card_header(
+                div(
+                  class = "basic-upload-status-card-header",
+                  tags$strong("Uploaded files"),
+                  tags$small(
                     paste(
-                      "This removes only the temporary Dashboard copy and",
-                      "its parsed data. The original file remains on your",
-                      "computer."
+                      "Follow parsing progress or use the remove action beside",
+                      "a file. Original Excel files remain unchanged."
                     )
                   )
                 )
               ),
-              col_widths = c(8, 4)
+              card_body(uiOutput(ns("file_status")))
             )
           )
         ),
         nav_panel(
-          "Cleaned Data Preview",
+          span(
+            class = "data-section-tab-label",
+            bs_icon("table"),
+            tags$span("View Cleaned Data")
+          ),
           value = "preview",
-          icon = bs_icon("table"),
           div(
             class = "pt-3 cleaned-preview-page",
             div(
@@ -1315,7 +1469,13 @@ mod_data_upload_ui <- function(id) {
               card(
                 class = "cleaned-preview-data-card",
                 full_screen = TRUE,
-                card_header("Cleaned table"),
+                card_header(
+                  div(
+                    class = "cleaned-preview-data-header",
+                    tags$span("Cleaned table"),
+                    uiOutput(ns("preview_download_ui"))
+                  )
+                ),
                 card_body(
                   div(
                     class = "workbook-sheet-browser",
@@ -1369,6 +1529,7 @@ mod_data_upload_ui <- function(id) {
             )
           )
         )
+      )
       )
     )
   )
@@ -1622,48 +1783,11 @@ mod_data_upload_server <- function(
       )
 
       observeEvent(
-        registry(),
+        input$remove_file,
         {
-          rows <- registry()
-          choices <- if (nrow(rows) == 0L) {
-            character()
-          } else {
-            labels <- paste0(
-              rows$original_name,
-              " | ",
-              unname(BASIC_UPLOAD_REPORT_TYPES[rows$report_type]),
-              " | ",
-              rows$status
-            )
-            stats::setNames(rows$file_id, labels)
-          }
+          file_id <- as.character(input$remove_file)
 
-          current <- isolate(input$selected_file)
-          selected <- if (!is.null(current) && current %in% rows$file_id) {
-            current
-          } else if (nrow(rows) > 0L) {
-            rows$file_id[[1L]]
-          } else {
-            character()
-          }
-
-          updateSelectInput(
-            session,
-            "selected_file",
-            choices = choices,
-            selected = selected
-          )
-        },
-        ignoreInit = FALSE
-      )
-
-      observeEvent(
-        input$delete_file,
-        {
-          file_id <- input$selected_file
-
-          if (is.null(file_id) || !nzchar(file_id)) {
-            showNotification("Select an uploaded file first.", type = "warning")
+          if (length(file_id) != 1L || !nzchar(file_id)) {
             return()
           }
 
@@ -1671,7 +1795,10 @@ mod_data_upload_server <- function(
           row <- rows[rows$file_id == file_id, , drop = FALSE]
 
           if (nrow(row) == 0L) {
-            showNotification("That file is no longer available.", type = "warning")
+            showNotification(
+              "That upload has already been removed.",
+              type = "warning"
+            )
             return()
           }
 
@@ -1680,7 +1807,8 @@ mod_data_upload_server <- function(
             paste(row$original_name[[1L]], "was removed from this session."),
             type = "message"
           )
-        }
+        },
+        ignoreInit = TRUE
       )
 
       output$file_status <- renderUI({
@@ -1701,8 +1829,17 @@ mod_data_upload_server <- function(
             percent <- round(100 * row$progress[[1L]])
             error_text <- row$error_message[[1L]]
 
+            remove_script <- sprintf(
+              paste0("Shiny.setInputValue('%s', this.dataset.fileId, ",
+                     "{priority: 'event'});"),
+              session$ns("remove_file")
+            )
+
             div(
-              class = "basic-upload-status-row",
+              class = paste(
+                "basic-upload-status-row",
+                paste0("status-", row$status[[1L]])
+              ),
               div(
                 class = "basic-upload-status-heading",
                 div(
@@ -1712,9 +1849,24 @@ mod_data_upload_server <- function(
                     unname(BASIC_UPLOAD_REPORT_TYPES[[row$report_type[[1L]]]])
                   )
                 ),
-                span(
-                  class = paste("basic-status-badge", row$status[[1L]]),
-                  row$status[[1L]]
+                div(
+                  class = "basic-upload-status-actions",
+                  span(
+                    class = paste("basic-status-badge", row$status[[1L]]),
+                    row$status[[1L]]
+                  ),
+                  tags$button(
+                    type = "button",
+                    class = "basic-upload-remove-button",
+                    title = paste("Remove", row$original_name[[1L]]),
+                    `aria-label` = paste(
+                      "Remove uploaded file",
+                      row$original_name[[1L]]
+                    ),
+                    `data-file-id` = row$file_id[[1L]],
+                    onclick = remove_script,
+                    bs_icon("trash", size = "15px")
+                  )
                 )
               ),
               tags$progress(value = percent, max = 100),
@@ -2057,6 +2209,59 @@ mod_data_upload_server <- function(
           direction = input$preview_sort_direction
         )
       })
+
+      preview_export_sheets <- reactive({
+        basic_cleaned_export_sheets(
+          data = preview_table_data(),
+          source_sheets = preview_source_sheets(),
+          years = selected_preview_years(),
+          measures = selected_preview_measures(),
+          value_types = selected_preview_value_types(),
+          search = input$preview_search,
+          sort_column = input$preview_sort_column,
+          sort_direction = input$preview_sort_direction
+        )
+      })
+
+      output$preview_download_ui <- renderUI({
+        if (length(preview_export_sheets()) == 0L) {
+          return(tags$button(
+            type = "button",
+            class = paste(
+              "btn btn-sm btn-outline-secondary",
+              "cleaned-preview-download"
+            ),
+            disabled = "disabled",
+            bs_icon("download"),
+            tags$span("Download Excel")
+          ))
+        }
+
+        downloadButton(
+          session$ns("download_cleaned_data"),
+          "Download Excel",
+          icon = bs_icon("download"),
+          class = "btn btn-primary btn-sm cleaned-preview-download"
+        )
+      })
+
+      output$download_cleaned_data <- downloadHandler(
+        filename = function() {
+          basic_cleaned_export_filename(
+            selected_preview_report_type(),
+            selected_preview_years()
+          )
+        },
+        content = function(file) {
+          sheets <- preview_export_sheets()
+          shiny::req(length(sheets) > 0L)
+          writexl::write_xlsx(sheets, path = file, format_headers = TRUE)
+        },
+        contentType = paste0(
+          "application/vnd.openxmlformats-officedocument.",
+          "spreadsheetml.sheet"
+        )
+      )
 
       preview_page <- reactiveVal(1L)
 

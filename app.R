@@ -2,6 +2,13 @@ library(shiny)
 library(bslib)
 library(bsicons)
 
+if (!requireNamespace("writexl", quietly = TRUE)) {
+  stop(
+    "Package `writexl` is required to download cleaned data as Excel.",
+    call. = FALSE
+  )
+}
+
 options(shiny.maxRequestSize = 100 * 1024^2)
 
 # -------------------------------------------------------------------------
