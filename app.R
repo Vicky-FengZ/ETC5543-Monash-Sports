@@ -1,7 +1,6 @@
 library(shiny)
 library(bslib)
 library(bsicons)
-library(readxl)
 
 options(shiny.maxRequestSize = 100 * 1024^2)
 

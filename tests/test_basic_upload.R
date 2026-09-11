@@ -555,6 +555,12 @@ stopifnot(
 fake_parsers <- list(
   monthly_site = function(path, source_name) {
     stopifnot(file.exists(path))
+    payload <- rawToChar(readBin(path, what = "raw", n = file.info(path)$size))
+
+    if (identical(payload, "synthetic failed replacement")) {
+      stop("Synthetic replacement failure")
+    }
+
     make_fake_result(
       source_name,
       "monthly_site_report_data",
@@ -689,6 +695,64 @@ shiny::testServer(
     session$flushReact()
     stopifnot(preview_page_state()$page == 2L)
 
+    original_stored_path <- returned_data$uploads$stored_path[[1L]]
+    original_file_id <- returned_data$uploads$file_id[[1L]]
+    failed_replacement_path <- tempfile(fileext = ".xlsx")
+    writeBin(
+      charToRaw("synthetic failed replacement"),
+      failed_replacement_path
+    )
+    session$setInputs(
+      monthly_reports = data.frame(
+        name = "Monthly Site Report 2099.xlsx",
+        size = file.info(failed_replacement_path)$size,
+        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        datapath = failed_replacement_path,
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+
+    after_failed_replacement <- session$returned()
+    stopifnot(
+      nrow(after_failed_replacement$uploads) == 2L,
+      sum(after_failed_replacement$uploads$status == "ready") == 1L,
+      sum(after_failed_replacement$uploads$status == "failed") == 1L,
+      original_file_id %in% after_failed_replacement$uploads$file_id,
+      file.exists(original_stored_path),
+      inherits(
+        after_failed_replacement$monthly_reports,
+        "monthly_site_report_data"
+      ),
+      nrow(after_failed_replacement$monthly_reports$finance) == 30L
+    )
+
+    successful_replacement_path <- tempfile(fileext = ".xlsx")
+    writeBin(
+      charToRaw("synthetic successful replacement"),
+      successful_replacement_path
+    )
+    session$setInputs(
+      monthly_reports = data.frame(
+        name = "Monthly Site Report 2099.xlsx",
+        size = file.info(successful_replacement_path)$size,
+        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        datapath = successful_replacement_path,
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+
+    returned_data <- session$returned()
+    stopifnot(
+      nrow(returned_data$uploads) == 1L,
+      returned_data$uploads$status[[1L]] == "ready",
+      returned_data$uploads$file_id[[1L]] != original_file_id,
+      !file.exists(original_stored_path),
+      inherits(returned_data$monthly_reports, "monthly_site_report_data"),
+      nrow(returned_data$monthly_reports$finance) == 30L
+    )
+
     stored_path <- returned_data$uploads$stored_path[[1L]]
     file_id <- returned_data$uploads$file_id[[1L]]
     stopifnot(file.exists(stored_path))
@@ -724,7 +788,12 @@ shiny::testServer(
       is.null(failed_data$site_reports)
     )
 
-    unlink(c(upload_path, failed_path))
+    unlink(c(
+      upload_path,
+      failed_replacement_path,
+      successful_replacement_path,
+      failed_path
+    ))
   }
 )
 

@@ -1,8 +1,8 @@
 # -------------------------------------------------------------------------
 # Monthly Site Report import
 # -------------------------------------------------------------------------
-# This file only deals with locating and reading Excel workbooks. Validation
-# and conversion to dashboard-ready tables live in the next two data files.
+# This file locates and reads Excel workbooks and exposes the report-family
+# loader. Cleaning and validation implementations live in their own files.
 
 require_monthly_report_packages <- function() {
 
@@ -102,6 +102,19 @@ extract_monthly_site_report_year <- function(source_name) {
 }
 
 
+monthly_site_import_sheet_names <- function(sheet_names) {
+
+  keys <- normalise_excel_label(sheet_names)
+  is_dashboard <- keys == "dashboard"
+  is_chart_sheet <- grepl(
+    "^chart([[:space:]_-]*[0-9]+)?$",
+    keys
+  )
+
+  as.character(sheet_names)[!is_dashboard & !is_chart_sheet]
+}
+
+
 read_monthly_site_report_file <- function(
   path,
   source_name = basename(path)
@@ -128,11 +141,9 @@ read_monthly_site_report_file <- function(
   report_year <- extract_monthly_site_report_year(source_name)
   sheet_names <- readxl::excel_sheets(path)
 
-  # DASHBOARD contains presentation cells rather than the source finance
-  # blocks. All other sheets are retained here and checked during validation.
-  import_sheets <- sheet_names[
-    normalise_excel_label(sheet_names) != "dashboard"
-  ]
+  # DASHBOARD and Excel chart sheets contain presentation objects rather than
+  # source finance blocks. Retain every other sheet for structural validation.
+  import_sheets <- monthly_site_import_sheet_names(sheet_names)
 
   sheet_results <- lapply(
     import_sheets,
@@ -428,7 +439,8 @@ load_monthly_site_reports <- function(
       validation = validation,
       files = file_summary
     ),
-    class = "monthly_site_report_data"
+    class = "monthly_site_report_data",
+    source_sheet_order = workbook_source_sheet_order(workbooks)
   )
 }
 

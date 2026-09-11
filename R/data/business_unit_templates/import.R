@@ -535,7 +535,8 @@ load_business_unit_template_reports <- function(
       validation = validation,
       files = files
     ),
-    class = "business_unit_template_report_data"
+    class = "business_unit_template_report_data",
+    source_sheet_order = workbook_source_sheet_order(workbooks)
   )
 }
 

@@ -59,6 +59,25 @@ bind_import_tables <- function(tables, empty_table) {
 }
 
 
+workbook_source_sheet_order <- function(workbooks) {
+
+  sheet_orders <- lapply(
+    workbooks,
+    function(workbook) {
+      sheets <- workbook$workbook_sheets
+
+      if (is.null(sheets)) {
+        character()
+      } else {
+        as.character(sheets)
+      }
+    }
+  )
+
+  unique(unlist(sheet_orders, use.names = FALSE))
+}
+
+
 cell_as_text <- function(raw_sheet, row, column) {
 
   if (
@@ -119,6 +138,7 @@ cell_as_number <- function(raw_sheet, row, column) {
     "^\\(.*\\)$",
     value
   )
+  is_percentage <- grepl("%", value, fixed = TRUE)
 
   value <- gsub(
     "[$,%()[:space:]]",
@@ -132,6 +152,10 @@ cell_as_number <- function(raw_sheet, row, column) {
 
   if (is_parenthesised && !is.na(result)) {
     result <- -result
+  }
+
+  if (is_percentage && !is.na(result)) {
+    result <- result / 100
   }
 
   result

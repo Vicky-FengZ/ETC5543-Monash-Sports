@@ -2,6 +2,38 @@
 # Monthly Site Report cleaning
 # -------------------------------------------------------------------------
 
+first_column_labels <- function(raw_sheet) {
+
+  if (!is.data.frame(raw_sheet) || ncol(raw_sheet) == 0L) {
+    return(character())
+  }
+
+  normalise_excel_label(raw_sheet[[1]])
+}
+
+
+sheet_has_finance_sections <- function(raw_sheet) {
+
+  labels <- first_column_labels(raw_sheet)
+
+  all(c("income", "expenses") %in% labels)
+}
+
+
+sheet_has_discount_section <- function(raw_sheet) {
+
+  "discounts" %in% first_column_labels(raw_sheet)
+}
+
+
+sheet_has_total_revenue_section <- function(raw_sheet) {
+
+  labels <- first_column_labels(raw_sheet)
+
+  any(grepl("^total revenue.*actual.*opp", labels))
+}
+
+
 empty_monthly_finance_table <- function() {
 
   data.frame(

@@ -701,7 +701,8 @@ load_venues_tracking_reports <- function(
       validation = validation,
       files = file_summary
     ),
-    class = "venues_tracking_report_data"
+    class = "venues_tracking_report_data",
+    source_sheet_order = workbook_source_sheet_order(workbooks)
   )
 }
 

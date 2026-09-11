@@ -13,6 +13,12 @@ BASIC_UPLOAD_REPORT_TYPES <- c(
 
 
 attach_basic_upload_sheet_order <- function(result, path) {
+  existing_order <- attr(result, "source_sheet_order", exact = TRUE)
+
+  if (length(existing_order) > 0L) {
+    return(result)
+  }
+
   sheet_order <- tryCatch(
     readxl::excel_sheets(path),
     error = function(error) character()
@@ -1442,16 +1448,8 @@ mod_data_upload_server <- function(
           stop("No parser is configured for report type: ", report_type)
         }
 
-        # Selecting a file with the same name replaces its previous temporary
-        # session copy, preventing duplicate years from entering the charts.
-        current_rows <- registry()
-        duplicate_ids <- current_rows$file_id[
-          current_rows$report_type == report_type &
-            current_rows$original_name %in% upload_info$name
-        ]
-        remove_session_files(duplicate_ids)
-
         queued_ids <- character(nrow(upload_info))
+        queued_rows <- vector("list", nrow(upload_info))
         now_key <- format(Sys.time(), "%Y%m%d%H%M%OS6")
 
         for (index in seq_len(nrow(upload_info))) {
@@ -1484,23 +1482,25 @@ mod_data_upload_server <- function(
             "Waiting to be parsed"
           }
 
-          registry(rbind(
-            registry(),
-            data.frame(
-              file_id = file_id,
-              report_type = report_type,
-              original_name = as.character(upload_info$name[[index]]),
-              stored_path = if (copied) stored_path else NA_character_,
-              size = as.numeric(upload_info$size[[index]]),
-              status = status,
-              progress = if (copied) 0 else 1,
-              detail = detail,
-              warning_count = 0L,
-              error_message = if (copied) NA_character_ else detail,
-              stringsAsFactors = FALSE
-            )
-          ))
+          queued_rows[[index]] <- data.frame(
+            file_id = file_id,
+            report_type = report_type,
+            original_name = as.character(upload_info$name[[index]]),
+            stored_path = if (copied) stored_path else NA_character_,
+            size = as.numeric(upload_info$size[[index]]),
+            status = status,
+            progress = if (copied) 0 else 1,
+            detail = detail,
+            warning_count = 0L,
+            error_message = if (copied) NA_character_ else detail,
+            stringsAsFactors = FALSE
+          )
         }
+
+        registry(rbind(
+          registry(),
+          do.call(rbind, queued_rows)
+        ))
 
         progress <- Progress$new(
           session = session,
@@ -1565,6 +1565,18 @@ mod_data_upload_server <- function(
                 error_message = issues$first_error
               )
             } else {
+              # Commit same-name replacement only after the candidate has
+              # parsed and validated successfully. A failed candidate leaves
+              # the previous ready file and its dashboard data untouched.
+              current <- registry()
+              replacement_ids <- current$file_id[
+                current$file_id != file_id &
+                  current$report_type == report_type &
+                  tolower(trimws(current$original_name)) ==
+                    tolower(trimws(row$original_name[[1L]]))
+              ]
+              remove_session_files(replacement_ids)
+
               results <- parsed_results()
               results[[file_id]] <- parsed
               parsed_results(results)

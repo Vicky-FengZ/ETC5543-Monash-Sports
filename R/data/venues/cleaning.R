@@ -2388,18 +2388,19 @@ casual_hours_summary_records <- function(raw_sheet, workbook, layout) {
 }
 
 
-casual_hours_detail_records <- function(raw_sheet, workbook, layout) {
+casual_hours_paid_reporting <- function(raw_sheet, layout) {
+
+  empty_result <- list(
+    has_detail_rows = FALSE,
+    reported_months = integer()
+  )
 
   if (nrow(layout) != 1L) {
-    return(empty_venues_casual_hours_table())
+    return(empty_result)
   }
 
-  metric_columns <- c(
-    "Budgeted Hours" = layout$budget_column[[1]],
-    "Paid Hours" = layout$paid_column[[1]],
-    "Variance" = layout$variance_column[[1]]
-  )
-  records <- list()
+  has_detail_rows <- FALSE
+  reported_months <- integer()
 
   for (source_row in seq.int(layout$header_row[[1]] + 1L, nrow(raw_sheet))) {
     fortnight <- cell_as_text(
@@ -2412,40 +2413,7 @@ casual_hours_detail_records <- function(raw_sheet, workbook, layout) {
       next
     }
 
-    pay_period_start <- venues_cell_as_date(
-      raw_sheet,
-      source_row,
-      layout$pay_period_start_column[[1]]
-    )
-    pay_period_end_row <- source_row
-
-    if (source_row < nrow(raw_sheet)) {
-      next_fortnight <- cell_as_text(
-        raw_sheet,
-        source_row + 1L,
-        layout$fortnight_column[[1]]
-      )
-
-      if (is.na(next_fortnight)) {
-        pay_period_end_row <- source_row + 1L
-      }
-    }
-
-    pay_period_end <- venues_cell_as_date(
-      raw_sheet,
-      pay_period_end_row,
-      layout$pay_period_end_column[[1]]
-    )
-    timesheet_deadline <- venues_cell_as_date(
-      raw_sheet,
-      source_row,
-      layout$timesheet_column[[1]]
-    )
-    pay_date <- venues_cell_as_date(
-      raw_sheet,
-      source_row,
-      layout$pay_date_column[[1]]
-    )
+    has_detail_rows <- TRUE
     raw_month <- venues_optional_cell_as_text(
       raw_sheet,
       source_row,
@@ -2453,61 +2421,33 @@ casual_hours_detail_records <- function(raw_sheet, workbook, layout) {
     )
     month <- venues_month_from_text(raw_month)
 
-    if (is.na(month) && !is.na(pay_date)) {
-      month <- as.integer(format(pay_date, "%m"))
-    }
-
-    record_date <- if (!is.na(pay_date)) {
-      pay_date
-    } else if (!is.na(pay_period_end)) {
-      pay_period_end
-    } else {
-      pay_period_start
-    }
-    roster <- venues_optional_cell_as_text(
-      raw_sheet,
-      source_row,
-      layout$roster_column[[1]]
-    )
-    notes <- venues_optional_cell_as_text(
-      raw_sheet,
-      source_row,
-      layout$notes_column[[1]]
-    )
-
-    for (metric in names(metric_columns)) {
-      source_column <- unname(metric_columns[[metric]])
-      reported_value <- cell_as_number(raw_sheet, source_row, source_column)
-
-      records[[length(records) + 1L]] <- data.frame(
-        report_year = as.integer(workbook$report_year),
-        date = as.Date(record_date),
-        month = as.integer(month),
-        month_label = if (is.na(month)) NA_character_ else month.abb[[month]],
-        period_type = "Pay Period",
-        record_group = "Pay Period",
-        record_id = fortnight,
-        row_type = "Pay Period",
-        roster = roster,
-        fortnight = fortnight,
-        pay_period_start = pay_period_start,
-        pay_period_end = pay_period_end,
-        timesheet_deadline = timesheet_deadline,
-        pay_date = pay_date,
-        notes = notes,
-        metric = metric,
-        value = reported_value,
-        is_reported = !is.na(reported_value),
-        source_file = workbook$source_file,
-        source_sheet = workbook$casual_hours_sheet_name,
-        source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
+    if (is.na(month)) {
+      pay_date <- venues_cell_as_date(
+        raw_sheet,
+        source_row,
+        layout$pay_date_column[[1]]
       )
+
+      if (!is.na(pay_date)) {
+        month <- as.integer(format(pay_date, "%m"))
+      }
+    }
+
+    paid_value <- cell_as_number(
+      raw_sheet,
+      source_row,
+      layout$paid_column[[1]]
+    )
+
+    if (!is.na(month) && !is.na(paid_value)) {
+      reported_months <- c(reported_months, as.integer(month))
     }
   }
 
-  bind_import_tables(records, empty_venues_casual_hours_table())
+  list(
+    has_detail_rows = has_detail_rows,
+    reported_months = sort(unique(reported_months))
+  )
 }
 
 
@@ -2524,9 +2464,8 @@ clean_venues_tracking_report_casual_hours <- function(workbook) {
     raw_sheet,
     summary_layout
   )
-  detail_data <- casual_hours_detail_records(
+  paid_reporting <- casual_hours_paid_reporting(
     raw_sheet,
-    workbook,
     detail_layout
   )
   result <- casual_hours_summary_records(
@@ -2544,15 +2483,9 @@ clean_venues_tracking_report_casual_hours <- function(workbook) {
     for (row_index in summary_indices) {
       metric <- result$metric[[row_index]]
 
-      if (metric == "Paid Hours" && nrow(detail_data) > 0L) {
-        matching_detail <-
-          detail_data$period_type == "Pay Period" &
-          detail_data$source_file == result$source_file[[row_index]] &
-          detail_data$month == result$month[[row_index]] &
-          detail_data$metric == "Paid Hours"
-        result$is_reported[[row_index]] <- any(
-          detail_data$is_reported[matching_detail]
-        )
+      if (metric == "Paid Hours" && isTRUE(paid_reporting$has_detail_rows)) {
+        result$is_reported[[row_index]] <-
+          result$month[[row_index]] %in% paid_reporting$reported_months
       } else if (metric == "Variance") {
         matching_summary <-
           summary_month_rows &

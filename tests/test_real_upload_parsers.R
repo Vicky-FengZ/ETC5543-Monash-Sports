@@ -14,8 +14,8 @@ if (!nzchar(real_data_root)) {
   )
 
   monthly <- load_monthly_site_reports(
-    paths = tail(monthly_files, 1L),
-    source_names = basename(tail(monthly_files, 1L)),
+    paths = monthly_files,
+    source_names = basename(monthly_files),
     strict = FALSE
   )
   venues <- load_venues_tracking_reports(
@@ -24,23 +24,11 @@ if (!nzchar(real_data_root)) {
     strict = FALSE
   )
   sites <- load_business_unit_template_reports(
-    paths = head(site_files, 1L),
-    source_names = basename(head(site_files, 1L)),
+    paths = site_files,
+    source_names = basename(site_files),
     strict = FALSE
   )
 
-  monthly <- attach_basic_upload_sheet_order(
-    monthly,
-    tail(monthly_files, 1L)
-  )
-  venues <- attach_basic_upload_sheet_order(
-    venues,
-    tail(venue_files, 1L)
-  )
-  sites <- attach_basic_upload_sheet_order(
-    sites,
-    head(site_files, 1L)
-  )
   monthly_preview <- basic_preview_monthly_site_data(monthly)
   monthly_preview_sheets <- basic_preview_source_sheets(
     monthly_preview,
@@ -69,8 +57,13 @@ if (!nzchar(real_data_root)) {
   stopifnot(
     inherits(monthly, "monthly_site_report_data"),
     length(attr(monthly, "source_sheet_order")) > 0L,
-    nrow(monthly$files) == 1L,
+    nrow(monthly$files) == length(monthly_files),
     nrow(monthly$finance) > 0L,
+    !any(
+      !is.na(monthly$validation$sheet) &
+        normalise_excel_label(monthly$validation$sheet) == "chart1"
+    ),
+    !any(grepl("rId1", monthly$validation$message, fixed = TRUE)),
     nrow(monthly_preview) ==
       nrow(monthly$finance) +
       nrow(monthly$discounts) +
@@ -164,7 +157,7 @@ if (!nzchar(real_data_root)) {
     !any(grepl("^\\.preview_", names(venues_preview))),
     inherits(sites, "business_unit_template_report_data"),
     length(attr(sites, "source_sheet_order")) > 0L,
-    nrow(sites$files) == 1L,
+    nrow(sites$files) == length(site_files),
     nrow(sites$finance) > 0L,
     identical(
       basic_preview_table_names(sites, "site_detail"),

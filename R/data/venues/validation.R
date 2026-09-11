@@ -1296,16 +1296,23 @@ validate_venues_operational_checks <- function(checks) {
   }
 
   issues <- list()
-  file_dataset_key <- paste(
+  file_dataset_check_key <- paste(
     checks$source_file,
     checks$dataset,
+    checks$check_type,
     sep = "\r"
   )
 
-  for (indices in split(seq_len(nrow(checks)), file_dataset_key)) {
+  for (indices in split(seq_len(nrow(checks)), file_dataset_check_key)) {
     file_checks <- checks[indices, , drop = FALSE]
     failed <- file_checks$status == "fail"
     incomplete <- !file_checks$status %in% c("pass", "fail")
+    check_label <- gsub(
+      "_",
+      " ",
+      as.character(file_checks$check_type[[1L]]),
+      fixed = TRUE
+    )
 
     if (any(failed)) {
       maximum_difference <- max(
@@ -1320,7 +1327,9 @@ validate_venues_operational_checks <- function(checks) {
           file_checks$dataset[[1]],
           " validation failed for ",
           sum(failed),
-          " monthly-to-total check(s); maximum absolute difference: ",
+          " ",
+          check_label,
+          " check(s); maximum absolute difference: ",
           format(
             round(maximum_difference, 2),
             big.mark = ",",
@@ -1347,6 +1356,8 @@ validate_venues_operational_checks <- function(checks) {
         sheet = file_checks$source_sheet[[1]],
         message = paste0(
           file_checks$dataset[[1]],
+          " ",
+          check_label,
           " validation was incomplete for ",
           sum(incomplete),
           " check(s) (",
