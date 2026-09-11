@@ -68,8 +68,8 @@ ui <- page_navbar(
 
 server <- function(input, output, session) {
 
-  # Data upload module will eventually become the central data source.
-  # At the prototype stage it simply returns uploaded-file metadata.
+  # Uploaded workbooks are parsed once, then shared with the dashboard and
+  # the cleaned-data preview through this session-level reactive source.
   dashboard_data <- mod_data_upload_server("data_upload")
 
   mod_overview_server(

@@ -143,11 +143,21 @@ venues_reports <- load_venues_tracking_reports()
 venues_reports$finance
 venues_reports$attendance
 venues_reports$facility_hire
+venues_reports$court_hire
 venues_reports$membership
+venues_reports$online_sales
+venues_reports$merchandise
+venues_reports$casual_hours
+venues_reports$casual_wages
 venues_reports$checks
 venues_reports$attendance_checks
 venues_reports$facility_hire_checks
+venues_reports$court_hire_checks
 venues_reports$membership_checks
+venues_reports$online_sales_checks
+venues_reports$merchandise_checks
+venues_reports$casual_hours_checks
+venues_reports$casual_wages_checks
 venues_reports$files
 venues_reports$validation
 ```
@@ -159,7 +169,12 @@ Key outputs:
 | `finance` | MTD Finance values by fund, metric and value type |
 | `attendance` | Facility, activity and customer/category attendance with Month and YTD periods |
 | `facility_hire` | Facility-hire revenue and transaction measures with Month and YTD periods |
+| `court_hire` | Annual Court Hire comparisons by activity, including previous year, report year, growth achieved, monthly values and reported totals |
 | `membership` | Membership measures such as New, Renewed, Active and Retention |
+| `online_sales` | Online revenue by site, category and Month/YTD period, with reporting flags for incomplete months |
+| `merchandise` | Equipment hire, equipment sales and Monash Sport merchandise revenue/transaction measures |
+| `casual_hours` | Monthly summary only: budgeted hours, paid hours and variance, plus the reported total |
+| `casual_wages` | Budget, actual and variance for the salary-year block matching each workbook's report year |
 | `*_checks` | Independent monthly-to-YTD and finance reconciliation checks |
 
 The source workbook's `MTD Total` and `YTD Total` rows are retained separately
@@ -247,7 +262,7 @@ appropriate raw-data folder and run its loader again.
 | Report type | Example future filename | Required recognisable structure |
 |---|---|---|
 | Monthly Site Report | `Monthly Site Report 2026 - December.xlsx` | Finance sections labelled Income, Expenses, months, Budget, Actual and Variance |
-| Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire and Membership tracking sheets |
+| Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire, Court Hire year comparison, Membership, Online Sales, Merchandise, Casual Hours and Casual Wages sheets; a year prefix such as `2026 Casual Hours` and a comparison name such as `Court Hire 2025 vs 2026` are accepted |
 | Business Unit report | `Aquatics Site Report 2026.xlsx` | Finance, Direct Visits and Indirect Visits; Memberships and Enrollments are optional |
 
 If a future workbook changes its structure, inspect the returned `validation`

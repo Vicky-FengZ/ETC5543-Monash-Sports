@@ -12,6 +12,16 @@ BASIC_UPLOAD_REPORT_TYPES <- c(
 )
 
 
+attach_basic_upload_sheet_order <- function(result, path) {
+  sheet_order <- tryCatch(
+    readxl::excel_sheets(path),
+    error = function(error) character()
+  )
+  attr(result, "source_sheet_order") <- as.character(sheet_order)
+  result
+}
+
+
 empty_basic_upload_registry <- function() {
   data.frame(
     file_id = character(),
@@ -32,25 +42,28 @@ empty_basic_upload_registry <- function() {
 basic_upload_parsers <- function() {
   list(
     monthly_site = function(path, source_name) {
-      load_monthly_site_reports(
+      result <- load_monthly_site_reports(
         paths = path,
         source_names = source_name,
         strict = FALSE
       )
+      attach_basic_upload_sheet_order(result, path)
     },
     site_detail = function(path, source_name) {
-      load_business_unit_template_reports(
+      result <- load_business_unit_template_reports(
         paths = path,
         source_names = source_name,
         strict = FALSE
       )
+      attach_basic_upload_sheet_order(result, path)
     },
     venues_tracking = function(path, source_name) {
-      load_venues_tracking_reports(
+      result <- load_venues_tracking_reports(
         paths = path,
         source_names = source_name,
         strict = FALSE
       )
+      attach_basic_upload_sheet_order(result, path)
     }
   )
 }
@@ -107,7 +120,930 @@ combine_basic_upload_results <- function(objects, result_class) {
     }
   )
   names(combined) <- fields
-  structure(combined, class = result_class)
+  sheet_order <- unique(unlist(
+    lapply(
+      objects,
+      function(object) attr(object, "source_sheet_order", exact = TRUE)
+    ),
+    use.names = FALSE
+  ))
+  structure(
+    combined,
+    class = result_class,
+    source_sheet_order = as.character(sheet_order)
+  )
+}
+
+
+BASIC_PREVIEW_REPORT_FIELDS <- c(
+  monthly_site = "monthly_reports",
+  site_detail = "site_reports",
+  venues_tracking = "venues_reports"
+)
+
+BASIC_PREVIEW_TABLES <- list(
+  monthly_site = c("finance", "discounts", "total_revenue"),
+  site_detail = c(
+    "finance",
+    "discounts",
+    "total_revenue",
+    "visits",
+    "memberships",
+    "enrollments"
+  ),
+  venues_tracking = c(
+    "finance",
+    "attendance",
+    "facility_hire",
+    "court_hire",
+    "membership",
+    "online_sales",
+    "merchandise",
+    "casual_hours",
+    "casual_wages"
+  )
+)
+
+BASIC_PREVIEW_ALL_SHEETS <- "__all_source_sheets__"
+
+
+basic_preview_report <- function(data, report_type) {
+  if (!is.list(data) ||
+      length(report_type) != 1L ||
+      is.na(report_type) ||
+      !report_type %in% names(BASIC_PREVIEW_REPORT_FIELDS)) {
+    return(NULL)
+  }
+
+  data[[unname(BASIC_PREVIEW_REPORT_FIELDS[[report_type]])]]
+}
+
+
+basic_preview_table_names <- function(report, report_type = NULL) {
+  if (!is.list(report) || is.null(names(report))) {
+    return(character())
+  }
+
+  data_frame_fields <- names(report)[vapply(report, is.data.frame, logical(1L))]
+
+  if (length(report_type) == 1L &&
+      !is.na(report_type) &&
+      report_type %in% names(BASIC_PREVIEW_TABLES)) {
+    return(intersect(BASIC_PREVIEW_TABLES[[report_type]], data_frame_fields))
+  }
+
+  excluded <- data_frame_fields %in% c("validation", "files", "checks") |
+    grepl("_checks$", data_frame_fields)
+
+  data_frame_fields[!excluded]
+}
+
+
+basic_preview_table_label <- function(table_name) {
+  labels <- gsub("_", " ", as.character(table_name), fixed = TRUE)
+  tools::toTitleCase(labels)
+}
+
+
+empty_monthly_site_preview_table <- function() {
+  data.frame(
+    data_section = character(),
+    report_year = integer(),
+    period_date = as.Date(character()),
+    period_type = character(),
+    month = integer(),
+    month_label = character(),
+    site = character(),
+    site_code = character(),
+    business_unit = character(),
+    is_summary = logical(),
+    measure = character(),
+    value_type = character(),
+    value = double(),
+    validation_status = character(),
+    validation_difference = double(),
+    validation_relative_difference = double(),
+    validation_tolerance = double(),
+    source_file = character(),
+    source_sheet = character(),
+    source_row = integer(),
+    source_column = integer(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+basic_preview_column <- function(data, column, missing_value) {
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    return(rep(missing_value, 0L))
+  }
+
+  if (!column %in% names(data)) {
+    return(rep(missing_value, nrow(data)))
+  }
+
+  data[[column]]
+}
+
+
+basic_preview_as_date <- function(value) {
+  if (inherits(value, "Date")) {
+    return(as.Date(value))
+  }
+
+  if (inherits(value, c("POSIXct", "POSIXlt"))) {
+    return(as.Date(value))
+  }
+
+  if (is.numeric(value)) {
+    return(as.Date(value, origin = "1970-01-01"))
+  }
+
+  suppressWarnings(as.Date(as.character(value)))
+}
+
+
+make_monthly_site_preview_rows <- function(
+  data,
+  data_section,
+  period_date,
+  period_type,
+  measure,
+  value_type,
+  value,
+  section_order,
+  value_order = 1L
+) {
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    return(NULL)
+  }
+
+  row_count <- nrow(data)
+  recycle <- function(values) rep_len(values, row_count)
+
+  data.frame(
+    data_section = rep(data_section, row_count),
+    report_year = suppressWarnings(as.integer(as.character(
+      basic_preview_column(data, "report_year", NA_integer_)
+    ))),
+    period_date = basic_preview_as_date(recycle(period_date)),
+    period_type = as.character(recycle(period_type)),
+    month = suppressWarnings(as.integer(as.character(
+      basic_preview_column(data, "month", NA_integer_)
+    ))),
+    month_label = as.character(
+      basic_preview_column(data, "month_label", NA_character_)
+    ),
+    site = as.character(
+      basic_preview_column(data, "site", NA_character_)
+    ),
+    site_code = as.character(
+      basic_preview_column(data, "site_code", NA_character_)
+    ),
+    business_unit = as.character(
+      basic_preview_column(data, "business_unit", NA_character_)
+    ),
+    is_summary = as.logical(
+      basic_preview_column(data, "is_summary", NA)
+    ),
+    measure = as.character(recycle(measure)),
+    value_type = as.character(recycle(value_type)),
+    value = suppressWarnings(as.numeric(recycle(value))),
+    validation_status = as.character(
+      basic_preview_column(data, "validation_status", NA_character_)
+    ),
+    validation_difference = suppressWarnings(as.numeric(
+      basic_preview_column(data, "validation_difference", NA_real_)
+    )),
+    validation_relative_difference = suppressWarnings(as.numeric(
+      basic_preview_column(
+        data,
+        "validation_relative_difference",
+        NA_real_
+      )
+    )),
+    validation_tolerance = suppressWarnings(as.numeric(
+      basic_preview_column(data, "validation_tolerance", NA_real_)
+    )),
+    source_file = as.character(
+      basic_preview_column(data, "source_file", NA_character_)
+    ),
+    source_sheet = as.character(
+      basic_preview_column(data, "source_sheet", NA_character_)
+    ),
+    source_row = suppressWarnings(as.integer(as.character(
+      basic_preview_column(data, "source_row", NA_integer_)
+    ))),
+    source_column = suppressWarnings(as.integer(as.character(
+      basic_preview_column(data, "source_column", NA_integer_)
+    ))),
+    .preview_section_order = rep(as.integer(section_order), row_count),
+    .preview_value_order = as.integer(recycle(value_order)),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+basic_preview_monthly_site_data <- function(report) {
+  if (!is.list(report)) {
+    return(NULL)
+  }
+
+  finance <- report$finance
+  discounts <- report$discounts
+  total_revenue <- report$total_revenue
+  rows <- list()
+
+  if (is.data.frame(finance) && nrow(finance) > 0L) {
+    rows[[length(rows) + 1L]] <- make_monthly_site_preview_rows(
+      data = finance,
+      data_section = "Finance",
+      period_date = basic_preview_column(finance, "date", as.Date(NA)),
+      period_type = "Month",
+      measure = basic_preview_column(finance, "metric", NA_character_),
+      value_type = basic_preview_column(
+        finance,
+        "value_type",
+        NA_character_
+      ),
+      value = basic_preview_column(finance, "value", NA_real_),
+      section_order = 1L
+    )
+  }
+
+  if (is.data.frame(discounts) && nrow(discounts) > 0L) {
+    rows[[length(rows) + 1L]] <- make_monthly_site_preview_rows(
+      data = discounts,
+      data_section = "Discounts",
+      period_date = basic_preview_column(discounts, "date", as.Date(NA)),
+      period_type = "Month",
+      measure = "Discount Opportunity",
+      value_type = basic_preview_column(
+        discounts,
+        "discount_type",
+        NA_character_
+      ),
+      value = basic_preview_column(discounts, "value", NA_real_),
+      section_order = 2L
+    )
+  }
+
+  revenue_fields <- c(
+    actual_income = "Actual Income",
+    discount_opportunity = "Discount Opportunity",
+    calculated_total_revenue = "Calculated Total Revenue",
+    reported_total_revenue = "Reported Total Revenue"
+  )
+
+  if (is.data.frame(total_revenue) && nrow(total_revenue) > 0L) {
+    for (field_index in seq_along(revenue_fields)) {
+      field <- names(revenue_fields)[[field_index]]
+
+      if (!field %in% names(total_revenue)) {
+        next
+      }
+
+      rows[[length(rows) + 1L]] <- make_monthly_site_preview_rows(
+        data = total_revenue,
+        data_section = "Total Revenue",
+        period_date = basic_preview_column(
+          total_revenue,
+          "period_end",
+          as.Date(NA)
+        ),
+        period_type = "Report Year",
+        measure = "Total Revenue",
+        value_type = unname(revenue_fields[[field_index]]),
+        value = basic_preview_column(total_revenue, field, NA_real_),
+        section_order = 3L,
+        value_order = field_index
+      )
+    }
+  }
+
+  rows <- Filter(
+    function(data) is.data.frame(data) && nrow(data) > 0L,
+    rows
+  )
+
+  if (length(rows) == 0L) {
+    return(empty_monthly_site_preview_table())
+  }
+
+  result <- do.call(rbind, rows)
+  sheet_key <- basic_preview_sheet_key(result$source_sheet)
+  row_order <- order(
+    result$report_year,
+    result$source_file,
+    sheet_key,
+    result$.preview_section_order,
+    is.na(result$source_row),
+    result$source_row,
+    is.na(result$source_column),
+    result$source_column,
+    result$.preview_value_order,
+    na.last = TRUE
+  )
+  result <- result[row_order, , drop = FALSE]
+  result$.preview_section_order <- NULL
+  result$.preview_value_order <- NULL
+  rownames(result) <- NULL
+  result
+}
+
+
+basic_preview_typed_missing <- function(prototype, size) {
+  prototype[rep(NA_integer_, as.integer(size))]
+}
+
+
+bind_basic_preview_tables <- function(tables) {
+  tables <- Filter(is.data.frame, tables)
+
+  if (length(tables) == 0L) {
+    return(data.frame())
+  }
+
+  column_names <- unique(unlist(lapply(tables, names), use.names = FALSE))
+  prototypes <- stats::setNames(
+    lapply(
+      column_names,
+      function(column) {
+        table_index <- which(vapply(
+          tables,
+          function(data) column %in% names(data),
+          logical(1L)
+        ))[[1L]]
+        tables[[table_index]][[column]]
+      }
+    ),
+    column_names
+  )
+
+  aligned <- lapply(
+    tables,
+    function(data) {
+      missing_columns <- setdiff(column_names, names(data))
+
+      for (column in missing_columns) {
+        data[[column]] <- basic_preview_typed_missing(
+          prototypes[[column]],
+          nrow(data)
+        )
+      }
+
+      data[, column_names, drop = FALSE]
+    }
+  )
+
+  result <- do.call(rbind, aligned)
+  rownames(result) <- NULL
+  result
+}
+
+
+basic_preview_combined_report_data <- function(report, report_type) {
+  if (!is.list(report) ||
+      length(report_type) != 1L ||
+      is.na(report_type) ||
+      !report_type %in% names(BASIC_PREVIEW_TABLES)) {
+    return(NULL)
+  }
+
+  table_names <- basic_preview_table_names(report, report_type)
+
+  if (length(table_names) == 0L) {
+    return(data.frame())
+  }
+
+  tables <- lapply(
+    seq_along(table_names),
+    function(table_index) {
+      data <- report[[table_names[[table_index]]]]
+
+      if (!is.data.frame(data)) {
+        return(NULL)
+      }
+
+      data$.preview_table_order <- rep.int(as.integer(table_index), nrow(data))
+      data$.preview_row_order <- seq_len(nrow(data))
+      data
+    }
+  )
+  result <- bind_basic_preview_tables(tables)
+
+  if (nrow(result) == 0L) {
+    result$.preview_table_order <- NULL
+    result$.preview_row_order <- NULL
+    return(result)
+  }
+
+  sheet_order <- basic_preview_sheet_key(
+    attr(report, "source_sheet_order", exact = TRUE)
+  )
+  sheet_rank <- match(
+    basic_preview_sheet_key(
+      basic_preview_column(result, "source_sheet", NA_character_)
+    ),
+    sheet_order
+  )
+  sheet_rank[is.na(sheet_rank)] <-
+    length(sheet_order) + seq_len(sum(is.na(sheet_rank)))
+  report_year <- suppressWarnings(as.integer(as.character(
+    basic_preview_column(result, "report_year", NA_integer_)
+  )))
+  source_file <- as.character(
+    basic_preview_column(result, "source_file", NA_character_)
+  )
+  row_order <- order(
+    report_year,
+    source_file,
+    sheet_rank,
+    result$.preview_table_order,
+    result$.preview_row_order,
+    na.last = TRUE
+  )
+  result <- result[row_order, , drop = FALSE]
+  result$.preview_table_order <- NULL
+  result$.preview_row_order <- NULL
+  rownames(result) <- NULL
+  result
+}
+
+
+basic_preview_drop_empty_columns <- function(data) {
+  if (!is.data.frame(data) || ncol(data) == 0L || nrow(data) == 0L) {
+    return(data)
+  }
+
+  has_value <- vapply(
+    data,
+    function(column) {
+      if (is.character(column) || is.factor(column)) {
+        return(any(!is.na(column) & nzchar(trimws(as.character(column)))))
+      }
+
+      any(!is.na(column))
+    },
+    logical(1L)
+  )
+
+  data[, has_value, drop = FALSE]
+}
+
+
+basic_preview_years <- function(data) {
+  if (!is.data.frame(data) || !"report_year" %in% names(data)) {
+    return(character())
+  }
+
+  years <- suppressWarnings(as.integer(as.character(data$report_year)))
+  as.character(sort(unique(years[!is.na(years)])))
+}
+
+
+basic_preview_sheet_key <- function(value) {
+  tolower(basic_preview_sheet_label(value))
+}
+
+
+basic_preview_sheet_label <- function(value) {
+  value <- as.character(value)
+  value[is.na(value)] <- ""
+  labels <- trimws(gsub("[[:space:]]+", " ", value))
+  comparison_keys <- tolower(trimws(gsub(
+    "[[:space:]_-]+",
+    " ",
+    labels
+  )))
+
+  casual_hours <- grepl(
+    paste0(
+      "^(?:(19|20)[0-9]{2} )?casual hours",
+      "(?: (19|20)[0-9]{2})?$"
+    ),
+    comparison_keys
+  )
+  court_hire <- grepl(
+    paste0(
+      "^(?:(19|20)[0-9]{2} )?court hire",
+      "(?: (19|20)[0-9]{2} vs (19|20)[0-9]{2})?$"
+    ),
+    comparison_keys
+  )
+  casual_hire <- grepl(
+    paste0(
+      "^(?:(19|20)[0-9]{2} )?casual hire",
+      "(?: (19|20)[0-9]{2}(?: vs (19|20)[0-9]{2})?)?$"
+    ),
+    comparison_keys
+  )
+
+  labels[casual_hours] <- "Casual Hours"
+  labels[court_hire | casual_hire] <- "Casual Hire"
+  labels
+}
+
+
+basic_preview_source_sheets <- function(data, source_sheet_order = character()) {
+  if (!is.data.frame(data) || !"source_sheet" %in% names(data)) {
+    return(character())
+  }
+
+  source_sheets <- as.character(data$source_sheet)
+  labels <- basic_preview_sheet_label(source_sheets)
+  keys <- basic_preview_sheet_key(source_sheets)
+  present <- nzchar(keys)
+  labels <- labels[present & !duplicated(keys)]
+  keys <- keys[present & !duplicated(keys)]
+
+  if (length(labels) == 0L || length(source_sheet_order) == 0L) {
+    return(labels)
+  }
+
+  workbook_order <- basic_preview_sheet_key(source_sheet_order)
+  rank <- match(keys, workbook_order)
+  unmatched <- is.na(rank)
+  rank[unmatched] <- length(workbook_order) + seq_len(sum(unmatched))
+  labels[order(rank)]
+}
+
+
+basic_preview_field_values <- function(data, column) {
+  if (!is.data.frame(data) || !column %in% names(data)) {
+    return(character())
+  }
+
+  values <- as.character(data[[column]])
+  present <- !is.na(values) & nzchar(trimws(values))
+  unique(values[present])
+}
+
+
+basic_preview_valid_selections <- function(selected, available) {
+  if (is.null(selected) || length(selected) == 0L) {
+    return(character())
+  }
+
+  selected <- as.character(selected)
+  selected <- selected[!is.na(selected) & nzchar(selected)]
+  selected[selected %in% available]
+}
+
+
+filter_basic_preview_table <- function(
+  data,
+  year = character(),
+  source_sheet = BASIC_PREVIEW_ALL_SHEETS,
+  measures = character(),
+  value_types = character(),
+  search = ""
+) {
+  if (!is.data.frame(data)) {
+    return(NULL)
+  }
+
+  filtered <- data
+  selected_years <- if (is.null(year)) character() else as.character(year)
+  selected_years <- selected_years[
+    !is.na(selected_years) &
+      nzchar(selected_years) &
+      selected_years != "__all__"
+  ]
+
+  if ("report_year" %in% names(filtered) &&
+      length(selected_years) > 0L) {
+    filtered <- filtered[
+      !is.na(filtered$report_year) &
+        as.character(filtered$report_year) %in% selected_years,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  selected_sheet <- if (is.null(source_sheet)) {
+    BASIC_PREVIEW_ALL_SHEETS
+  } else {
+    as.character(source_sheet)
+  }
+  if ("source_sheet" %in% names(filtered) &&
+      length(selected_sheet) == 1L &&
+      !is.na(selected_sheet) &&
+      nzchar(selected_sheet) &&
+      selected_sheet != BASIC_PREVIEW_ALL_SHEETS) {
+    filtered <- filtered[
+      !is.na(filtered$source_sheet) &
+        basic_preview_sheet_key(filtered$source_sheet) ==
+          basic_preview_sheet_key(selected_sheet),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  selected_measures <- if (is.null(measures)) {
+    character()
+  } else {
+    as.character(measures)
+  }
+  selected_measures <- selected_measures[
+    !is.na(selected_measures) & nzchar(selected_measures)
+  ]
+  if ("measure" %in% names(filtered) && length(selected_measures) > 0L) {
+    filtered <- filtered[
+      !is.na(filtered$measure) &
+        as.character(filtered$measure) %in% selected_measures,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  selected_value_types <- if (is.null(value_types)) {
+    character()
+  } else {
+    as.character(value_types)
+  }
+  selected_value_types <- selected_value_types[
+    !is.na(selected_value_types) & nzchar(selected_value_types)
+  ]
+  if ("value_type" %in% names(filtered) &&
+      length(selected_value_types) > 0L) {
+    filtered <- filtered[
+      !is.na(filtered$value_type) &
+        as.character(filtered$value_type) %in% selected_value_types,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  search_text <- if (is.null(search)) "" else trimws(as.character(search))
+  if (length(search_text) == 1L &&
+      !is.na(search_text) &&
+      nzchar(search_text) &&
+      nrow(filtered) > 0L) {
+    search_text <- tolower(search_text)
+    matches <- Reduce(
+      `|`,
+      lapply(
+        filtered,
+        function(column) {
+          grepl(
+            search_text,
+            tolower(as.character(column)),
+            fixed = TRUE
+          )
+        }
+      )
+    )
+    matches[is.na(matches)] <- FALSE
+    filtered <- filtered[matches, , drop = FALSE]
+  }
+
+  rownames(filtered) <- NULL
+  filtered
+}
+
+
+format_basic_preview_table <- function(data) {
+  if (!is.data.frame(data)) {
+    return(NULL)
+  }
+
+  formatted <- data
+
+  if ("source_sheet" %in% names(formatted)) {
+    formatted$source_sheet <- basic_preview_sheet_label(
+      formatted$source_sheet
+    )
+  }
+
+  date_columns <- names(formatted)[vapply(
+    formatted,
+    inherits,
+    logical(1L),
+    what = "Date"
+  )]
+
+  for (column in date_columns) {
+    values <- formatted[[column]]
+    formatted_values <- format(values, "%Y-%m-%d")
+    formatted_values[is.na(values)] <- NA_character_
+    formatted[[column]] <- formatted_values
+  }
+
+  formatted
+}
+
+
+next_basic_preview_sort <- function(
+  clicked_column,
+  current_column = "__none__",
+  current_direction = "asc"
+) {
+  clicked_column <- as.character(clicked_column)
+  current_column <- as.character(current_column)
+  current_direction <- tolower(as.character(current_direction))
+
+  if (length(clicked_column) != 1L ||
+      is.na(clicked_column) ||
+      !nzchar(clicked_column)) {
+    return(list(
+      column = current_column[[1L]],
+      direction = current_direction[[1L]]
+    ))
+  }
+
+  direction <- if (
+    length(current_column) == 1L &&
+      !is.na(current_column) &&
+      identical(clicked_column, current_column)
+  ) {
+    if (identical(current_direction, "desc")) "asc" else "desc"
+  } else {
+    "desc"
+  }
+
+  list(column = clicked_column, direction = direction)
+}
+
+
+basic_preview_cell_text <- function(value) {
+  if (length(value) == 0L || is.na(value[[1L]])) {
+    return("")
+  }
+
+  value <- value[[1L]]
+
+  if (is.numeric(value)) {
+    return(format(
+      value,
+      trim = TRUE,
+      scientific = FALSE,
+      digits = 12
+    ))
+  }
+
+  as.character(value)
+}
+
+
+basic_preview_table_ui <- function(
+  data,
+  sort_column = "__none__",
+  sort_direction = "asc",
+  sort_input_id
+) {
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    return(NULL)
+  }
+
+  columns <- names(data)
+  active_column <- if (
+    length(sort_column) == 1L &&
+      !is.na(sort_column) &&
+      sort_column %in% columns
+  ) {
+    sort_column
+  } else {
+    "__none__"
+  }
+  active_direction <- if (identical(as.character(sort_direction), "desc")) {
+    "desc"
+  } else {
+    "asc"
+  }
+
+  header_cells <- lapply(columns, function(column) {
+    active <- identical(column, active_column)
+    arrow <- if (!active) {
+      "\u21c5"
+    } else if (identical(active_direction, "desc")) {
+      "\u2193"
+    } else {
+      "\u2191"
+    }
+    next_direction <- if (active && identical(active_direction, "desc")) {
+      "ascending"
+    } else {
+      "descending"
+    }
+
+    tags$th(
+      scope = "col",
+      `aria-sort` = if (active) {
+        if (identical(active_direction, "desc")) "descending" else "ascending"
+      } else {
+        "none"
+      },
+      tags$button(
+        type = "button",
+        class = paste(
+          "cleaned-preview-sort-button",
+          if (active) "active" else NULL
+        ),
+        `data-column` = column,
+        title = paste("Sort", next_direction, "by", column),
+        `aria-label` = paste("Sort", next_direction, "by", column),
+        onclick = paste0(
+          "Shiny.setInputValue('",
+          sort_input_id,
+          "', this.dataset.column, {priority: 'event'});"
+        ),
+        span(
+          class = "cleaned-preview-sort-arrow",
+          `aria-hidden` = "true",
+          arrow
+        ),
+        span(class = "cleaned-preview-column-label", column)
+      )
+    )
+  })
+
+  body_rows <- lapply(seq_len(nrow(data)), function(row_index) {
+    tags$tr(lapply(columns, function(column) {
+      tags$td(basic_preview_cell_text(data[[column]][row_index]))
+    }))
+  })
+
+  tags$table(
+    class = "table table-striped table-hover table-sm cleaned-preview-html-table",
+    tags$thead(tags$tr(header_cells)),
+    tags$tbody(body_rows)
+  )
+}
+
+
+sort_basic_preview_table <- function(
+  data,
+  column = "__none__",
+  direction = "asc"
+) {
+  if (!is.data.frame(data)) {
+    return(NULL)
+  }
+
+  column <- if (is.null(column)) "__none__" else as.character(column)
+  if (length(column) != 1L ||
+      is.na(column) ||
+      column == "__none__" ||
+      !column %in% names(data) ||
+      nrow(data) < 2L) {
+    return(data)
+  }
+
+  decreasing <- identical(as.character(direction), "desc")
+  row_order <- tryCatch(
+    order(data[[column]], decreasing = decreasing, na.last = TRUE),
+    error = function(error) seq_len(nrow(data))
+  )
+  sorted <- data[row_order, , drop = FALSE]
+  rownames(sorted) <- NULL
+  sorted
+}
+
+
+paginate_basic_preview_table <- function(data, page = 1L, page_size = 25L) {
+  if (!is.data.frame(data)) {
+    return(list(
+      data = NULL,
+      page = 1L,
+      pages = 1L,
+      from = 0L,
+      to = 0L,
+      total = 0L
+    ))
+  }
+
+  page_size <- suppressWarnings(as.integer(page_size))
+  if (length(page_size) != 1L || is.na(page_size) || page_size < 1L) {
+    page_size <- 25L
+  }
+
+  total <- nrow(data)
+  pages <- max(1L, as.integer(ceiling(total / page_size)))
+  page <- suppressWarnings(as.integer(page))
+  if (length(page) != 1L || is.na(page)) {
+    page <- 1L
+  }
+  page <- min(max(page, 1L), pages)
+
+  if (total == 0L) {
+    page_data <- data[FALSE, , drop = FALSE]
+    from <- 0L
+    to <- 0L
+  } else {
+    from <- (page - 1L) * page_size + 1L
+    to <- min(page * page_size, total)
+    page_data <- data[seq.int(from, to), , drop = FALSE]
+  }
+
+  list(
+    data = page_data,
+    page = page,
+    pages = pages,
+    from = from,
+    to = to,
+    total = total
+  )
 }
 
 
@@ -161,83 +1097,272 @@ mod_data_upload_ui <- function(id) {
         h2("Data Management"),
         p(
           paste(
-            "Upload Excel reports, follow their parsing progress,",
-            "and remove files from the current session."
+            "Upload and manage Excel reports, then inspect the cleaned",
+            "tables used by the dashboard."
           )
         )
       ),
-      div(
-        class = "basic-session-note",
-        bs_icon("info-circle"),
-        div(
-          tags$strong("Session-only upload"),
-          tags$small(
-            paste(
-              "Refreshing or closing the dashboard clears these uploads.",
-              "Your original Excel files are never modified."
-            )
-          )
-        )
-      ),
-      layout_columns(
-        basic_upload_card(
-          ns = ns,
-          title = "Monthly Site Reports",
-          input_id = "monthly_reports",
-          heading = "Overview and site comparison",
-          description = "Upload one or more annual Monthly Site Report workbooks.",
-          icon = "cloud-arrow-up"
-        ),
-        basic_upload_card(
-          ns = ns,
-          title = "Detailed Site Reports",
-          input_id = "site_reports",
-          heading = "Site detail",
-          description = "Upload Business Unit Template site or program reports.",
-          icon = "building"
-        ),
-        basic_upload_card(
-          ns = ns,
-          title = "Venues Tracking Reports",
-          input_id = "venues_reports",
-          heading = "Venues operations",
-          description = "Upload annual Venues Tracking Report workbooks.",
-          icon = "activity"
-        ),
-        col_widths = c(4, 4, 4)
-      ),
-      br(),
-      layout_columns(
-        card(
-          full_screen = TRUE,
-          card_header("File parsing status"),
-          card_body(uiOutput(ns("file_status")))
-        ),
-        card(
-          card_header("Remove an uploaded file"),
-          card_body(
-            selectInput(
-              ns("selected_file"),
-              "Uploaded file",
-              choices = character(),
-              width = "100%"
-            ),
-            actionButton(
-              ns("delete_file"),
-              "Delete selected file",
-              icon = bs_icon("trash"),
-              class = "btn-outline-danger w-100"
-            ),
-            p(
-              class = "text-secondary small mt-3 mb-0",
-              paste(
-                "This removes only the temporary Dashboard copy and its",
-                "parsed data. The original file remains on your computer."
+      navset_pill(
+        id = ns("data_section"),
+        nav_panel(
+          "Upload & Manage",
+          value = "upload",
+          icon = bs_icon("cloud-arrow-up"),
+          div(
+            class = "pt-3",
+            div(
+              class = "basic-session-note",
+              bs_icon("info-circle"),
+              div(
+                tags$strong("Session-only upload"),
+                tags$small(
+                  paste(
+                    "Refreshing or closing the dashboard clears these uploads.",
+                    "Your original Excel files are never modified."
+                  )
+                )
               )
+            ),
+            layout_columns(
+              basic_upload_card(
+                ns = ns,
+                title = "Monthly Site Reports",
+                input_id = "monthly_reports",
+                heading = "Overview and site comparison",
+                description = paste(
+                  "Upload one or more annual Monthly Site Report",
+                  "workbooks."
+                ),
+                icon = "cloud-arrow-up"
+              ),
+              basic_upload_card(
+                ns = ns,
+                title = "Detailed Site Reports",
+                input_id = "site_reports",
+                heading = "Site detail",
+                description = paste(
+                  "Upload Business Unit Template site or program",
+                  "reports."
+                ),
+                icon = "building"
+              ),
+              basic_upload_card(
+                ns = ns,
+                title = "Venues Tracking Reports",
+                input_id = "venues_reports",
+                heading = "Venues operations",
+                description = paste(
+                  "Upload annual Venues Tracking Report workbooks."
+                ),
+                icon = "activity"
+              ),
+              col_widths = c(4, 4, 4)
+            ),
+            br(),
+            layout_columns(
+              card(
+                full_screen = TRUE,
+                card_header("File parsing status"),
+                card_body(uiOutput(ns("file_status")))
+              ),
+              card(
+                card_header("Remove an uploaded file"),
+                card_body(
+                  selectInput(
+                    ns("selected_file"),
+                    "Uploaded file",
+                    choices = character(),
+                    width = "100%"
+                  ),
+                  actionButton(
+                    ns("delete_file"),
+                    "Delete selected file",
+                    icon = bs_icon("trash"),
+                    class = "btn-outline-danger w-100"
+                  ),
+                  p(
+                    class = "text-secondary small mt-3 mb-0",
+                    paste(
+                      "This removes only the temporary Dashboard copy and",
+                      "its parsed data. The original file remains on your",
+                      "computer."
+                    )
+                  )
+                )
+              ),
+              col_widths = c(8, 4)
             )
           )
         ),
-        col_widths = c(8, 4)
+        nav_panel(
+          "Cleaned Data Preview",
+          value = "preview",
+          icon = bs_icon("table"),
+          div(
+            class = "pt-3 cleaned-preview-page",
+            div(
+              class = "cleaned-preview-intro",
+              h4("Cleaned Data Preview"),
+              p(
+                paste(
+                  "Inspect the cleaned tables created from successfully",
+                  "parsed files. Previewing does not read the Excel files again."
+                )
+              )
+            ),
+            layout_columns(
+              card(
+                class = "cleaned-preview-controls",
+                card_header("Preview controls"),
+                card_body(
+                  selectInput(
+                    ns("preview_report_type"),
+                    "Report family",
+                    choices = stats::setNames(
+                      names(BASIC_UPLOAD_REPORT_TYPES),
+                      unname(BASIC_UPLOAD_REPORT_TYPES)
+                    ),
+                    selected = names(BASIC_UPLOAD_REPORT_TYPES)[[1L]],
+                    width = "100%"
+                  ),
+                  selectizeInput(
+                    ns("preview_year"),
+                    "Reporting year",
+                    choices = character(),
+                    selected = character(),
+                    multiple = TRUE,
+                    options = list(
+                      placeholder = "All reporting years",
+                      plugins = list("remove_button"),
+                      closeAfterSelect = TRUE
+                    ),
+                    width = "100%"
+                  ),
+                  conditionalPanel(
+                    condition = "input.preview_report_type === 'monthly_site'",
+                    selectizeInput(
+                      ns("preview_measure"),
+                      "Measure",
+                      choices = character(),
+                      selected = character(),
+                      multiple = TRUE,
+                      options = list(
+                        placeholder = "All measures",
+                        plugins = list("remove_button"),
+                        closeAfterSelect = TRUE
+                      ),
+                      width = "100%"
+                    ),
+                    selectizeInput(
+                      ns("preview_value_type"),
+                      "Value type",
+                      choices = character(),
+                      selected = character(),
+                      multiple = TRUE,
+                      options = list(
+                        placeholder = "All value types",
+                        plugins = list("remove_button"),
+                        closeAfterSelect = TRUE
+                      ),
+                      width = "100%"
+                    ),
+                    ns = ns
+                  ),
+                  textInput(
+                    ns("preview_search"),
+                    "Search rows",
+                    value = "",
+                    placeholder = "Search any displayed column",
+                    width = "100%"
+                  ),
+                  selectInput(
+                    ns("preview_sort_column"),
+                    "Sort by",
+                    choices = c("Original order" = "__none__"),
+                    selected = "__none__",
+                    width = "100%"
+                  ),
+                  selectInput(
+                    ns("preview_sort_direction"),
+                    "Sort direction",
+                    choices = c(
+                      "Ascending" = "asc",
+                      "Descending" = "desc"
+                    ),
+                    selected = "asc",
+                    width = "100%"
+                  ),
+                  selectInput(
+                    ns("preview_page_size"),
+                    "Rows per page",
+                    choices = c(
+                      "10 rows" = "10",
+                      "25 rows" = "25",
+                      "50 rows" = "50",
+                      "100 rows" = "100"
+                    ),
+                    selected = "25",
+                    width = "100%"
+                  )
+                )
+              ),
+              card(
+                class = "cleaned-preview-data-card",
+                full_screen = TRUE,
+                card_header("Cleaned table"),
+                card_body(
+                  div(
+                    class = "workbook-sheet-browser",
+                    div(
+                      class = "workbook-sheet-heading",
+                      bs_icon("files"),
+                      div(
+                        tags$strong("Source sheet"),
+                        tags$small(
+                          "Switch between the worksheets represented in the cleaned data."
+                        )
+                      )
+                    ),
+                    div(
+                      class = "workbook-sheet-tabs",
+                      radioButtons(
+                        ns("preview_source_sheet"),
+                        label = NULL,
+                        choices = c(
+                          "All sheets" = BASIC_PREVIEW_ALL_SHEETS
+                        ),
+                        selected = BASIC_PREVIEW_ALL_SHEETS,
+                        inline = TRUE
+                      )
+                    )
+                  ),
+                  uiOutput(ns("preview_summary")),
+                  div(
+                    class = "cleaned-preview-table",
+                    uiOutput(ns("cleaned_data_table"))
+                  ),
+                  div(
+                    class = "cleaned-preview-pagination",
+                    actionButton(
+                      ns("preview_previous"),
+                      "Previous",
+                      icon = bs_icon("chevron-left"),
+                      class = "btn-outline-secondary"
+                    ),
+                    uiOutput(ns("preview_page_info")),
+                    actionButton(
+                      ns("preview_next"),
+                      "Next",
+                      icon = bs_icon("chevron-right"),
+                      class = "btn-outline-secondary"
+                    )
+                  )
+                )
+              ),
+              col_widths = c(3, 9)
+            )
+          )
+        )
       )
     )
   )
@@ -593,26 +1718,26 @@ mod_data_upload_server <- function(
         ))
       })
 
-      reactive({
-        rows <- registry()
-        ready_rows <- rows[rows$status == "ready", , drop = FALSE]
+      analysis_data <- reactive({
         results <- parsed_results()
 
-        select_objects <- function(report_type) {
-          ids <- ready_rows$file_id[ready_rows$report_type == report_type]
-          unname(results[ids])
+        select_objects <- function(result_class) {
+          Filter(
+            function(result) inherits(result, result_class),
+            unname(results)
+          )
         }
 
         monthly <- combine_basic_upload_results(
-          select_objects("monthly_site"),
+          select_objects("monthly_site_report_data"),
           "monthly_site_report_data"
         )
         sites <- combine_basic_upload_results(
-          select_objects("site_detail"),
+          select_objects("business_unit_template_report_data"),
           "business_unit_template_report_data"
         )
         venues <- combine_basic_upload_results(
-          select_objects("venues_tracking"),
+          select_objects("venues_tracking_report_data"),
           "venues_tracking_report_data"
         )
 
@@ -622,10 +1747,494 @@ mod_data_upload_server <- function(
           venues_reports = venues,
           monthly = monthly,
           sites = sites,
-          venues = venues,
-          uploads = rows
+          venues = venues
         )
       })
+
+      dashboard_data <- reactive({
+        c(
+          analysis_data(),
+          list(
+            uploads = registry()
+          )
+        )
+      })
+
+      selected_preview_report_type <- reactive({
+        report_type <- input$preview_report_type
+
+        if (is.null(report_type) ||
+            length(report_type) != 1L ||
+            !report_type %in% names(BASIC_PREVIEW_REPORT_FIELDS)) {
+          return(names(BASIC_PREVIEW_REPORT_FIELDS)[[1L]])
+        }
+
+        report_type
+      })
+
+      preview_report <- reactive({
+        basic_preview_report(
+          analysis_data(),
+          selected_preview_report_type()
+        )
+      })
+
+      preview_table_data <- reactive({
+        report <- preview_report()
+        report_type <- selected_preview_report_type()
+
+        if (identical(report_type, "monthly_site")) {
+          preview <- basic_preview_monthly_site_data(report)
+
+          if (is.data.frame(preview) && "data_section" %in% names(preview)) {
+            preview$data_section <- NULL
+          }
+
+          return(preview)
+        }
+
+        basic_preview_combined_report_data(report, report_type)
+      })
+
+      selected_preview_years <- reactive({
+        available_years <- basic_preview_years(preview_table_data())
+        basic_preview_valid_selections(input$preview_year, available_years)
+      })
+
+      preview_sheet_data <- reactive({
+        filter_basic_preview_table(
+          preview_table_data(),
+          year = selected_preview_years(),
+          source_sheet = BASIC_PREVIEW_ALL_SHEETS,
+          search = ""
+        )
+      })
+
+      preview_source_sheets <- reactive({
+        basic_preview_source_sheets(
+          preview_sheet_data(),
+          source_sheet_order = attr(
+            preview_report(),
+            "source_sheet_order",
+            exact = TRUE
+          )
+        )
+      })
+
+      selected_preview_source_sheet <- reactive({
+        monthly_site_preview <- identical(
+          selected_preview_report_type(),
+          "monthly_site"
+        )
+        source_sheets <- preview_source_sheets()
+        selected_sheet <- input$preview_source_sheet
+        selected_is_available <-
+          length(selected_sheet) == 1L &&
+          !is.na(selected_sheet) &&
+          selected_sheet %in% source_sheets
+
+        if (selected_is_available) {
+          return(selected_sheet)
+        }
+
+        if (monthly_site_preview && length(source_sheets) > 0L) {
+          return(source_sheets[[1L]])
+        }
+
+        BASIC_PREVIEW_ALL_SHEETS
+      })
+
+      preview_measure_data <- reactive({
+        filter_basic_preview_table(
+          preview_table_data(),
+          year = selected_preview_years(),
+          source_sheet = selected_preview_source_sheet(),
+          search = ""
+        )
+      })
+
+      preview_measure_choices <- reactive({
+        if (!identical(selected_preview_report_type(), "monthly_site")) {
+          return(character())
+        }
+
+        basic_preview_field_values(preview_measure_data(), "measure")
+      })
+
+      selected_preview_measures <- reactive({
+        basic_preview_valid_selections(
+          input$preview_measure,
+          preview_measure_choices()
+        )
+      })
+
+      preview_value_type_data <- reactive({
+        filter_basic_preview_table(
+          preview_measure_data(),
+          measures = selected_preview_measures(),
+          search = ""
+        )
+      })
+
+      preview_value_type_choices <- reactive({
+        if (!identical(selected_preview_report_type(), "monthly_site")) {
+          return(character())
+        }
+
+        basic_preview_field_values(preview_value_type_data(), "value_type")
+      })
+
+      selected_preview_value_types <- reactive({
+        basic_preview_valid_selections(
+          input$preview_value_type,
+          preview_value_type_choices()
+        )
+      })
+
+      observe({
+        years <- basic_preview_years(preview_table_data())
+        choices <- stats::setNames(years, years)
+        current <- isolate(input$preview_year)
+        selected <- basic_preview_valid_selections(current, years)
+
+        updateSelectizeInput(
+          session,
+          "preview_year",
+          choices = choices,
+          selected = selected,
+          server = TRUE
+        )
+      })
+
+      observe({
+        monthly_site_preview <- identical(
+          selected_preview_report_type(),
+          "monthly_site"
+        )
+        source_sheets <- preview_source_sheets()
+        choices <- if (monthly_site_preview && length(source_sheets) > 0L) {
+          stats::setNames(source_sheets, source_sheets)
+        } else if (monthly_site_preview) {
+          c("No sheets available" = BASIC_PREVIEW_ALL_SHEETS)
+        } else {
+          c(
+            "All sheets" = BASIC_PREVIEW_ALL_SHEETS,
+            stats::setNames(source_sheets, source_sheets)
+          )
+        }
+        current <- isolate(input$preview_source_sheet)
+        selected <- if (!is.null(current) && current %in% unname(choices)) {
+          current
+        } else if (monthly_site_preview && length(source_sheets) > 0L) {
+          source_sheets[[1L]]
+        } else {
+          BASIC_PREVIEW_ALL_SHEETS
+        }
+
+        updateRadioButtons(
+          session,
+          "preview_source_sheet",
+          choices = choices,
+          selected = selected,
+          inline = TRUE
+        )
+      })
+
+      observe({
+        choices <- preview_measure_choices()
+        selected <- basic_preview_valid_selections(
+          isolate(input$preview_measure),
+          choices
+        )
+
+        updateSelectizeInput(
+          session,
+          "preview_measure",
+          choices = stats::setNames(choices, choices),
+          selected = selected,
+          server = TRUE
+        )
+      })
+
+      observe({
+        choices <- preview_value_type_choices()
+        selected <- basic_preview_valid_selections(
+          isolate(input$preview_value_type),
+          choices
+        )
+
+        updateSelectizeInput(
+          session,
+          "preview_value_type",
+          choices = stats::setNames(choices, choices),
+          selected = selected,
+          server = TRUE
+        )
+      })
+
+      observe({
+        table_data <- preview_display_data()
+        columns <- if (is.data.frame(table_data)) names(table_data) else character()
+        choices <- c(
+          "Original order" = "__none__",
+          stats::setNames(columns, basic_preview_table_label(columns))
+        )
+        current <- isolate(input$preview_sort_column)
+        selected <- if (!is.null(current) && current %in% unname(choices)) {
+          current
+        } else {
+          "__none__"
+        }
+
+        updateSelectInput(
+          session,
+          "preview_sort_column",
+          choices = choices,
+          selected = selected
+        )
+      })
+
+      observeEvent(input$preview_column_sort, {
+        clicked_column <- as.character(input$preview_column_sort)
+        table_data <- preview_display_data()
+
+        if (!is.data.frame(table_data) ||
+            length(clicked_column) != 1L ||
+            is.na(clicked_column) ||
+            !clicked_column %in% names(table_data)) {
+          return()
+        }
+
+        next_sort <- next_basic_preview_sort(
+          clicked_column = clicked_column,
+          current_column = input$preview_sort_column,
+          current_direction = input$preview_sort_direction
+        )
+
+        updateSelectInput(
+          session,
+          "preview_sort_column",
+          selected = next_sort$column
+        )
+        updateSelectInput(
+          session,
+          "preview_sort_direction",
+          selected = next_sort$direction
+        )
+      }, ignoreInit = TRUE)
+
+      preview_filtered_data <- reactive({
+        filter_basic_preview_table(
+          preview_table_data(),
+          year = selected_preview_years(),
+          source_sheet = selected_preview_source_sheet(),
+          measures = selected_preview_measures(),
+          value_types = selected_preview_value_types(),
+          search = input$preview_search
+        )
+      })
+
+      preview_display_data <- reactive({
+        basic_preview_drop_empty_columns(preview_filtered_data())
+      })
+
+      preview_sorted_data <- reactive({
+        sort_basic_preview_table(
+          preview_display_data(),
+          column = input$preview_sort_column,
+          direction = input$preview_sort_direction
+        )
+      })
+
+      preview_page <- reactiveVal(1L)
+
+      observeEvent(
+        list(
+          input$preview_report_type,
+          input$preview_year,
+          input$preview_source_sheet,
+          input$preview_measure,
+          input$preview_value_type,
+          input$preview_search,
+          input$preview_sort_column,
+          input$preview_sort_direction,
+          input$preview_page_size
+        ),
+        preview_page(1L),
+        ignoreInit = TRUE
+      )
+
+      preview_page_state <- reactive({
+        paginate_basic_preview_table(
+          preview_sorted_data(),
+          page = preview_page(),
+          page_size = input$preview_page_size
+        )
+      })
+
+      observeEvent(input$preview_previous, {
+        page_state <- preview_page_state()
+        preview_page(max(1L, page_state$page - 1L))
+      })
+
+      observeEvent(input$preview_next, {
+        page_state <- preview_page_state()
+        preview_page(min(page_state$pages, page_state$page + 1L))
+      })
+
+      output$preview_summary <- renderUI({
+        report <- preview_report()
+        report_type <- selected_preview_report_type()
+        monthly_site_preview <- identical(report_type, "monthly_site")
+        table_data <- preview_table_data()
+
+        if (is.null(report)) {
+          return(div(
+            class = "cleaned-preview-empty",
+            bs_icon("table"),
+            div(
+              tags$strong("No cleaned data is available yet"),
+              tags$small(
+                "Upload and successfully parse a file in Upload & Manage."
+              )
+            )
+          ))
+        }
+
+        if (is.null(table_data)) {
+          return(div(
+            class = "cleaned-preview-empty",
+            bs_icon("table"),
+            div(
+              tags$strong("No preview table is available"),
+              tags$small("Cleaned rows appear after parsing finishes.")
+            )
+          ))
+        }
+
+        filtered_data <- preview_filtered_data()
+        selected_years <- selected_preview_years()
+        year_label <- if (length(selected_years) == 0L) {
+          "All years"
+        } else {
+          paste(selected_years, collapse = ", ")
+        }
+        selected_sheet <- selected_preview_source_sheet()
+        valid_selected_sheet <-
+          length(selected_sheet) == 1L &&
+          !is.na(selected_sheet) &&
+          nzchar(selected_sheet)
+        sheet_label <- if (
+          !valid_selected_sheet ||
+            selected_sheet == BASIC_PREVIEW_ALL_SHEETS
+        ) {
+          "All source sheets"
+        } else {
+          paste("Sheet:", selected_sheet)
+        }
+        display_title <- if (
+          valid_selected_sheet &&
+            selected_sheet != BASIC_PREVIEW_ALL_SHEETS
+        ) {
+          selected_sheet
+        } else {
+          paste(
+            unname(BASIC_UPLOAD_REPORT_TYPES[[report_type]]),
+            "contents"
+          )
+        }
+        content_label <- if (monthly_site_preview) {
+          selected_measures <- selected_preview_measures()
+
+          if (length(selected_measures) == 0L) {
+            "All measures"
+          } else {
+            paste(selected_measures, collapse = ", ")
+          }
+        } else {
+          sheet_label
+        }
+
+        div(
+          class = "cleaned-preview-summary",
+          div(
+            tags$strong(display_title),
+            tags$small(
+              paste(
+                unname(BASIC_UPLOAD_REPORT_TYPES[[
+                  report_type
+                ]]),
+                "·",
+                year_label,
+                "·",
+                content_label
+              )
+            )
+          ),
+          div(
+            class = "cleaned-preview-counts",
+            span(
+              paste0(
+                format(nrow(filtered_data), big.mark = ",", scientific = FALSE),
+                " of ",
+                format(nrow(table_data), big.mark = ",", scientific = FALSE),
+                " rows"
+              )
+            ),
+            span(paste(ncol(preview_display_data()), "columns"))
+          ),
+          if (nrow(table_data) == 0L) {
+            p(
+              class = "cleaned-preview-no-match",
+              "This table was created, but it contains no cleaned rows."
+            )
+          } else if (nrow(filtered_data) == 0L) {
+            p(
+              class = "cleaned-preview-no-match",
+              "No rows match the current filters."
+            )
+          }
+        )
+      })
+
+      output$cleaned_data_table <- renderUI({
+        page_state <- preview_page_state()
+
+        if (is.null(page_state$data) || page_state$total == 0L) {
+          return(NULL)
+        }
+
+        basic_preview_table_ui(
+          data = format_basic_preview_table(page_state$data),
+          sort_column = input$preview_sort_column,
+          sort_direction = input$preview_sort_direction,
+          sort_input_id = session$ns("preview_column_sort")
+        )
+      })
+
+      output$preview_page_info <- renderUI({
+        page_state <- preview_page_state()
+
+        text <- if (page_state$total == 0L) {
+          "No rows"
+        } else {
+          paste0(
+            format(page_state$from, big.mark = ",", scientific = FALSE),
+            "–",
+            format(page_state$to, big.mark = ",", scientific = FALSE),
+            " of ",
+            format(page_state$total, big.mark = ",", scientific = FALSE),
+            " · Page ",
+            page_state$page,
+            " of ",
+            page_state$pages
+          )
+        }
+
+        span(class = "cleaned-preview-page-info", text)
+      })
+
+      dashboard_data
     }
   )
 }

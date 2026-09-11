@@ -132,19 +132,44 @@ find_venues_tracking_sheet <- function(
   sheet_names,
   expected_name,
   source_name,
-  required = FALSE
+  required = FALSE,
+  allow_year_prefix = FALSE,
+  allow_year_comparison_suffix = FALSE
 ) {
 
+  sheet_keys <- normalise_excel_label(sheet_names)
+  expected_keys <- normalise_excel_label(expected_name)
+
+  if (isTRUE(allow_year_prefix)) {
+    sheet_keys <- sub(
+      "^(19|20)[0-9]{2}[[:space:]_-]+",
+      "",
+      sheet_keys
+    )
+  }
+
+  if (isTRUE(allow_year_comparison_suffix)) {
+    sheet_keys <- sub(
+      paste0(
+        "[[:space:]_-]+(19|20)[0-9]{2}",
+        "[[:space:]_-]+vs[[:space:]_-]+(19|20)[0-9]{2}$"
+      ),
+      "",
+      sheet_keys
+    )
+  }
+
   matches <- sheet_names[
-    normalise_excel_label(sheet_names) ==
-      normalise_excel_label(expected_name)
+    sheet_keys %in% expected_keys
   ]
+
+  expected_label <- paste(expected_name, collapse = " or ")
 
   if (length(matches) > 1L) {
     stop(
       paste0(
         "Expected at most one ",
-        expected_name,
+        expected_label,
         " sheet in ",
         source_name,
         "; found ",
@@ -160,7 +185,7 @@ find_venues_tracking_sheet <- function(
       stop(
         paste0(
           "Expected exactly one ",
-          expected_name,
+          expected_label,
           " sheet in ",
           source_name,
           "; found 0."
@@ -217,9 +242,36 @@ read_venues_tracking_report_file <- function(
     expected_name = "Facility Hire Tracking",
     source_name = source_name
   )
+  court_hire_sheet_name <- find_venues_tracking_sheet(
+    sheet_names = sheet_names,
+    expected_name = "Court Hire",
+    source_name = source_name,
+    allow_year_comparison_suffix = TRUE
+  )
   membership_sheet_name <- find_venues_tracking_sheet(
     sheet_names = sheet_names,
     expected_name = "Membership Tracking",
+    source_name = source_name
+  )
+  online_sales_sheet_name <- find_venues_tracking_sheet(
+    sheet_names = sheet_names,
+    expected_name = "Online Sales",
+    source_name = source_name
+  )
+  merchandise_sheet_name <- find_venues_tracking_sheet(
+    sheet_names = sheet_names,
+    expected_name = "Merchandise Tracking",
+    source_name = source_name
+  )
+  casual_hours_sheet_name <- find_venues_tracking_sheet(
+    sheet_names = sheet_names,
+    expected_name = "Casual Hours",
+    source_name = source_name,
+    allow_year_prefix = TRUE
+  )
+  casual_wages_sheet_name <- find_venues_tracking_sheet(
+    sheet_names = sheet_names,
+    expected_name = "Casual Wages",
     source_name = source_name
   )
 
@@ -237,10 +289,35 @@ read_venues_tracking_report_file <- function(
   } else {
     read_venues_tracking_sheet(path, facility_hire_sheet_name)
   }
+  court_hire_sheet <- if (is.na(court_hire_sheet_name)) {
+    NULL
+  } else {
+    read_venues_tracking_sheet(path, court_hire_sheet_name)
+  }
   membership_sheet <- if (is.na(membership_sheet_name)) {
     NULL
   } else {
     read_venues_tracking_sheet(path, membership_sheet_name)
+  }
+  online_sales_sheet <- if (is.na(online_sales_sheet_name)) {
+    NULL
+  } else {
+    read_venues_tracking_sheet(path, online_sales_sheet_name)
+  }
+  merchandise_sheet <- if (is.na(merchandise_sheet_name)) {
+    NULL
+  } else {
+    read_venues_tracking_sheet(path, merchandise_sheet_name)
+  }
+  casual_hours_sheet <- if (is.na(casual_hours_sheet_name)) {
+    NULL
+  } else {
+    read_venues_tracking_sheet(path, casual_hours_sheet_name)
+  }
+  casual_wages_sheet <- if (is.na(casual_wages_sheet_name)) {
+    NULL
+  } else {
+    read_venues_tracking_sheet(path, casual_wages_sheet_name)
   }
 
   structure(
@@ -259,8 +336,18 @@ read_venues_tracking_report_file <- function(
       attendance_sheet = attendance_sheet,
       facility_hire_sheet_name = facility_hire_sheet_name,
       facility_hire_sheet = facility_hire_sheet,
+      court_hire_sheet_name = court_hire_sheet_name,
+      court_hire_sheet = court_hire_sheet,
       membership_sheet_name = membership_sheet_name,
-      membership_sheet = membership_sheet
+      membership_sheet = membership_sheet,
+      online_sales_sheet_name = online_sales_sheet_name,
+      online_sales_sheet = online_sales_sheet,
+      merchandise_sheet_name = merchandise_sheet_name,
+      merchandise_sheet = merchandise_sheet,
+      casual_hours_sheet_name = casual_hours_sheet_name,
+      casual_hours_sheet = casual_hours_sheet,
+      casual_wages_sheet_name = casual_wages_sheet_name,
+      casual_wages_sheet = casual_wages_sheet
     ),
     class = "venues_tracking_report_workbook"
   )
@@ -408,12 +495,52 @@ load_venues_tracking_reports <- function(
     empty_venues_facility_hire_table()
   )
 
+  court_hire <- bind_import_tables(
+    lapply(
+      valid_workbooks,
+      clean_venues_tracking_report_court_hire
+    ),
+    empty_venues_court_hire_table()
+  )
+
   membership <- bind_import_tables(
     lapply(
       valid_workbooks,
       clean_venues_tracking_report_membership
     ),
     empty_venues_membership_table()
+  )
+
+  online_sales <- bind_import_tables(
+    lapply(
+      valid_workbooks,
+      clean_venues_tracking_report_online_sales
+    ),
+    empty_venues_online_sales_table()
+  )
+
+  merchandise <- bind_import_tables(
+    lapply(
+      valid_workbooks,
+      clean_venues_tracking_report_merchandise
+    ),
+    empty_venues_merchandise_table()
+  )
+
+  casual_hours <- bind_import_tables(
+    lapply(
+      valid_workbooks,
+      clean_venues_tracking_report_casual_hours
+    ),
+    empty_venues_casual_hours_table()
+  )
+
+  casual_wages <- bind_import_tables(
+    lapply(
+      valid_workbooks,
+      clean_venues_tracking_report_casual_wages
+    ),
+    empty_venues_casual_wages_table()
   )
 
   checks <- build_venues_finance_checks(
@@ -428,8 +555,28 @@ load_venues_tracking_reports <- function(
     facility_hire,
     validation_tolerance = validation_tolerance
   )
+  court_hire_checks <- build_venues_court_hire_checks(
+    court_hire,
+    validation_tolerance = validation_tolerance
+  )
   membership_checks <- build_venues_membership_checks(
     membership,
+    validation_tolerance = validation_tolerance
+  )
+  online_sales_checks <- build_venues_online_sales_checks(
+    online_sales,
+    validation_tolerance = validation_tolerance
+  )
+  merchandise_checks <- build_venues_merchandise_checks(
+    merchandise,
+    validation_tolerance = validation_tolerance
+  )
+  casual_hours_checks <- build_venues_casual_hours_checks(
+    casual_hours,
+    validation_tolerance = validation_tolerance
+  )
+  casual_wages_checks <- build_venues_casual_wages_checks(
+    casual_wages,
     validation_tolerance = validation_tolerance
   )
 
@@ -439,7 +586,12 @@ load_venues_tracking_reports <- function(
       validate_venues_finance_checks(checks),
       validate_venues_operational_checks(attendance_checks),
       validate_venues_operational_checks(facility_hire_checks),
-      validate_venues_operational_checks(membership_checks)
+      validate_venues_operational_checks(court_hire_checks),
+      validate_venues_operational_checks(membership_checks),
+      validate_venues_operational_checks(online_sales_checks),
+      validate_venues_operational_checks(merchandise_checks),
+      validate_venues_operational_checks(casual_hours_checks),
+      validate_venues_operational_checks(casual_wages_checks)
     ),
     empty_import_issue_table()
   )
@@ -451,7 +603,12 @@ load_venues_tracking_reports <- function(
       finance_sheet = character(),
       attendance_sheet = character(),
       facility_hire_sheet = character(),
+      court_hire_sheet = character(),
       membership_sheet = character(),
+      online_sales_sheet = character(),
+      merchandise_sheet = character(),
+      casual_hours_sheet = character(),
+      casual_wages_sheet = character(),
       path = character(),
       stringsAsFactors = FALSE
     )
@@ -482,9 +639,34 @@ load_venues_tracking_reports <- function(
         function(x) x$facility_hire_sheet_name,
         character(1)
       ),
+      court_hire_sheet = vapply(
+        workbooks,
+        function(x) x$court_hire_sheet_name,
+        character(1)
+      ),
       membership_sheet = vapply(
         workbooks,
         function(x) x$membership_sheet_name,
+        character(1)
+      ),
+      online_sales_sheet = vapply(
+        workbooks,
+        function(x) x$online_sales_sheet_name,
+        character(1)
+      ),
+      merchandise_sheet = vapply(
+        workbooks,
+        function(x) x$merchandise_sheet_name,
+        character(1)
+      ),
+      casual_hours_sheet = vapply(
+        workbooks,
+        function(x) x$casual_hours_sheet_name,
+        character(1)
+      ),
+      casual_wages_sheet = vapply(
+        workbooks,
+        function(x) x$casual_wages_sheet_name,
         character(1)
       ),
       path = vapply(
@@ -504,8 +686,18 @@ load_venues_tracking_reports <- function(
       attendance_checks = attendance_checks,
       facility_hire = facility_hire,
       facility_hire_checks = facility_hire_checks,
+      court_hire = court_hire,
+      court_hire_checks = court_hire_checks,
       membership = membership,
       membership_checks = membership_checks,
+      online_sales = online_sales,
+      online_sales_checks = online_sales_checks,
+      merchandise = merchandise,
+      merchandise_checks = merchandise_checks,
+      casual_hours = casual_hours,
+      casual_hours_checks = casual_hours_checks,
+      casual_wages = casual_wages,
+      casual_wages_checks = casual_wages_checks,
       validation = validation,
       files = file_summary
     ),
@@ -528,7 +720,12 @@ print.venues_tracking_report_data <- function(x, ...) {
   cat("  Finance rows:", nrow(x$finance), "\n")
   cat("  Attendance rows:", nrow(x$attendance), "\n")
   cat("  Facility hire rows:", nrow(x$facility_hire), "\n")
+  cat("  Court hire rows:", nrow(x$court_hire), "\n")
   cat("  Membership rows:", nrow(x$membership), "\n")
+  cat("  Online sales rows:", nrow(x$online_sales), "\n")
+  cat("  Merchandise rows:", nrow(x$merchandise), "\n")
+  cat("  Casual hours rows:", nrow(x$casual_hours), "\n")
+  cat("  Casual wages rows:", nrow(x$casual_wages), "\n")
   cat(
     "  Finance checks passed:",
     sum(x$checks$status == "pass"),
@@ -551,10 +748,45 @@ print.venues_tracking_report_data <- function(x, ...) {
     "\n"
   )
   cat(
+    "  Court hire checks passed:",
+    sum(x$court_hire_checks$status == "pass"),
+    "of",
+    nrow(x$court_hire_checks),
+    "\n"
+  )
+  cat(
     "  Membership checks passed:",
     sum(x$membership_checks$status == "pass"),
     "of",
     nrow(x$membership_checks),
+    "\n"
+  )
+  cat(
+    "  Online sales checks passed:",
+    sum(x$online_sales_checks$status == "pass"),
+    "of",
+    nrow(x$online_sales_checks),
+    "\n"
+  )
+  cat(
+    "  Merchandise checks passed:",
+    sum(x$merchandise_checks$status == "pass"),
+    "of",
+    nrow(x$merchandise_checks),
+    "\n"
+  )
+  cat(
+    "  Casual hours checks passed:",
+    sum(x$casual_hours_checks$status == "pass"),
+    "of",
+    nrow(x$casual_hours_checks),
+    "\n"
+  )
+  cat(
+    "  Casual wages checks passed:",
+    sum(x$casual_wages_checks$status == "pass"),
+    "of",
+    nrow(x$casual_wages_checks),
     "\n"
   )
   cat("  Validation issues:", nrow(x$validation), "\n")
