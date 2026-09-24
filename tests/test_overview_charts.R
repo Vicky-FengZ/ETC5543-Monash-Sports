@@ -31,6 +31,52 @@ make_finance_rows <- function(
   )
 }
 
+make_monthly_finance_rows <- function(
+  year,
+  month,
+  site,
+  is_summary,
+  income_actual,
+  income_budget,
+  expenses_actual,
+  expenses_budget,
+  source_file
+) {
+
+  month_date <- as.Date(
+    sprintf("%04d-%02d-01", year, month)
+  )
+
+  data.frame(
+    report_year = rep(as.integer(year), 4L),
+    date = rep(month_date, 4L),
+    month = rep(as.integer(month), 4L),
+    month_label = rep(month.abb[[month]], 4L),
+    site = rep(site, 4L),
+    is_summary = rep(is_summary, 4L),
+    metric = c(
+      "Income",
+      "Income",
+      "Expenses",
+      "Expenses"
+    ),
+    value_type = c(
+      "Actual",
+      "Budget",
+      "Actual",
+      "Budget"
+    ),
+    value = c(
+      income_actual,
+      income_budget,
+      expenses_actual,
+      expenses_budget
+    ),
+    source_file = rep(source_file, 4L),
+    stringsAsFactors = FALSE
+  )
+}
+
 make_revenue_row <- function(
   year,
   site,
@@ -91,6 +137,138 @@ stopifnot(
   identical(annual$budget_variance, c(10, 0)),
   all(annual$aggregation_source == "Monash Sport YTD Summary"),
   length(overview_duplicate_report_years(synthetic_reports)) == 0L
+)
+
+# -------------------------------------------------------------------------
+# Monthly Overview finance calculation
+# -------------------------------------------------------------------------
+
+monthly_reports_fixture <- list(
+  finance = rbind(
+
+    # Organisation-wide values that should be used.
+    make_monthly_finance_rows(
+      2025, 1,
+      "Monash Sport", TRUE,
+      120, 110,
+      80, 75,
+      "2025.xlsx"
+    ),
+
+    make_monthly_finance_rows(
+      2025, 2,
+      "Monash Sport", TRUE,
+      150, 140,
+      90, 85,
+      "2025.xlsx"
+    ),
+
+    # Site values deliberately made very large.
+    # These must NOT be added to the Monash Sport total.
+    make_monthly_finance_rows(
+      2025, 1,
+      "Clayton", TRUE,
+      999, 999,
+      999, 999,
+      "2025.xlsx"
+    ),
+
+    make_monthly_finance_rows(
+      2025, 2,
+      "Clayton", TRUE,
+      999, 999,
+      999, 999,
+      "2025.xlsx"
+    )
+  )
+)
+
+monthly_finance <- calculate_overview_monthly_finance(
+  monthly_reports_fixture
+)
+
+stopifnot(
+  nrow(monthly_finance) == 2L,
+
+  identical(
+    monthly_finance$date,
+    as.Date(c(
+      "2025-01-01",
+      "2025-02-01"
+    ))
+  ),
+
+  identical(
+    monthly_finance$income_actual,
+    c(120, 150)
+  ),
+
+  identical(
+    monthly_finance$income_budget,
+    c(110, 140)
+  ),
+
+  identical(
+    monthly_finance$expenses_actual,
+    c(80, 90)
+  ),
+
+  identical(
+    monthly_finance$expenses_budget,
+    c(75, 85)
+  ),
+
+  identical(
+    monthly_finance$net_actual,
+    c(40, 60)
+  ),
+
+  identical(
+    monthly_finance$net_budget,
+    c(35, 55)
+  ),
+
+  all(
+    monthly_finance$aggregation_source ==
+      "Monash Sport Monthly Summary"
+  )
+)
+
+monthly_fallback_fixture <- list(
+  finance = rbind(
+
+    make_monthly_finance_rows(
+      2026, 1,
+      "Clayton", TRUE,
+      50, 45,
+      30, 28,
+      "2026.xlsx"
+    ),
+
+    make_monthly_finance_rows(
+      2026, 1,
+      "Caulfield", TRUE,
+      70, 65,
+      40, 38,
+      "2026.xlsx"
+    )
+  )
+)
+
+monthly_fallback <- calculate_overview_monthly_finance(
+  monthly_fallback_fixture
+)
+
+stopifnot(
+  nrow(monthly_fallback) == 1L,
+  monthly_fallback$income_actual[[1L]] == 120,
+  monthly_fallback$income_budget[[1L]] == 110,
+  monthly_fallback$expenses_actual[[1L]] == 70,
+  monthly_fallback$expenses_budget[[1L]] == 66,
+  monthly_fallback$net_actual[[1L]] == 50,
+  monthly_fallback$net_budget[[1L]] == 44,
+  monthly_fallback$aggregation_source[[1L]] ==
+    "Sum of Site Monthly Summaries"
 )
 
 annual_revenue <- calculate_overview_annual_revenue(synthetic_reports)

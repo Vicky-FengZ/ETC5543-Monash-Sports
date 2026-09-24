@@ -200,6 +200,228 @@ calculate_overview_annual_finance <- function(monthly_reports) {
   ]
 }
 
+# -------------------------------------------------------------------------
+# Monthly Overview finance
+# -------------------------------------------------------------------------
+
+empty_overview_monthly_finance <- function() {
+  data.frame(
+    report_year = integer(),
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    income_actual = double(),
+    income_budget = double(),
+    expenses_actual = double(),
+    expenses_budget = double(),
+    net_actual = double(),
+    net_budget = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_overview_monthly_finance <- function(monthly_reports) {
+
+  if (is.null(monthly_reports)) {
+    return(empty_overview_monthly_finance())
+  }
+
+  finance <- if (is.data.frame(monthly_reports)) {
+    monthly_reports
+  } else {
+    monthly_reports$finance
+  }
+
+  required_columns <- c(
+    "report_year",
+    "date",
+    "site",
+    "is_summary",
+    "metric",
+    "value_type",
+    "value"
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(empty_overview_monthly_finance())
+  }
+
+  missing_columns <- setdiff(required_columns, names(finance))
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly Site Report finance data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Keep only monthly site-level / organisation-level summary values.
+  #
+  # Actual and Budget are retained here so the same prepared dataset
+  # can support both the Income/Expenses trend and later Budget vs Actual
+  # analysis.
+  finance <- finance[
+    finance$is_summary %in% TRUE &
+      finance$metric %in% c("Income", "Expenses") &
+      finance$value_type %in% c("Actual", "Budget") &
+      !is.na(finance$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(finance) == 0L) {
+    return(empty_overview_monthly_finance())
+  }
+
+  finance$date <- as.Date(finance$date)
+
+  years <- sort(unique(as.integer(finance$report_year)))
+  years <- years[!is.na(years)]
+
+  result_rows <- list()
+
+  for (year in years) {
+
+    year_rows <- finance[
+      finance$report_year == year,
+      ,
+      drop = FALSE
+    ]
+
+    site_key <- trimws(tolower(year_rows$site))
+
+    organisation_rows <- year_rows[
+      !is.na(site_key) &
+        site_key == "monash sport",
+      ,
+      drop = FALSE
+    ]
+
+    # Use the same anti-double-counting rule as the annual Overview:
+    # prefer the Monash Sport summary when available; otherwise sum
+    # the individual site summary rows.
+    if (nrow(organisation_rows) > 0L) {
+
+      selected <- organisation_rows
+      aggregation_source <- "Monash Sport Monthly Summary"
+
+    } else {
+
+      selected <- year_rows[
+        !is.na(site_key) &
+          site_key != "monash sport",
+        ,
+        drop = FALSE
+      ]
+
+      aggregation_source <- "Sum of Site Monthly Summaries"
+    }
+
+    date_keys <- sort(unique(format(selected$date, "%Y-%m-%d")))
+
+    for (date_key in date_keys) {
+
+      current_date <- as.Date(date_key)
+
+      month_rows <- selected[
+        selected$date == current_date,
+        ,
+        drop = FALSE
+      ]
+
+      value_for <- function(metric, value_type) {
+
+        keep <- month_rows$metric == metric &
+          month_rows$value_type == value_type
+
+        sum_available_finance_values(
+          month_rows$value[keep]
+        )
+      }
+
+      income_actual <- value_for(
+        "Income",
+        "Actual"
+      )
+
+      income_budget <- value_for(
+        "Income",
+        "Budget"
+      )
+
+      expenses_actual <- value_for(
+        "Expenses",
+        "Actual"
+      )
+
+      expenses_budget <- value_for(
+        "Expenses",
+        "Budget"
+      )
+
+      month_number <- as.integer(
+        format(current_date, "%m")
+      )
+
+      result_rows[[length(result_rows) + 1L]] <- data.frame(
+        report_year = as.integer(year),
+        date = current_date,
+        month = month_number,
+        month_label = month.abb[[month_number]],
+        income_actual = income_actual,
+        income_budget = income_budget,
+        expenses_actual = expenses_actual,
+        expenses_budget = expenses_budget,
+        net_actual = if (
+          is.na(income_actual) ||
+            is.na(expenses_actual)
+        ) {
+          NA_real_
+        } else {
+          income_actual - expenses_actual
+        },
+        net_budget = if (
+          is.na(income_budget) ||
+            is.na(expenses_budget)
+        ) {
+          NA_real_
+        } else {
+          income_budget - expenses_budget
+        },
+        aggregation_source = aggregation_source,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  if (length(result_rows) == 0L) {
+    return(empty_overview_monthly_finance())
+  }
+
+  result <- do.call(
+    rbind,
+    result_rows
+  )
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
 
 overview_metric_values <- function(annual_finance, metric) {
   if (nrow(annual_finance) == 0L) {
@@ -371,3 +593,4 @@ calculate_overview_annual_revenue <- function(monthly_reports) {
   rownames(result) <- NULL
   result
 }
+
