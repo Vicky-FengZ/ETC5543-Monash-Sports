@@ -76,6 +76,209 @@ overview_plot_limits <- function(values) {
   limits + c(-padding, padding)
 }
 
+plot_monthly_income_expenses <- function(monthly_finance) {
+
+  if (
+    is.null(monthly_finance) ||
+      !is.data.frame(monthly_finance) ||
+      nrow(monthly_finance) == 0L
+  ) {
+    stop(
+      "No monthly finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "income_actual",
+    "expenses_actual"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(monthly_finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly finance data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  monthly_finance <- monthly_finance[
+    order(monthly_finance$date),
+    ,
+    drop = FALSE
+  ]
+
+  dates <- as.Date(monthly_finance$date)
+  income <- suppressWarnings(
+    as.numeric(monthly_finance$income_actual)
+  )
+  expenses <- suppressWarnings(
+    as.numeric(monthly_finance$expenses_actual)
+  )
+
+  valid_dates <- !is.na(dates)
+
+  if (
+    !any(valid_dates) ||
+      !any(is.finite(c(income, expenses)))
+  ) {
+    stop(
+      "No finite monthly Income or Expenses values are available.",
+      call. = FALSE
+    )
+  }
+
+  dates <- dates[valid_dates]
+  income <- income[valid_dates]
+  expenses <- expenses[valid_dates]
+
+  limits <- overview_plot_limits(
+    c(income, expenses)
+  )
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1]] == x_limits[[2]]) {
+    x_limits <- x_limits + c(-15, 15)
+  }
+
+  old_par <- par(
+    mar = c(5.2, 5.8, 2.8, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    dates,
+    income,
+    type = "n",
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = ""
+  )
+
+  y_ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= limits[[1]] &
+      y_ticks <= limits[[2]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  lines(
+    dates,
+    income,
+    col = "#2563EB",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    income,
+    pch = 21,
+    cex = 1,
+    lwd = 1.8,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  lines(
+    dates,
+    expenses,
+    col = "#F59E0B",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    expenses,
+    pch = 21,
+    cex = 1,
+    lwd = 1.8,
+    col = "#F59E0B",
+    bg = "white"
+  )
+
+  x_ticks <- pretty(
+    range(dates),
+    n = 8
+  )
+
+  axis.Date(
+    1,
+    at = x_ticks,
+    format = "%b\n%Y",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format_compact_currency(y_ticks),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Income",
+      "Expenses"
+    ),
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    lty = 1,
+    lwd = 2.6,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.82,
+    text.col = "#475569",
+    inset = c(0, -0.02),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
 
 plot_annual_performance_trend <- function(annual_finance, metric) {
   values <- overview_metric_values(annual_finance, metric)

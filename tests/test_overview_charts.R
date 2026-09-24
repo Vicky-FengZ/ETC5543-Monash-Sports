@@ -16,6 +16,7 @@ make_finance_rows <- function(
 ) {
   data.frame(
     report_year = rep(as.integer(year), 4L),
+        date = rep( as.Date(sprintf("%04d-01-01", year)), 4L),
     site = rep(site, 4L),
     is_summary = rep(is_summary, 4L),
     metric = c("Income", "Income", "Expenses", "Expenses"),
@@ -326,9 +327,11 @@ stopifnot(
 
 ui_html <- as.character(mod_overview_ui("overview-test"))
 stopifnot(
+  grepl("overview-test-monthly_income_expenses",ui_html,fixed = TRUE ),
   grepl("overview-test-annual_performance_trend", ui_html, fixed = TRUE),
   grepl("overview-test-budget_vs_actual", ui_html, fixed = TRUE),
   grepl("overview-test-revenue_capture_plot", ui_html, fixed = TRUE),
+  grepl("height:460px", ui_html, fixed = TRUE),
   grepl("height:480px", ui_html, fixed = TRUE),
   grepl("height:520px", ui_html, fixed = TRUE),
   !grepl("Year-by-year performance", ui_html, fixed = TRUE),
@@ -355,7 +358,11 @@ shiny::testServer(
     stopifnot(
       identical(available_years(), c(2024L, 2025L)),
       nrow(annual_finance()) == 2L,
+      nrow(monthly_finance()) == 2L,
       nrow(annual_revenue()) == 2L,
+      nrow(filtered_monthly_finance()) == 2L,
+      nrow(filtered_annual_finance()) == 2L,
+      nrow(filtered_annual_revenue()) == 2L,
       nrow(filtered_annual_finance()) == 2L,
       nrow(filtered_annual_revenue()) == 2L,
       output$income_value == "$150",
@@ -370,6 +377,7 @@ shiny::testServer(
 
     # Accessing the outputs forces all renderPlot expressions to execute.
     stopifnot(
+      !is.null(output$monthly_income_expenses),
       !is.null(output$annual_performance_trend),
       !is.null(output$budget_vs_actual),
       !is.null(output$revenue_capture_plot)
@@ -409,6 +417,21 @@ shiny::testServer(
   }
 )
 
+monthly_file <- tempfile(fileext = ".png")
+
+grDevices::png(
+  monthly_file,
+  width = 1000,
+  height = 520,
+  res = 96
+)
+
+plot_monthly_income_expenses(
+  monthly_finance
+)
+
+grDevices::dev.off()
+
 trend_file <- tempfile(fileext = ".png")
 grDevices::png(trend_file, width = 900, height = 500, res = 96)
 plot_annual_performance_trend(annual, "Net Result")
@@ -425,6 +448,8 @@ plot_revenue_capture_over_time(annual_revenue)
 grDevices::dev.off()
 
 stopifnot(
+  file.exists(monthly_file),
+  file.info(monthly_file)$size > 0L,
   file.exists(trend_file),
   file.info(trend_file)$size > 0L,
   file.exists(budget_file),
@@ -432,6 +457,13 @@ stopifnot(
   file.exists(revenue_file),
   file.info(revenue_file)$size > 0L
 )
-unlink(c(trend_file, budget_file, revenue_file))
+unlink(
+  c(
+    monthly_file,
+    trend_file,
+    budget_file,
+    revenue_file
+  )
+)
 
 cat("PASS test_overview_charts.R\n")

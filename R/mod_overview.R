@@ -114,6 +114,30 @@ mod_overview_ui <- function(id) {
         )
       ),
 
+           br(),
+
+      card(
+        full_screen = TRUE,
+
+        card_header(
+          div(
+            div(
+              class = "chart-header-title",
+              "Income & Expenses Over Time"
+            ),
+
+            uiOutput(
+              ns("monthly_finance_period")
+            )
+          )
+        ),
+
+        plotOutput(
+          ns("monthly_income_expenses"),
+          height = "460px"
+        )
+      ),
+
       br(),
 
       # Main analysis row:
@@ -334,6 +358,10 @@ mod_overview_server <- function(
 
       annual_revenue <- reactive({
         calculate_overview_annual_revenue(monthly_reports())
+      })
+
+      monthly_finance <- reactive({
+        calculate_overview_monthly_finance(monthly_reports())
       })
 
       duplicate_years <- reactive({
@@ -693,6 +721,18 @@ mod_overview_server <- function(
       })
 
       # Chart subtitles keep the scope of each chart visible to the user.
+
+            output$monthly_finance_period <- renderUI({
+        x <- period()
+
+        chart_subtitle(
+          paste0(
+            "Monthly Actual Income and Expenses · ",
+            x$label
+          )
+        )
+      })
+
       output$trend_period <- renderUI({
         x <- period()
 
@@ -713,6 +753,18 @@ mod_overview_server <- function(
             x$label
           )
         )
+      })
+
+            filtered_monthly_finance <- reactive({
+        x <- monthly_finance()
+        selected_period <- period()
+
+        x[
+          x$report_year >= selected_period$from &
+            x$report_year <= selected_period$to,
+          ,
+          drop = FALSE
+        ]
       })
 
       filtered_annual_finance <- reactive({
@@ -761,6 +813,31 @@ mod_overview_server <- function(
           )
         )
       }
+
+            output$monthly_income_expenses <- renderPlot(
+        {
+          x <- filtered_monthly_finance()
+
+          validate_monthly_chart_data(x)
+
+          available_values <- is.finite(x$income_actual) |
+            is.finite(x$expenses_actual)
+
+          validate(
+            need(
+              any(available_values),
+              paste(
+                "No monthly Income or Expenses values are available",
+                "for this period."
+              )
+            )
+          )
+
+          plot_monthly_income_expenses(x)
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$annual_performance_trend <- renderPlot(
         {
