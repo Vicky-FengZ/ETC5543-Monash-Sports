@@ -808,3 +808,56 @@ calculate_site_annual_finance <- function(monthly_reports) {
 
   result
 }
+
+site_finance_values <- function(
+    site_finance,
+    metric,
+    value_type = "Actual"
+) {
+
+  if (
+    is.null(site_finance) ||
+      !is.data.frame(site_finance) ||
+      nrow(site_finance) == 0L
+  ) {
+    return(double())
+  }
+
+  if (!value_type %in% c("Actual", "Budget")) {
+    stop(
+      "value_type must be either 'Actual' or 'Budget'.",
+      call. = FALSE
+    )
+  }
+
+  suffix <- if (value_type == "Actual") {
+    "actual"
+  } else {
+    "budget"
+  }
+
+  column <- switch(
+    metric,
+    "Income" = paste0("income_", suffix),
+    "Expenses" = paste0("expenses_", suffix),
+    "Net Result" = paste0("net_", suffix),
+    stop(
+      paste0("Unknown Site Comparison metric: ", metric),
+      call. = FALSE
+    )
+  )
+
+  if (!column %in% names(site_finance)) {
+    stop(
+      paste0(
+        "Site finance data is missing: ",
+        column
+      ),
+      call. = FALSE
+    )
+  }
+
+  suppressWarnings(
+    as.numeric(site_finance[[column]])
+  )
+}

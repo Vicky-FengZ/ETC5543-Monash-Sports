@@ -840,3 +840,231 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Site Comparison plots
+# -------------------------------------------------------------------------
+
+plot_site_performance_over_time <- function(
+    site_finance,
+    metric
+) {
+
+  if (
+    is.null(site_finance) ||
+      !is.data.frame(site_finance) ||
+      nrow(site_finance) == 0L
+  ) {
+    stop(
+      "No site finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "report_year",
+    "site"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(site_finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Site finance data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  values <- site_finance_values(
+    site_finance,
+    metric,
+    "Actual"
+  )
+
+  years <- suppressWarnings(
+    as.integer(site_finance$report_year)
+  )
+
+  sites <- trimws(
+    as.character(site_finance$site)
+  )
+
+  keep <- is.finite(values) &
+    !is.na(years) &
+    !is.na(sites) &
+    nzchar(sites)
+
+  values <- values[keep]
+  years <- years[keep]
+  sites <- sites[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      paste0(
+        "No finite Actual ",
+        metric,
+        " values are available."
+      ),
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    report_year = years,
+    site = sites,
+    value = values,
+    stringsAsFactors = FALSE
+  )
+
+  site_names <- sort(
+    unique(plot_data$site)
+  )
+
+  year_values <- sort(
+    unique(plot_data$report_year)
+  )
+
+  limits <- overview_plot_limits(
+    plot_data$value
+  )
+
+  x_limits <- range(
+    year_values
+  )
+
+  if (length(year_values) == 1L) {
+    x_limits <- x_limits + c(-0.5, 0.5)
+  } else {
+    x_limits <- x_limits + c(-0.25, 0.25)
+  }
+
+  colours <- grDevices::hcl.colors(
+    length(site_names),
+    palette = "Dark 3"
+  )
+
+  old_par <- par(
+    mar = c(4.2, 5.8, 5.5, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= limits[[1]] &
+      y_ticks <= limits[[2]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  for (index in seq_along(site_names)) {
+
+    site_name <- site_names[[index]]
+
+    site_rows <- plot_data[
+      plot_data$site == site_name,
+      ,
+      drop = FALSE
+    ]
+
+    site_rows <- site_rows[
+      order(site_rows$report_year),
+      ,
+      drop = FALSE
+    ]
+
+    if (nrow(site_rows) > 1L) {
+      lines(
+        site_rows$report_year,
+        site_rows$value,
+        col = colours[[index]],
+        lwd = 2.4
+      )
+    }
+
+    points(
+      site_rows$report_year,
+      site_rows$value,
+      pch = 21,
+      cex = 1.05,
+      lwd = 1.8,
+      col = colours[[index]],
+      bg = "white"
+    )
+  }
+
+  axis(
+    1,
+    at = year_values,
+    labels = year_values,
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.88
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format_compact_currency(y_ticks),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = site_names,
+    col = colours,
+    lty = 1,
+    lwd = 2.4,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    ncol = min(3L, length(site_names)),
+    cex = 0.76,
+    text.col = "#475569",
+    inset = c(0, -0.03),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}

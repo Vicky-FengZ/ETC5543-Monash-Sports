@@ -194,3 +194,77 @@ stopifnot(
 
 
 cat("PASS test_site_comparison.R\n")
+
+# -------------------------------------------------------------------------
+# Site metric extraction
+# -------------------------------------------------------------------------
+
+stopifnot(
+  identical(
+    site_finance_values(
+      site_annual,
+      "Income",
+      "Actual"
+    ),
+    c(100, 80, 120, 90)
+  ),
+
+  identical(
+    site_finance_values(
+      site_annual,
+      "Expenses",
+      "Actual"
+    ),
+    c(60, 50, 70, 55)
+  ),
+
+  identical(
+    site_finance_values(
+      site_annual,
+      "Net Result",
+      "Actual"
+    ),
+    c(40, 30, 50, 35)
+  ),
+
+  identical(
+    site_finance_values(
+      site_annual,
+      "Net Result",
+      "Budget"
+    ),
+    c(40, 37, 45, 36)
+  )
+)
+
+
+# -------------------------------------------------------------------------
+# Site Performance Over Time plot
+# -------------------------------------------------------------------------
+
+site_trend_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  site_trend_file,
+  width = 1100,
+  height = 600,
+  res = 96
+)
+
+plot_site_performance_over_time(
+  site_annual,
+  "Income"
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(site_trend_file),
+  file.info(site_trend_file)$size > 0L
+)
+
+
+unlink(site_trend_file)

@@ -91,8 +91,9 @@ mod_site_comparison_ui <- function(id) {
           )
         ),
         
-        placeholder_chart(
-          "Compare actual performance across sites year by year"
+        plotOutput(
+          ns("site_performance_trend"),
+          height = "520px"
         )
       ),
       
@@ -474,6 +475,113 @@ mod_site_comparison_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
+
+      # -------------------------------------------------------------------
+      # Monthly Site Report data
+      # -------------------------------------------------------------------
+
+      monthly_reports <- reactive({
+
+        if (is.null(data)) {
+          return(NULL)
+        }
+
+        dashboard_data <- if (shiny::is.reactive(data)) {
+          data()
+        } else {
+          data
+        }
+
+        if (inherits(
+          dashboard_data,
+          "monthly_site_report_data"
+        )) {
+          return(dashboard_data)
+        }
+
+        if (!is.list(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (!is.null(
+          dashboard_data$monthly_reports
+        )) {
+          return(
+            dashboard_data$monthly_reports
+          )
+        }
+
+        dashboard_data$monthly
+      })
+
+
+      site_annual_finance <- reactive({
+        calculate_site_annual_finance(
+          monthly_reports()
+        )
+      })
+
+
+      available_years <- reactive({
+
+        x <- site_annual_finance()
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L
+        ) {
+          return(integer())
+        }
+
+        years <- sort(
+          unique(
+            as.integer(
+              x$report_year
+            )
+          )
+        )
+
+        years[
+          !is.na(years)
+        ]
+      })
+
+
+      duplicate_years <- reactive({
+        overview_duplicate_report_years(
+          monthly_reports()
+        )
+      })
+
+
+      # When files are loaded, set the selectors to the available data range.
+      observeEvent(
+        available_years(),
+        {
+
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
+          updateSelectInput(
+            session,
+            "from_year",
+            choices = years,
+            selected = min(years)
+          )
+
+          updateSelectInput(
+            session,
+            "to_year",
+            choices = years,
+            selected = max(years)
+          )
+        },
+        ignoreInit = FALSE
+      )
       
       # Synchronise the two year selectors so From Year never exceeds To Year.
       observeEvent(
@@ -485,10 +593,16 @@ mod_site_comparison_server <- function(
             input$from_year
           )
           
+                    years <- available_years()
+
+          if (length(years) == 0L) {
+            years <- APP_YEARS
+          }
+
           current_to <- if (
             is.null(input$to_year)
           ) {
-            max(APP_YEARS)
+            max(years)
           } else {
             as.integer(input$to_year)
           }
@@ -496,8 +610,8 @@ mod_site_comparison_server <- function(
           updateSelectInput(
             session,
             "to_year",
-            choices = APP_YEARS[
-              APP_YEARS >= from_year
+            choices = years[
+              years >= from_year
             ],
             selected = max(
               from_year,
@@ -517,10 +631,16 @@ mod_site_comparison_server <- function(
             input$to_year
           )
           
+                    years <- available_years()
+
+          if (length(years) == 0L) {
+            years <- APP_YEARS
+          }
+
           current_from <- if (
             is.null(input$from_year)
           ) {
-            min(APP_YEARS)
+            min(years)
           } else {
             as.integer(input$from_year)
           }
@@ -528,8 +648,8 @@ mod_site_comparison_server <- function(
           updateSelectInput(
             session,
             "from_year",
-            choices = APP_YEARS[
-              APP_YEARS <= to_year
+            choices = years[
+              years <= to_year
             ],
             selected = min(
               to_year,
@@ -568,6 +688,19 @@ mod_site_comparison_server <- function(
           metric = input$metric
         )
       })
+
+            filtered_site_finance <- reactive({
+
+        x <- site_annual_finance()
+        selected_period <- period()
+
+        x[
+          x$report_year >= selected_period$from &
+            x$report_year <= selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
       
       # Site-level labels: trend uses the full range; ranking/budget use To Year.
       output$period_subtitle <- renderUI({
@@ -599,6 +732,68 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+            output$site_performance_trend <- renderPlot(
+        {
+
+          x <- filtered_site_finance()
+          reports <- monthly_reports()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload at least one Monthly Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(
+                  duplicate_years(),
+                  collapse = ", "
+                ),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No site finance data is available",
+                "for this period."
+              )
+            )
+          )
+
+          metric <- input$metric
+
+          values <- site_finance_values(
+            x,
+            metric,
+            "Actual"
+          )
+
+          validate(
+            need(
+              any(is.finite(values)),
+              paste(
+                "No Actual",
+                metric,
+                "values are available for this period."
+              )
+            )
+          )
+
+          plot_site_performance_over_time(
+            x,
+            metric
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
       
       output$snapshot_title <- renderUI({
         
@@ -770,12 +965,17 @@ mod_site_comparison_server <- function(
         )
       })
       
-      invisible(
+            invisible(
         list(
           period = period,
           selected_site = reactive(
             input$selected_site
-          )
+          ),
+          monthly_reports = monthly_reports,
+          available_years = available_years,
+          site_annual_finance = site_annual_finance,
+          filtered_site_finance = filtered_site_finance,
+          duplicate_years = duplicate_years
         )
       )
     }
