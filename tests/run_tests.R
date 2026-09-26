@@ -25,6 +25,7 @@ source(file.path("tests", "test_data_pipeline_regressions.R"))
 source(file.path("tests", "test_venues_tracking_extensions.R"))
 source(file.path("tests", "test_basic_upload.R"))
 source(file.path("tests", "test_overview_charts.R"))
+source(file.path("tests", "test_site_comparison.R"))
 source(file.path("tests", "test_real_upload_parsers.R"))
 
 cat("ALL TESTS PASSED\n")

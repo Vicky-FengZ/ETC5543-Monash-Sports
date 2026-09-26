@@ -1,0 +1,196 @@
+# -------------------------------------------------------------------------
+# Site Comparison calculations
+# -------------------------------------------------------------------------
+
+make_site_finance_rows <- function(
+    year,
+    site,
+    is_summary,
+    income_actual,
+    income_budget,
+    expenses_actual,
+    expenses_budget
+) {
+
+  data.frame(
+    report_year = rep(
+      as.integer(year),
+      4L
+    ),
+    site = rep(
+      site,
+      4L
+    ),
+    is_summary = rep(
+      is_summary,
+      4L
+    ),
+    metric = c(
+      "Income",
+      "Income",
+      "Expenses",
+      "Expenses"
+    ),
+    value_type = c(
+      "Actual",
+      "Budget",
+      "Actual",
+      "Budget"
+    ),
+    value = c(
+      income_actual,
+      income_budget,
+      expenses_actual,
+      expenses_budget
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+site_finance_fixture <- list(
+  finance = rbind(
+
+    make_site_finance_rows(
+      2024,
+      "H&F Clayton",
+      TRUE,
+      100,
+      95,
+      60,
+      55
+    ),
+
+    make_site_finance_rows(
+      2024,
+      "Venues Clayton",
+      TRUE,
+      80,
+      85,
+      50,
+      48
+    ),
+
+    make_site_finance_rows(
+      2025,
+      "H&F Clayton",
+      TRUE,
+      120,
+      110,
+      70,
+      65
+    ),
+
+    make_site_finance_rows(
+      2025,
+      "Venues Clayton",
+      TRUE,
+      90,
+      88,
+      55,
+      52
+    ),
+
+    # Organisation-wide values must not appear as another site.
+    make_site_finance_rows(
+      2024,
+      "Monash Sport",
+      TRUE,
+      999,
+      999,
+      999,
+      999
+    ),
+
+    # Non-summary values must also be ignored.
+    make_site_finance_rows(
+      2024,
+      "H&F Clayton",
+      FALSE,
+      888,
+      888,
+      888,
+      888
+    )
+  )
+)
+
+
+site_annual <- calculate_site_annual_finance(
+  site_finance_fixture
+)
+
+
+stopifnot(
+  nrow(site_annual) == 4L,
+  !any(site_annual$site == "Monash Sport"),
+  all(
+    site_annual$aggregation_source ==
+      "Site YTD Summary"
+  )
+)
+
+
+hf_2024 <- site_annual[
+  site_annual$report_year == 2024L &
+    site_annual$site == "H&F Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(hf_2024) == 1L,
+  hf_2024$income_actual[[1L]] == 100,
+  hf_2024$income_budget[[1L]] == 95,
+  hf_2024$expenses_actual[[1L]] == 60,
+  hf_2024$expenses_budget[[1L]] == 55,
+  hf_2024$net_actual[[1L]] == 40,
+  hf_2024$net_budget[[1L]] == 40,
+  hf_2024$budget_variance[[1L]] == 0
+)
+
+
+venues_2024 <- site_annual[
+  site_annual$report_year == 2024L &
+    site_annual$site == "Venues Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(venues_2024) == 1L,
+  venues_2024$income_actual[[1L]] == 80,
+  venues_2024$income_budget[[1L]] == 85,
+  venues_2024$expenses_actual[[1L]] == 50,
+  venues_2024$expenses_budget[[1L]] == 48,
+  venues_2024$net_actual[[1L]] == 30,
+  venues_2024$net_budget[[1L]] == 37,
+  venues_2024$budget_variance[[1L]] == -7
+)
+
+
+hf_2025 <- site_annual[
+  site_annual$report_year == 2025L &
+    site_annual$site == "H&F Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  hf_2025$net_actual[[1L]] == 50,
+  hf_2025$net_budget[[1L]] == 45,
+  hf_2025$budget_variance[[1L]] == 5
+)
+
+
+stopifnot(
+  nrow(
+    calculate_site_annual_finance(NULL)
+  ) == 0L
+)
+
+
+cat("PASS test_site_comparison.R\n")

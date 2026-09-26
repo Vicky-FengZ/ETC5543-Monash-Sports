@@ -594,3 +594,217 @@ calculate_overview_annual_revenue <- function(monthly_reports) {
   result
 }
 
+# -------------------------------------------------------------------------
+# Site Comparison calculations
+# -------------------------------------------------------------------------
+
+empty_site_annual_finance <- function() {
+  data.frame(
+    report_year = integer(),
+    site = character(),
+    income_actual = double(),
+    income_budget = double(),
+    expenses_actual = double(),
+    expenses_budget = double(),
+    net_actual = double(),
+    net_budget = double(),
+    budget_variance = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_site_annual_finance <- function(monthly_reports) {
+
+  if (is.null(monthly_reports)) {
+    return(empty_site_annual_finance())
+  }
+
+  finance <- if (is.data.frame(monthly_reports)) {
+    monthly_reports
+  } else {
+    monthly_reports$finance
+  }
+
+  required_columns <- c(
+    "report_year",
+    "site",
+    "is_summary",
+    "metric",
+    "value_type",
+    "value"
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(empty_site_annual_finance())
+  }
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly Site Report finance data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  finance <- finance[
+    finance$is_summary %in% TRUE &
+      finance$metric %in% c("Income", "Expenses") &
+      finance$value_type %in% c("Actual", "Budget"),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(finance) == 0L) {
+    return(empty_site_annual_finance())
+  }
+
+  finance$report_year <- suppressWarnings(
+    as.integer(finance$report_year)
+  )
+
+  finance$site <- trimws(
+    as.character(finance$site)
+  )
+
+  site_key <- tolower(finance$site)
+
+  # Monash Sport is the organisation-wide total and must not appear as
+  # another site in the comparison.
+  finance <- finance[
+    !is.na(finance$report_year) &
+      !is.na(site_key) &
+      nzchar(site_key) &
+      site_key != "monash sport",
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(finance) == 0L) {
+    return(empty_site_annual_finance())
+  }
+
+  groups <- unique(
+    finance[c(
+      "report_year",
+      "site"
+    )]
+  )
+
+  groups <- groups[
+    order(
+      groups$report_year,
+      groups$site
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rows <- vector(
+    "list",
+    nrow(groups)
+  )
+
+  for (index in seq_len(nrow(groups))) {
+
+    year <- groups$report_year[[index]]
+    site <- groups$site[[index]]
+
+    selected <- finance[
+      finance$report_year == year &
+        finance$site == site,
+      ,
+      drop = FALSE
+    ]
+
+    value_for <- function(metric, value_type) {
+
+      keep <- selected$metric == metric &
+        selected$value_type == value_type
+
+      sum_available_finance_values(
+        selected$value[keep]
+      )
+    }
+
+    income_actual <- value_for(
+      "Income",
+      "Actual"
+    )
+
+    income_budget <- value_for(
+      "Income",
+      "Budget"
+    )
+
+    expenses_actual <- value_for(
+      "Expenses",
+      "Actual"
+    )
+
+    expenses_budget <- value_for(
+      "Expenses",
+      "Budget"
+    )
+
+    net_actual <- if (
+      is.na(income_actual) ||
+        is.na(expenses_actual)
+    ) {
+      NA_real_
+    } else {
+      income_actual - expenses_actual
+    }
+
+    net_budget <- if (
+      is.na(income_budget) ||
+        is.na(expenses_budget)
+    ) {
+      NA_real_
+    } else {
+      income_budget - expenses_budget
+    }
+
+    rows[[index]] <- data.frame(
+      report_year = as.integer(year),
+      site = site,
+      income_actual = income_actual,
+      income_budget = income_budget,
+      expenses_actual = expenses_actual,
+      expenses_budget = expenses_budget,
+      net_actual = net_actual,
+      net_budget = net_budget,
+      budget_variance = if (
+        is.na(net_actual) ||
+          is.na(net_budget)
+      ) {
+        NA_real_
+      } else {
+        net_actual - net_budget
+      },
+      aggregation_source = "Site YTD Summary",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  result <- do.call(
+    rbind,
+    rows
+  )
+
+  rownames(result) <- NULL
+
+  result
+}
