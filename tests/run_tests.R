@@ -20,7 +20,10 @@ source(file.path("R", "calculations.R"))
 source(file.path("R", "plots.R"))
 source(file.path("R", "config.R"))
 source(file.path("R", "ui_helpers.R"))
+
 source(file.path("R", "mod_overview.R"))
+source(file.path("R", "mod_site_comparison.R"))
+
 source(file.path("tests", "test_data_pipeline_regressions.R"))
 source(file.path("tests", "test_venues_tracking_extensions.R"))
 source(file.path("tests", "test_basic_upload.R"))
