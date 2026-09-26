@@ -363,7 +363,6 @@ shiny::testServer(
       nrow(annual_revenue()) == 2L,
       nrow(filtered_monthly_finance()) == 2L,
       nrow(filtered_annual_finance()) == 2L,
-      nrow(filtered_annual_revenue()) == 2L,
       nrow(filtered_annual_finance()) == 2L,
       nrow(filtered_annual_revenue()) == 2L,
       output$income_value == "$150",
