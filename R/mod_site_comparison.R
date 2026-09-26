@@ -8,9 +8,9 @@
 
 mod_site_comparison_ui <- function(id) {
   
-  ns <- NS(id)
+  ns <- shiny::NS(id)
   
-  nav_panel(
+  bslib::nav_panel(
     "Site Comparison",
     icon = bs_icon("buildings"),
     
@@ -133,8 +133,9 @@ mod_site_comparison_ui <- function(id) {
             )
           ),
           
-          placeholder_chart(
-            "Actual performance ranking by site"
+          plotOutput(
+            ns("site_ranking"),
+            height = "480px"
           )
         ),
         
@@ -472,7 +473,7 @@ mod_site_comparison_server <- function(
     data = NULL
 ) {
   
-  moduleServer(
+  shiny::moduleServer(
     id,
     function(input, output, session) {
 
@@ -701,6 +702,18 @@ mod_site_comparison_server <- function(
           drop = FALSE
         ]
       })
+
+            snapshot_site_finance <- reactive({
+
+        x <- site_annual_finance()
+        selected_period <- period()
+
+        x[
+          x$report_year == selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
       
       # Site-level labels: trend uses the full range; ranking/budget use To Year.
       output$period_subtitle <- renderUI({
@@ -818,6 +831,68 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+            output$site_ranking <- renderPlot(
+        {
+
+          x <- snapshot_site_finance()
+          reports <- monthly_reports()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload at least one Monthly Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(
+                  duplicate_years(),
+                  collapse = ", "
+                ),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No site finance data is available",
+                "for the selected year."
+              )
+            )
+          )
+
+          metric <- input$metric
+
+          values <- site_finance_values(
+            x,
+            metric,
+            "Actual"
+          )
+
+          validate(
+            need(
+              any(is.finite(values)),
+              paste(
+                "No Actual",
+                metric,
+                "values are available for the selected year."
+              )
+            )
+          )
+
+          plot_site_ranking(
+            x,
+            metric
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
       
       output$budget_subtitle <- renderUI({
         
@@ -975,6 +1050,7 @@ mod_site_comparison_server <- function(
           available_years = available_years,
           site_annual_finance = site_annual_finance,
           filtered_site_finance = filtered_site_finance,
+          snapshot_site_finance = snapshot_site_finance,
           duplicate_years = duplicate_years
         )
       )

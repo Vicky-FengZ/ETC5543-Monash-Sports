@@ -193,8 +193,6 @@ stopifnot(
 )
 
 
-cat("PASS test_site_comparison.R\n")
-
 # -------------------------------------------------------------------------
 # Site metric extraction
 # -------------------------------------------------------------------------
@@ -268,3 +266,79 @@ stopifnot(
 
 
 unlink(site_trend_file)
+
+# -------------------------------------------------------------------------
+# Site Ranking plot
+# -------------------------------------------------------------------------
+
+ranking_2025 <- site_annual[
+  site_annual$report_year == 2025L,
+  ,
+  drop = FALSE
+]
+
+
+site_ranking_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  site_ranking_file,
+  width = 850,
+  height = 520,
+  res = 96
+)
+
+plot_site_ranking(
+  ranking_2025,
+  "Income"
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(site_ranking_file),
+  file.info(site_ranking_file)$size > 0L
+)
+
+
+unlink(site_ranking_file)
+
+# -------------------------------------------------------------------------
+# Site Comparison module
+# -------------------------------------------------------------------------
+
+site_dashboard_data <- shiny::reactiveVal(
+  list(
+    monthly_reports = site_finance_fixture
+  )
+)
+
+
+shiny::testServer(
+  mod_site_comparison_server,
+  args = list(
+    data = site_dashboard_data
+  ),
+  {
+
+    session$setInputs(
+      from_year = "2024",
+      to_year = "2025",
+      metric = "Income",
+      selected_site = "H&F Clayton"
+    )
+
+    session$flushReact()
+
+        # Accessing the output forces the renderPlot expression to execute.
+    stopifnot(
+      !is.null(
+        output$site_performance_trend
+      )
+    )
+  }
+)
+
+cat("PASS test_site_comparison.R\n")

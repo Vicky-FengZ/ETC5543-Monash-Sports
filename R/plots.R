@@ -1068,3 +1068,217 @@ plot_site_performance_over_time <- function(
 
   invisible(NULL)
 }
+
+plot_site_ranking <- function(
+    site_finance,
+    metric
+) {
+
+  if (
+    is.null(site_finance) ||
+      !is.data.frame(site_finance) ||
+      nrow(site_finance) == 0L
+  ) {
+    stop(
+      "No site finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  if (!"site" %in% names(site_finance)) {
+    stop(
+      "Site finance data is missing: site",
+      call. = FALSE
+    )
+  }
+
+  values <- site_finance_values(
+    site_finance,
+    metric,
+    "Actual"
+  )
+
+  sites <- trimws(
+    as.character(site_finance$site)
+  )
+
+  keep <- is.finite(values) &
+    !is.na(sites) &
+    nzchar(sites)
+
+  values <- values[keep]
+  sites <- sites[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      paste0(
+        "No finite Actual ",
+        metric,
+        " values are available."
+      ),
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    site = sites,
+    value = values,
+    stringsAsFactors = FALSE
+  )
+
+  # Highest-performing site appears at the top.
+  plot_data <- plot_data[
+    order(
+      plot_data$value,
+      decreasing = FALSE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  max_label_width <- max(
+    nchar(plot_data$site),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    8,
+    min(
+      15,
+      max_label_width * 0.65
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      left_margin,
+      2,
+      2.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  value_range <- range(
+    c(
+      0,
+      plot_data$value
+    ),
+    na.rm = TRUE
+  )
+
+  padding <- diff(value_range) * 0.18
+
+  if (
+    !is.finite(padding) ||
+      padding == 0
+  ) {
+    padding <- max(
+      abs(plot_data$value),
+      1
+    ) * 0.18
+  }
+
+  x_limits <- c(
+    value_range[[1]] -
+      if (value_range[[1]] < 0) padding else 0,
+    value_range[[2]] + padding
+  )
+
+  bar_positions <- barplot(
+    plot_data$value,
+    names.arg = plot_data$site,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = x_limits,
+    axes = FALSE,
+    xlab = ""
+  )
+
+  x_ticks <- pretty(
+    x_limits,
+    n = 5
+  )
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    v = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  # Redraw bars so grid lines remain behind them.
+  barplot(
+    plot_data$value,
+    names.arg = plot_data$site,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = x_limits,
+    axes = FALSE,
+    xlab = "",
+    add = TRUE
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format_compact_currency(
+      x_ticks
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  label_offset <- diff(x_limits) * 0.015
+
+  for (index in seq_along(bar_positions)) {
+
+    value <- plot_data$value[[index]]
+
+    if (value >= 0) {
+
+      text(
+        value + label_offset,
+        bar_positions[[index]],
+        labels = format_compact_currency(
+          value
+        ),
+        pos = 4,
+        cex = 0.78,
+        col = "#475569",
+        xpd = NA
+      )
+
+    } else {
+
+      text(
+        value - label_offset,
+        bar_positions[[index]],
+        labels = format_compact_currency(
+          value
+        ),
+        pos = 2,
+        cex = 0.78,
+        col = "#475569",
+        xpd = NA
+      )
+    }
+  }
+
+  invisible(NULL)
+}
