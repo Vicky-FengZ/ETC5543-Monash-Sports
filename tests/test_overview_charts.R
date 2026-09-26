@@ -331,6 +331,7 @@ stopifnot(
   grepl("overview-test-annual_performance_trend", ui_html, fixed = TRUE),
   grepl("overview-test-budget_vs_actual", ui_html, fixed = TRUE),
   grepl("overview-test-revenue_capture_plot", ui_html, fixed = TRUE),
+  grepl("Annual Revenue Opportunity &amp; Capture", ui_html, fixed = TRUE),
   grepl("height:460px", ui_html, fixed = TRUE),
   grepl("height:480px", ui_html, fixed = TRUE),
   grepl("height:520px", ui_html, fixed = TRUE),

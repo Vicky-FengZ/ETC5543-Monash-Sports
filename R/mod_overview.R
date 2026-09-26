@@ -219,8 +219,8 @@ mod_overview_ui <- function(id) {
         p(
           class = "text-secondary mb-0",
           paste(
-            "Track the organisation-wide relationship between actual income,",
-            "discount opportunity and potential revenue."
+            "Compare annual Actual Income with the revenue opportunity",
+            "represented by discounts, and track the share of potential revenue captured."
           )
         ),
 
@@ -280,7 +280,7 @@ mod_overview_ui <- function(id) {
           div(
             div(
               class = "chart-header-title",
-              "Revenue Capture Over Time"
+              "Annual Revenue Opportunity & Capture"
             ),
 
             uiOutput(
@@ -983,7 +983,7 @@ mod_overview_server <- function(
 
         chart_subtitle(
           paste0(
-            "Organisation-wide revenue capture · ",
+            "Annual Actual Income + Discount Opportunity, with Capture Rate ·",
             x$label
           )
         )
