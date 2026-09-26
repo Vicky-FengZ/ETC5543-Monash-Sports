@@ -188,7 +188,7 @@ mod_overview_ui <- function(id) {
             div(
               div(
                 class = "chart-header-title",
-                "Budget vs Actual by Year"
+                "Budget vs Actual Net Result Over Time"
               ),
               uiOutput(
                 ns("budget_period")
@@ -749,7 +749,7 @@ mod_overview_server <- function(
 
         chart_subtitle(
           paste0(
-            "Net Result comparison · ",
+            "Monthly Budget vs Actual Net Result · ",
             x$label
           )
         )
@@ -861,26 +861,29 @@ mod_overview_server <- function(
       )
 
       output$budget_vs_actual <- renderPlot(
-        {
-          x <- filtered_annual_finance()
-          validate_monthly_chart_data(x)
+  {
+    x <- filtered_monthly_finance()
 
-          complete <- is.finite(x$net_actual) & is.finite(x$net_budget)
-          validate(
-            need(
-              any(complete),
-              paste(
-                "Complete Budget and Actual values are not available",
-                "for this period."
-              )
-            )
-          )
+    validate_monthly_chart_data(x)
 
-          plot_budget_vs_actual_net_result(x)
-        },
-        res = 96,
-        bg = "white"
+    complete <- is.finite(x$net_actual) &
+      is.finite(x$net_budget)
+
+    validate(
+      need(
+        any(complete),
+        paste(
+          "Complete monthly Budget and Actual Net Result values",
+          "are not available for this period."
+        )
       )
+    )
+
+    plot_monthly_budget_vs_actual_net_result(x)
+  },
+  res = 96,
+  bg = "white"
+)
 
       render_revenue_currency <- function(column) {
         renderText({
