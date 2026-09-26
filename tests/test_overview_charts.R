@@ -432,6 +432,21 @@ plot_monthly_income_expenses(
 
 grDevices::dev.off()
 
+monthly_budget_file <- tempfile(fileext = ".png")
+
+grDevices::png(
+  monthly_budget_file,
+  width = 1000,
+  height = 520,
+  res = 96
+)
+
+plot_monthly_budget_vs_actual_net_result(
+  monthly_finance
+)
+
+grDevices::dev.off()
+
 trend_file <- tempfile(fileext = ".png")
 grDevices::png(trend_file, width = 900, height = 500, res = 96)
 plot_annual_performance_trend(annual, "Net Result")
@@ -450,6 +465,7 @@ grDevices::dev.off()
 stopifnot(
   file.exists(monthly_file),
   file.info(monthly_file)$size > 0L,
+  file.info(monthly_file)$size > 0L,
   file.exists(trend_file),
   file.info(trend_file)$size > 0L,
   file.exists(budget_file),
@@ -460,6 +476,7 @@ stopifnot(
 unlink(
   c(
     monthly_file,
+    monthly_budget_file,
     trend_file,
     budget_file,
     revenue_file

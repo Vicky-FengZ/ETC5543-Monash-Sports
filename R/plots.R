@@ -486,6 +486,212 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
   invisible(NULL)
 }
 
+plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
+
+  if (
+    is.null(monthly_finance) ||
+      !is.data.frame(monthly_finance) ||
+      nrow(monthly_finance) == 0L
+  ) {
+    stop(
+      "No monthly finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "net_budget",
+    "net_actual"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(monthly_finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly finance data is missing: ",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  monthly_finance <- monthly_finance[
+    order(monthly_finance$date),
+    ,
+    drop = FALSE
+  ]
+
+  dates <- as.Date(monthly_finance$date)
+
+  budget <- suppressWarnings(
+    as.numeric(monthly_finance$net_budget)
+  )
+
+  actual <- suppressWarnings(
+    as.numeric(monthly_finance$net_actual)
+  )
+
+  complete <- !is.na(dates) &
+    is.finite(budget) &
+    is.finite(actual)
+
+  dates <- dates[complete]
+  budget <- budget[complete]
+  actual <- actual[complete]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No complete monthly Budget and Actual values are available.",
+      call. = FALSE
+    )
+  }
+
+  limits <- overview_plot_limits(
+    c(budget, actual)
+  )
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1]] == x_limits[[2]]) {
+    x_limits <- x_limits + c(-15, 15)
+  }
+
+  old_par <- par(
+    mar = c(5.2, 5.8, 2.8, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    dates,
+    actual,
+    type = "n",
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = ""
+  )
+
+  y_ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= limits[[1]] &
+      y_ticks <= limits[[2]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  # Budget is deliberately muted so Actual remains the main focus.
+  lines(
+    dates,
+    budget,
+    col = "#94A3B8",
+    lwd = 2.4,
+    lty = 2
+  )
+
+  points(
+    dates,
+    budget,
+    pch = 21,
+    cex = 0.95,
+    lwd = 1.6,
+    col = "#94A3B8",
+    bg = "white"
+  )
+
+  lines(
+    dates,
+    actual,
+    col = "#2563EB",
+    lwd = 2.8
+  )
+
+  points(
+    dates,
+    actual,
+    pch = 21,
+    cex = 1,
+    lwd = 1.8,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  x_ticks <- pretty(
+    range(dates),
+    n = 8
+  )
+
+  axis.Date(
+    1,
+    at = x_ticks,
+    format = "%b\n%Y",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format_compact_currency(y_ticks),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Budget",
+      "Actual"
+    ),
+    col = c(
+      "#94A3B8",
+      "#2563EB"
+    ),
+    lty = c(2, 1),
+    lwd = c(2.4, 2.8),
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.82,
+    text.col = "#475569",
+    inset = c(0, -0.02),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
 
 plot_revenue_capture_over_time <- function(annual_revenue) {
   complete <- is.finite(annual_revenue$actual_income) &
