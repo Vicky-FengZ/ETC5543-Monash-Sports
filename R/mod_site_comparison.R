@@ -155,8 +155,9 @@ mod_site_comparison_ui <- function(id) {
             )
           ),
           
-          placeholder_chart(
-            "Compare budget and actual performance across sites"
+          plotOutput(
+            ns("site_budget_performance"),
+            height = "480px"
           )
         ),
         
@@ -907,6 +908,77 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+            output$site_budget_performance <- renderPlot(
+        {
+
+          x <- snapshot_site_finance()
+          reports <- monthly_reports()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload at least one Monthly Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(
+                  duplicate_years(),
+                  collapse = ", "
+                ),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No site finance data is available",
+                "for the selected year."
+              )
+            )
+          )
+
+          metric <- input$metric
+
+          actual <- site_finance_values(
+            x,
+            metric,
+            "Actual"
+          )
+
+          budget <- site_finance_values(
+            x,
+            metric,
+            "Budget"
+          )
+
+          complete <- is.finite(actual) &
+            is.finite(budget)
+
+          validate(
+            need(
+              any(complete),
+              paste(
+                "Complete Budget and Actual",
+                metric,
+                "values are not available for the selected year."
+              )
+            )
+          )
+
+          plot_site_budget_performance(
+            x,
+            metric
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       # Revenue opportunity is fixed to the latest selected year and is not
       # controlled by the standard Income / Expenses / Net Result selector.

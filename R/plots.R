@@ -1282,3 +1282,247 @@ plot_site_ranking <- function(
 
   invisible(NULL)
 }
+
+plot_site_budget_performance <- function(
+    site_finance,
+    metric
+) {
+
+  if (
+    is.null(site_finance) ||
+      !is.data.frame(site_finance) ||
+      nrow(site_finance) == 0L
+  ) {
+    stop(
+      "No site finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  if (!"site" %in% names(site_finance)) {
+    stop(
+      "Site finance data is missing: site",
+      call. = FALSE
+    )
+  }
+
+  actual <- site_finance_values(
+    site_finance,
+    metric,
+    "Actual"
+  )
+
+  budget <- site_finance_values(
+    site_finance,
+    metric,
+    "Budget"
+  )
+
+  sites <- trimws(
+    as.character(site_finance$site)
+  )
+
+  # A Budget vs Actual comparison is meaningful only when both values
+  # are available for the site.
+  keep <- is.finite(actual) &
+    is.finite(budget) &
+    !is.na(sites) &
+    nzchar(sites)
+
+  actual <- actual[keep]
+  budget <- budget[keep]
+  sites <- sites[keep]
+
+  if (length(actual) == 0L) {
+    stop(
+      paste0(
+        "No complete Budget and Actual ",
+        metric,
+        " values are available."
+      ),
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    site = sites,
+    budget = budget,
+    actual = actual,
+    stringsAsFactors = FALSE
+  )
+
+  # Sort by Actual value so the strongest result appears at the top.
+  plot_data <- plot_data[
+    order(
+      plot_data$actual,
+      decreasing = FALSE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  values <- rbind(
+    Budget = plot_data$budget,
+    Actual = plot_data$actual
+  )
+
+  value_range <- range(
+    c(
+      0,
+      values
+    ),
+    na.rm = TRUE
+  )
+
+  padding <- diff(value_range) * 0.16
+
+  if (
+    !is.finite(padding) ||
+      padding == 0
+  ) {
+    padding <- max(
+      abs(values),
+      1
+    ) * 0.16
+  }
+
+  x_limits <- c(
+    value_range[[1]] -
+      if (value_range[[1]] < 0) padding else 0,
+    value_range[[2]] + padding
+  )
+
+  max_label_width <- max(
+    nchar(plot_data$site),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    8,
+    min(
+      15,
+      max_label_width * 0.65
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      left_margin,
+      4.2,
+      2.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    beside = TRUE,
+    horiz = TRUE,
+    names.arg = plot_data$site,
+    las = 1,
+    border = NA,
+    col = c(
+      "#94A3B8",
+      "#2563EB"
+    ),
+    axes = FALSE,
+    xlim = x_limits,
+    xlab = ""
+  )
+
+  x_ticks <- pretty(
+    x_limits,
+    n = 5
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format_compact_currency(
+      x_ticks
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = 0,
+    col = "#64748B",
+    lwd = 1
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Budget",
+      "Actual"
+    ),
+    fill = c(
+      "#94A3B8",
+      "#2563EB"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.82,
+    text.col = "#475569",
+    inset = c(0, -0.08),
+    xpd = NA
+  )
+
+  label_offset <- diff(x_limits) * 0.012
+
+  for (site_index in seq_len(ncol(values))) {
+
+    for (series_index in seq_len(nrow(values))) {
+
+      value <- values[
+        series_index,
+        site_index
+      ]
+
+      position <- positions[
+        series_index,
+        site_index
+      ]
+
+      if (value >= 0) {
+
+        text(
+          value + label_offset,
+          position,
+          labels = format_compact_currency(
+            value
+          ),
+          pos = 4,
+          cex = 0.72,
+          col = "#475569",
+          xpd = NA
+        )
+
+      } else {
+
+        text(
+          value - label_offset,
+          position,
+          labels = format_compact_currency(
+            value
+          ),
+          pos = 2,
+          cex = 0.72,
+          col = "#475569",
+          xpd = NA
+        )
+      }
+    }
+  }
+
+  invisible(NULL)
+}

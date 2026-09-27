@@ -306,6 +306,37 @@ stopifnot(
 unlink(site_ranking_file)
 
 # -------------------------------------------------------------------------
+# Site Budget Performance plot
+# -------------------------------------------------------------------------
+
+site_budget_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  site_budget_file,
+  width = 1000,
+  height = 520,
+  res = 96
+)
+
+plot_site_budget_performance(
+  ranking_2025,
+  "Income"
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(site_budget_file),
+  file.info(site_budget_file)$size > 0L
+)
+
+
+unlink(site_budget_file)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
@@ -332,10 +363,16 @@ shiny::testServer(
 
     session$flushReact()
 
-        # Accessing the output forces the renderPlot expression to execute.
+    # Accessing the outputs forces the renderPlot expressions to execute.
     stopifnot(
       !is.null(
         output$site_performance_trend
+      ),
+      !is.null(
+        output$site_ranking
+      ),
+      !is.null(
+        output$site_budget_performance
       )
     )
   }
