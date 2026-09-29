@@ -1281,3 +1281,414 @@ calculate_site_annual_discounts <- function(
 
   result
 }
+
+empty_facility_annual_finance <- function() {
+
+  data.frame(
+    report_year = integer(),
+    report_unit = character(),
+    campus = character(),
+    business_unit = character(),
+    income_actual = double(),
+    income_budget = double(),
+    expenses_actual = double(),
+    expenses_budget = double(),
+    net_actual = double(),
+    net_budget = double(),
+    budget_variance = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_facility_annual_finance <- function(
+    site_reports
+) {
+
+  if (is.null(site_reports)) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  finance <- site_reports$finance
+
+  required_columns <- c(
+    "report_year",
+    "period_type",
+    "report_unit",
+    "campus",
+    "business_unit",
+    "is_summary",
+    "metric",
+    "value_type",
+    "value"
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Detailed Site Report finance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Use the workbook's annual reported totals only.
+  # Summary rows are excluded because this view ranks
+  # individual facilities/business units.
+  finance <- finance[
+    finance$period_type == "Reported Total" &
+      !(finance$is_summary %in% TRUE) &
+      finance$metric %in%
+        c(
+          "Income",
+          "Expenses"
+        ) &
+      finance$value_type %in%
+        c(
+          "Actual",
+          "Budget"
+        ),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(finance) == 0L) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  finance$report_year <- as.integer(
+    finance$report_year
+  )
+
+  finance$report_unit <- trimws(
+    as.character(
+      finance$report_unit
+    )
+  )
+
+  finance$campus <- trimws(
+    as.character(
+      finance$campus
+    )
+  )
+
+  finance$business_unit <- trimws(
+    as.character(
+      finance$business_unit
+    )
+  )
+
+  finance <- finance[
+    !is.na(finance$business_unit) &
+      nzchar(finance$business_unit),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(finance) == 0L) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  keys <- unique(
+    finance[
+      c(
+        "report_year",
+        "report_unit",
+        "campus",
+        "business_unit"
+      )
+    ]
+  )
+
+  keys <- keys[
+    order(
+      keys$report_year,
+      keys$report_unit,
+      keys$business_unit
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rows <- vector(
+    "list",
+    nrow(keys)
+  )
+
+  for (index in seq_len(nrow(keys))) {
+
+    key <- keys[
+      index,
+      ,
+      drop = FALSE
+    ]
+
+    selected <- finance[
+      finance$report_year ==
+        key$report_year[[1L]] &
+        finance$report_unit ==
+          key$report_unit[[1L]] &
+        finance$campus ==
+          key$campus[[1L]] &
+        finance$business_unit ==
+          key$business_unit[[1L]],
+      ,
+      drop = FALSE
+    ]
+
+    value_for <- function(
+        metric,
+        value_type
+    ) {
+
+      keep <- selected$metric == metric &
+        selected$value_type == value_type
+
+      sum_available_finance_values(
+        selected$value[keep]
+      )
+    }
+
+    income_actual <- value_for(
+      "Income",
+      "Actual"
+    )
+
+    income_budget <- value_for(
+      "Income",
+      "Budget"
+    )
+
+    expenses_actual <- value_for(
+      "Expenses",
+      "Actual"
+    )
+
+    expenses_budget <- value_for(
+      "Expenses",
+      "Budget"
+    )
+
+    net_actual <- if (
+      is.na(income_actual) ||
+        is.na(expenses_actual)
+    ) {
+      NA_real_
+    } else {
+      income_actual -
+        expenses_actual
+    }
+
+    net_budget <- if (
+      is.na(income_budget) ||
+        is.na(expenses_budget)
+    ) {
+      NA_real_
+    } else {
+      income_budget -
+        expenses_budget
+    }
+
+    budget_variance <- if (
+      is.na(net_actual) ||
+        is.na(net_budget)
+    ) {
+      NA_real_
+    } else {
+      net_actual -
+        net_budget
+    }
+
+    rows[[index]] <- data.frame(
+      report_year =
+        key$report_year[[1L]],
+      report_unit =
+        key$report_unit[[1L]],
+      campus =
+        key$campus[[1L]],
+      business_unit =
+        key$business_unit[[1L]],
+      income_actual = income_actual,
+      income_budget = income_budget,
+      expenses_actual = expenses_actual,
+      expenses_budget = expenses_budget,
+      net_actual = net_actual,
+      net_budget = net_budget,
+      budget_variance = budget_variance,
+      aggregation_source =
+        "Detailed Site Report Reported Total",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  result <- do.call(
+    rbind,
+    rows
+  )
+
+  rownames(result) <- NULL
+
+  result
+}
+
+facility_site_key <- function(site) {
+
+  site <- as.character(site)
+
+  switch(
+    site,
+
+    "H&F Clayton" = list(
+      report_unit = "Health & Fitness",
+      campus = "Clayton"
+    ),
+
+    "Venues Clayton" = list(
+      report_unit = "Venues",
+      campus = "Clayton"
+    ),
+
+    "Aquatics Clayton" = list(
+      report_unit = "Aquatics",
+      campus = "Clayton"
+    ),
+
+    "Caulfield" = list(
+      report_unit = "Caulfield",
+      campus = "Caulfield"
+    ),
+
+    "Peninsula" = list(
+      report_unit = "Peninsula",
+      campus = "Peninsula"
+    ),
+
+    "Participation Programs" = list(
+      report_unit = "Participation Programs",
+      campus = "Multi-campus"
+    ),
+
+    NULL
+  )
+}
+
+
+filter_facility_finance_by_site <- function(
+    facility_finance,
+    site
+) {
+
+  if (
+    is.null(facility_finance) ||
+      !is.data.frame(facility_finance) ||
+      nrow(facility_finance) == 0L
+  ) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  key <- facility_site_key(site)
+
+  if (is.null(key)) {
+    return(
+      empty_facility_annual_finance()
+    )
+  }
+
+  facility_finance[
+    facility_finance$report_unit ==
+      key$report_unit &
+      facility_finance$campus ==
+        key$campus,
+    ,
+    drop = FALSE
+  ]
+}
+
+facility_finance_values <- function(
+    facility_finance,
+    metric,
+    value_type = "Actual"
+) {
+
+  if (
+    is.null(facility_finance) ||
+      !is.data.frame(facility_finance) ||
+      nrow(facility_finance) == 0L
+  ) {
+    return(double())
+  }
+
+  if (!value_type %in% c("Actual", "Budget")) {
+    stop(
+      "value_type must be Actual or Budget.",
+      call. = FALSE
+    )
+  }
+
+  suffix <- if (
+    value_type == "Actual"
+  ) {
+    "actual"
+  } else {
+    "budget"
+  }
+
+  column_name <- switch(
+    metric,
+
+    "Income" = paste0(
+      "income_",
+      suffix
+    ),
+
+    "Expenses" = paste0(
+      "expenses_",
+      suffix
+    ),
+
+    "Net Result" = paste0(
+      "net_",
+      suffix
+    ),
+
+    stop(
+      paste0(
+        "Unknown facility finance metric: ",
+        metric
+      ),
+      call. = FALSE
+    )
+  )
+
+  as.numeric(
+    facility_finance[[column_name]]
+  )
+}

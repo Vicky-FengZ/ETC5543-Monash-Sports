@@ -317,11 +317,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                paste(
-                  "Rank facilities and business units within",
-                  "the selected site"
-                )
+              plotOutput(
+                ns("facility_ranking"),
+                height = "480px"
               )
             ),
 
@@ -507,6 +505,49 @@ mod_site_comparison_server <- function(
         dashboard_data$monthly
       })
 
+      # -------------------------------------------------------------------
+      # Detailed Site Report data
+      # -------------------------------------------------------------------
+
+      site_reports <- reactive({
+
+        if (is.null(data)) {
+          return(NULL)
+        }
+
+        dashboard_data <- if (
+          shiny::is.reactive(data)
+        ) {
+          data()
+        } else {
+          data
+        }
+
+        if (inherits(
+          dashboard_data,
+          "business_unit_template_report_data"
+        )) {
+          return(
+            dashboard_data
+          )
+        }
+
+        if (!is.list(
+          dashboard_data
+        )) {
+          return(NULL)
+        }
+
+        if (!is.null(
+          dashboard_data$site_reports
+        )) {
+          return(
+            dashboard_data$site_reports
+          )
+        }
+
+        dashboard_data$sites
+      })
 
       site_annual_finance <- reactive({
         calculate_site_annual_finance(
@@ -526,16 +567,10 @@ mod_site_comparison_server <- function(
         )
       })
 
-      snapshot_site_revenue <- reactive({
-        
-        x <- site_annual_revenue()
-        selected_period <- period()
-        
-        x[
-          x$report_year == selected_period$to,
-          ,
-          drop = FALSE
-        ]
+      facility_annual_finance <- reactive({
+        calculate_facility_annual_finance(
+          site_reports()
+        )
       })
 
       snapshot_site_discounts <- reactive({
@@ -748,6 +783,29 @@ mod_site_comparison_server <- function(
         
         x[
           x$report_year == selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_facility_finance <- reactive({
+
+        req(
+          input$selected_site
+        )
+
+        x <- facility_annual_finance()
+
+        x <- filter_facility_finance_by_site(
+          x,
+          input$selected_site
+        )
+
+        selected_period <- period()
+
+        x[
+          x$report_year ==
+            selected_period$to,
           ,
           drop = FALSE
         ]
@@ -1205,6 +1263,62 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      output$facility_ranking <- renderPlot(
+        {
+
+          reports <- site_reports()
+          x <- snapshot_facility_finance()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste0(
+                "No facility finance data is available for ",
+                input$selected_site,
+                " in ",
+                period()$to,
+                "."
+              )
+            )
+          )
+
+          metric <- input$metric
+
+          values <- facility_finance_values(
+            x,
+            metric,
+            "Actual"
+          )
+
+          validate(
+            need(
+              any(
+                is.finite(values)
+              ),
+              paste(
+                "No Actual",
+                metric,
+                "values are available for this site and year."
+              )
+            )
+          )
+
+          plot_facility_ranking(
+            x,
+            metric
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
       
       output$facility_trend_subtitle <- renderUI({
         

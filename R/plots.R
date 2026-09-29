@@ -2091,3 +2091,240 @@ plot_site_discount_mix <- function(
 
   invisible(NULL)
 }
+
+plot_facility_ranking <- function(
+    facility_finance,
+    metric
+) {
+
+  if (
+    is.null(facility_finance) ||
+      !is.data.frame(facility_finance) ||
+      nrow(facility_finance) == 0L
+  ) {
+    stop(
+      "No facility finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "business_unit",
+    "income_actual",
+    "expenses_actual",
+    "net_actual"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Facility finance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  values <- facility_finance_values(
+    facility_finance,
+    metric,
+    "Actual"
+  )
+
+  labels <- trimws(
+    as.character(
+      facility_finance$business_unit
+    )
+  )
+
+  keep <- is.finite(values) &
+    !is.na(labels) &
+    nzchar(labels)
+
+  values <- values[keep]
+  labels <- labels[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      paste(
+        "No complete facility values are available",
+        "for the selected metric."
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Horizontal barplots draw the final row at the top.
+  # Ascending order therefore places the highest value at the top.
+  order_index <- order(
+    values,
+    decreasing = FALSE
+  )
+
+  values <- values[
+    order_index
+  ]
+
+  labels <- labels[
+    order_index
+  ]
+
+  limits <- overview_plot_limits(
+    values
+  )
+
+  # Wrap long facility/business-unit names so they fit
+  # comfortably inside the half-width dashboard card.
+  wrapped_labels <- vapply(
+    labels,
+    function(label) {
+
+      # Allow names containing "/" to wrap naturally.
+      label <- gsub(
+        "/",
+        "/ ",
+        label,
+        fixed = TRUE
+      )
+
+      paste(
+        strwrap(
+          label,
+          width = 18
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  label_lines <- unlist(
+    strsplit(
+      wrapped_labels,
+      "\n",
+      fixed = TRUE
+    )
+  )
+
+  max_label_width <- max(
+    nchar(label_lines),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    5.5,
+    min(
+      8,
+      max_label_width * 0.45
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4,
+      left_margin,
+      2.5,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    horiz = TRUE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = "#2563EB",
+    axes = FALSE,
+    xlim = limits
+  )
+
+  ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  ticks <- ticks[
+    ticks >= limits[[1]] &
+      ticks <= limits[[2]]
+  ]
+
+  axis(
+    1,
+    at = ticks,
+    labels = format_compact_currency(
+      ticks
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    v = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  # Redraw bars so grid lines remain behind them.
+  barplot(
+    values,
+    horiz = TRUE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = "#2563EB",
+    axes = FALSE,
+    xlim = limits,
+    add = TRUE
+  )
+
+  label_offset <- diff(
+    limits
+  ) * 0.02
+
+  text(
+    values +
+      ifelse(
+        values >= 0,
+        label_offset,
+        -label_offset
+      ),
+    positions,
+    labels = format_compact_currency(
+      values
+    ),
+    pos = ifelse(
+      values >= 0,
+      4,
+      2
+    ),
+    cex = 0.72,
+    col = "#334155",
+    xpd = NA
+  )
+
+  invisible(NULL)
+}

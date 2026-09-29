@@ -667,6 +667,348 @@ stopifnot(
 unlink(site_discount_mix_file)
 
 # -------------------------------------------------------------------------
+# Facility annual finance calculations
+# -------------------------------------------------------------------------
+
+make_facility_finance_row <- function(
+    year,
+    report_unit,
+    campus,
+    business_unit,
+    period_type,
+    is_summary,
+    metric,
+    value_type,
+    value
+) {
+
+  data.frame(
+    report_year = as.integer(year),
+    period_type = period_type,
+    report_unit = report_unit,
+    campus = campus,
+    business_unit = business_unit,
+    is_summary = is_summary,
+    metric = metric,
+    value_type = value_type,
+    value = value,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+facility_finance_fixture <- list(
+  finance = rbind(
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Income",
+      "Actual",
+      120
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Income",
+      "Budget",
+      110
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Expenses",
+      "Actual",
+      70
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Expenses",
+      "Budget",
+      65
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Income",
+      "Actual",
+      80
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Income",
+      "Budget",
+      75
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Expenses",
+      "Actual",
+      40
+    ),
+
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Expenses",
+      "Budget",
+      38
+    ),
+
+    # Summary row must not be ranked as a facility.
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "YTD Summary",
+      "Reported Total",
+      TRUE,
+      "Income",
+      "Actual",
+      999
+    ),
+
+    # Monthly row must not be mixed with the annual reported total.
+    make_facility_finance_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Month",
+      FALSE,
+      "Income",
+      "Actual",
+      999
+    )
+  )
+)
+
+
+facility_finance <- calculate_facility_annual_finance(
+  facility_finance_fixture
+)
+
+
+stopifnot(
+  nrow(facility_finance) == 2L,
+  !any(
+    facility_finance$business_unit ==
+      "YTD Summary"
+  )
+)
+
+
+swim_school_2025 <- facility_finance[
+  facility_finance$report_year == 2025L &
+    facility_finance$report_unit == "Aquatics" &
+    facility_finance$business_unit == "Swim School",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(swim_school_2025) == 1L,
+  swim_school_2025$income_actual[[1L]] == 120,
+  swim_school_2025$income_budget[[1L]] == 110,
+  swim_school_2025$expenses_actual[[1L]] == 70,
+  swim_school_2025$expenses_budget[[1L]] == 65,
+  swim_school_2025$net_actual[[1L]] == 50,
+  swim_school_2025$net_budget[[1L]] == 45,
+  swim_school_2025$budget_variance[[1L]] == 5
+)
+
+
+stopifnot(
+  nrow(
+    calculate_facility_annual_finance(NULL)
+  ) == 0L
+)
+
+# Facility site mapping ----------------------------------------------------
+
+aquatics_key <- facility_site_key(
+  "Aquatics Clayton"
+)
+
+stopifnot(
+  identical(
+    aquatics_key$report_unit,
+    "Aquatics"
+  ),
+  identical(
+    aquatics_key$campus,
+    "Clayton"
+  )
+)
+
+
+hf_key <- facility_site_key(
+  "H&F Clayton"
+)
+
+stopifnot(
+  identical(
+    hf_key$report_unit,
+    "Health & Fitness"
+  ),
+  identical(
+    hf_key$campus,
+    "Clayton"
+  )
+)
+
+
+participation_key <- facility_site_key(
+  "Participation Programs"
+)
+
+stopifnot(
+  identical(
+    participation_key$report_unit,
+    "Participation Programs"
+  ),
+  identical(
+    participation_key$campus,
+    "Multi-campus"
+  )
+)
+
+
+filtered_aquatics <- filter_facility_finance_by_site(
+  facility_finance,
+  "Aquatics Clayton"
+)
+
+stopifnot(
+  nrow(filtered_aquatics) == 2L,
+  all(
+    filtered_aquatics$report_unit ==
+      "Aquatics"
+  ),
+  all(
+    filtered_aquatics$campus ==
+      "Clayton"
+  )
+)
+
+
+stopifnot(
+  nrow(
+    filter_facility_finance_by_site(
+      facility_finance,
+      "Unknown Site"
+    )
+  ) == 0L
+)
+
+# -------------------------------------------------------------------------
+# Facility Ranking plot
+# -------------------------------------------------------------------------
+
+stopifnot(
+  identical(
+    facility_finance_values(
+      filtered_aquatics,
+      "Income",
+      "Actual"
+    ),
+    c(
+      80,
+      120
+    )
+  ) ||
+    identical(
+      sort(
+        facility_finance_values(
+          filtered_aquatics,
+          "Income",
+          "Actual"
+        )
+      ),
+      c(
+        80,
+        120
+      )
+    )
+)
+
+
+facility_ranking_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  facility_ranking_file,
+  width = 900,
+  height = 520,
+  res = 96
+)
+
+plot_facility_ranking(
+  filtered_aquatics,
+  "Income"
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_ranking_file
+  ),
+  file.info(
+    facility_ranking_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_ranking_file
+)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
@@ -679,7 +1021,8 @@ site_dashboard_reports <- list(
 
 site_dashboard_data <- shiny::reactiveVal(
   list(
-    monthly_reports = site_dashboard_reports
+    monthly_reports = site_dashboard_reports,
+    site_reports = facility_finance_fixture
   )
 )
 
@@ -695,7 +1038,7 @@ shiny::testServer(
       from_year = "2024",
       to_year = "2025",
       metric = "Income",
-      selected_site = "H&F Clayton"
+      selected_site = "Aquatics Clayton"
     )
 
     session$flushReact()
@@ -716,6 +1059,9 @@ shiny::testServer(
       ),
       !is.null(
         output$site_discount_mix
+      ),
+      !is.null(
+        output$facility_ranking
       )
     )
   }
