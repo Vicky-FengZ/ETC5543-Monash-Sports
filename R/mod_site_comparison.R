@@ -224,8 +224,9 @@ mod_site_comparison_ui <- function(id) {
             )
           ),
 
-          placeholder_chart(
-            "Student, staff and other discount composition"
+          plotOutput(
+            ns("site_discount_mix"),
+            height = "480px"
           )
         ),
 
@@ -519,6 +520,35 @@ mod_site_comparison_server <- function(
         )
       })
 
+      site_annual_discounts <- reactive({
+        calculate_site_annual_discounts(
+         monthly_reports()
+        )
+      })
+
+      snapshot_site_revenue <- reactive({
+        
+        x <- site_annual_revenue()
+        selected_period <- period()
+        
+        x[
+          x$report_year == selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_site_discounts <- reactive({
+        
+        x <- site_annual_discounts()
+        selected_period <- period()
+        
+        x[
+          x$report_year == selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
 
       available_years <- reactive({
 
@@ -1075,6 +1105,72 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      output$site_discount_mix <- renderPlot(
+        {
+          
+          x <- snapshot_site_discounts()
+          reports <- monthly_reports()
+          
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload at least one Monthly Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(
+                  duplicate_years(),
+                  collapse = ", "
+                ),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No site discount data is available",
+                "for the selected year."
+              )
+            )
+          )
+
+          complete <- is.finite(
+            x$student_discount
+          ) &
+            is.finite(
+              x$staff_discount
+            ) &
+            is.finite(
+              x$other_discount
+            ) &
+            is.finite(
+              x$total_discount
+            ) &
+            x$total_discount > 0
+
+        validate(
+            need(
+              any(complete),
+              paste(
+                "No complete discount mix values",
+                "are available for the selected year."
+              )
+            )
+          )
+
+          plot_site_discount_mix(
+            x
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
       
       # Facility-level focus stays concise here; each tab gives its own
       # relevant year or period in the subtitle below.

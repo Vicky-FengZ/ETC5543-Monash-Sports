@@ -305,6 +305,165 @@ stopifnot(
 )
 
 # -------------------------------------------------------------------------
+# Site Discount Mix calculations
+# -------------------------------------------------------------------------
+
+make_site_discount_rows <- function(
+    year,
+    site,
+    is_summary,
+    student,
+    staff,
+    other
+) {
+
+  data.frame(
+    report_year = rep(
+      as.integer(year),
+      3L
+    ),
+    site = rep(
+      site,
+      3L
+    ),
+    is_summary = rep(
+      is_summary,
+      3L
+    ),
+    discount_type = c(
+      "Student",
+      "Staff",
+      "Other"
+    ),
+    value = c(
+      student,
+      staff,
+      other
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+site_discount_fixture <- list(
+  discounts = rbind(
+
+    # Two periods for H&F Clayton.
+    make_site_discount_rows(
+      2025,
+      "H&F Clayton",
+      TRUE,
+      10,
+      5,
+      2
+    ),
+
+    make_site_discount_rows(
+      2025,
+      "H&F Clayton",
+      TRUE,
+      20,
+      6,
+      3
+    ),
+
+    # Two periods for Venues Clayton.
+    make_site_discount_rows(
+      2025,
+      "Venues Clayton",
+      TRUE,
+      5,
+      2,
+      1
+    ),
+
+    make_site_discount_rows(
+      2025,
+      "Venues Clayton",
+      TRUE,
+      7,
+      3,
+      2
+    ),
+
+    # Organisation total must not appear as another site.
+    make_site_discount_rows(
+      2025,
+      "Monash Sport",
+      TRUE,
+      999,
+      999,
+      999
+    ),
+
+    # Non-summary rows must be ignored.
+    make_site_discount_rows(
+      2025,
+      "H&F Clayton",
+      FALSE,
+      888,
+      888,
+      888
+    )
+  )
+)
+
+
+site_discounts <- calculate_site_annual_discounts(
+  site_discount_fixture
+)
+
+
+stopifnot(
+  nrow(site_discounts) == 2L,
+  !any(
+    site_discounts$site == "Monash Sport"
+  )
+)
+
+
+hf_discounts_2025 <- site_discounts[
+  site_discounts$report_year == 2025L &
+    site_discounts$site == "H&F Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(hf_discounts_2025) == 1L,
+  hf_discounts_2025$student_discount[[1L]] == 30,
+  hf_discounts_2025$staff_discount[[1L]] == 11,
+  hf_discounts_2025$other_discount[[1L]] == 5,
+  hf_discounts_2025$total_discount[[1L]] == 46,
+  hf_discounts_2025$aggregation_source[[1L]] ==
+    "Site YTD Summary"
+)
+
+
+venues_discounts_2025 <- site_discounts[
+  site_discounts$report_year == 2025L &
+    site_discounts$site == "Venues Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  venues_discounts_2025$student_discount[[1L]] == 12,
+  venues_discounts_2025$staff_discount[[1L]] == 5,
+  venues_discounts_2025$other_discount[[1L]] == 3,
+  venues_discounts_2025$total_discount[[1L]] == 20
+)
+
+
+stopifnot(
+  nrow(
+    calculate_site_annual_discounts(NULL)
+  ) == 0L
+)
+
+# -------------------------------------------------------------------------
 # Site metric extraction
 # -------------------------------------------------------------------------
 
@@ -478,12 +637,43 @@ stopifnot(
 unlink(site_revenue_file)
 
 # -------------------------------------------------------------------------
+# Site Discount Mix plot
+# -------------------------------------------------------------------------
+
+site_discount_mix_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  site_discount_mix_file,
+  width = 900,
+  height = 520,
+  res = 96
+)
+
+plot_site_discount_mix(
+  site_discounts
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(site_discount_mix_file),
+  file.info(site_discount_mix_file)$size > 0L
+)
+
+
+unlink(site_discount_mix_file)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
 site_dashboard_reports <- list(
   finance = site_finance_fixture$finance,
-  total_revenue = site_revenue_fixture$total_revenue
+  total_revenue = site_revenue_fixture$total_revenue,
+  discounts = site_discount_fixture$discounts
 )
 
 
@@ -523,6 +713,9 @@ shiny::testServer(
       ),
       !is.null(
         output$site_revenue_opportunity
+      ),
+      !is.null(
+        output$site_discount_mix
       )
     )
   }

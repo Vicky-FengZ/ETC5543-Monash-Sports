@@ -1811,3 +1811,283 @@ plot_site_revenue_opportunity <- function(
 
   invisible(NULL)
 }
+
+plot_site_discount_mix <- function(
+    site_discounts
+) {
+
+  if (
+    is.null(site_discounts) ||
+      !is.data.frame(site_discounts) ||
+      nrow(site_discounts) == 0L
+  ) {
+    stop(
+      "No site discount values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "site",
+    "student_discount",
+    "staff_discount",
+    "other_discount",
+    "total_discount"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(site_discounts)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Site discount data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  sites <- trimws(
+    as.character(
+      site_discounts$site
+    )
+  )
+
+  student <- as.numeric(
+    site_discounts$student_discount
+  )
+
+  staff <- as.numeric(
+    site_discounts$staff_discount
+  )
+
+  other <- as.numeric(
+    site_discounts$other_discount
+  )
+
+  total <- as.numeric(
+    site_discounts$total_discount
+  )
+
+  keep <- !is.na(sites) &
+    nzchar(sites) &
+    is.finite(student) &
+    is.finite(staff) &
+    is.finite(other) &
+    is.finite(total) &
+    total > 0
+
+  sites <- sites[keep]
+  student <- student[keep]
+  staff <- staff[keep]
+  other <- other[keep]
+  total <- total[keep]
+
+  if (length(sites) == 0L) {
+    stop(
+      "No complete site discount mix values are available.",
+      call. = FALSE
+    )
+  }
+
+  proportions <- rbind(
+    Student = student / total,
+    Staff = staff / total,
+    Other = other / total
+  )
+
+  # Order sites by total discount opportunity.
+  order_index <- order(
+    total,
+    decreasing = FALSE
+  )
+
+  sites <- sites[order_index]
+  total <- total[order_index]
+  proportions <- proportions[
+    ,
+    order_index,
+    drop = FALSE
+  ]
+
+  max_label_width <- max(
+    nchar(sites),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    6.5,
+    min(
+      10,
+      max_label_width * 0.45
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4,
+      left_margin,
+      3,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    proportions,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = sites,
+    las = 1,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    )
+  )
+
+  ticks <- seq(
+    0,
+    1,
+    by = 0.25
+  )
+
+  axis(
+    1,
+    at = ticks,
+    labels = paste0(
+      round(
+        ticks * 100
+      ),
+      "%"
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    proportions,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = sites,
+    las = 1,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    ),
+    add = TRUE
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Student",
+      "Staff",
+      "Other"
+    ),
+    fill = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.8,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.08
+    ),
+    xpd = NA
+  )
+
+  # Add percentage labels only where the segment is large enough
+  # to remain readable.
+  cumulative <- apply(
+    proportions,
+    2,
+    cumsum
+  )
+
+  starts <- rbind(
+    rep(
+      0,
+      ncol(proportions)
+    ),
+    cumulative[
+      -nrow(cumulative),
+      ,
+      drop = FALSE
+    ]
+  )
+
+  centres <- starts +
+    proportions / 2
+
+  for (row_index in seq_len(nrow(proportions))) {
+
+    for (column_index in seq_len(ncol(proportions))) {
+
+      share <- proportions[
+        row_index,
+        column_index
+      ]
+
+      if (
+        is.finite(share) &&
+          share >= 0.03
+      ) {
+
+        text(
+          centres[
+            row_index,
+            column_index
+          ],
+          positions[[column_index]],
+          labels = paste0(
+            round(
+              share * 100
+            ),
+            "%"
+          ),
+          cex = 0.7,
+          col = "white"
+        )
+      }
+    }
+  }
+
+  invisible(NULL)
+}
