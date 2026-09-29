@@ -1142,19 +1142,19 @@ plot_site_ranking <- function(
   )
 
   left_margin <- max(
-    8,
+    6.5,
     min(
-      15,
-      max_label_width * 0.65
+      10,
+      max_label_width * 0.45
     )
   )
 
   old_par <- par(
     mar = c(
-      4.5,
+      4,
       left_margin,
-      2,
-      2.5
+      3,
+      1.5
     ),
     family = "sans"
   )
