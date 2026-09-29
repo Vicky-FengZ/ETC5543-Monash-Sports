@@ -192,6 +192,117 @@ stopifnot(
   ) == 0L
 )
 
+# -------------------------------------------------------------------------
+# Site Revenue Opportunity calculations
+# -------------------------------------------------------------------------
+
+make_site_revenue_row <- function(
+    year,
+    site,
+    is_summary,
+    actual_income,
+    discount_opportunity,
+    reported_total_revenue,
+    validation_status = "pass"
+) {
+
+  data.frame(
+    report_year = as.integer(year),
+    site = site,
+    is_summary = is_summary,
+    actual_income = actual_income,
+    discount_opportunity = discount_opportunity,
+    reported_total_revenue = reported_total_revenue,
+    validation_status = validation_status,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+site_revenue_fixture <- list(
+  total_revenue = rbind(
+
+    make_site_revenue_row(
+      2025,
+      "H&F Clayton",
+      TRUE,
+      120,
+      30,
+      150
+    ),
+
+    make_site_revenue_row(
+      2025,
+      "Venues Clayton",
+      TRUE,
+      90,
+      10,
+      100
+    ),
+
+    # Organisation total must not appear as another site.
+    make_site_revenue_row(
+      2025,
+      "Monash Sport",
+      TRUE,
+      999,
+      999,
+      1998
+    ),
+
+    # Non-summary rows must be ignored.
+    make_site_revenue_row(
+      2025,
+      "H&F Clayton",
+      FALSE,
+      888,
+      888,
+      1776
+    )
+  )
+)
+
+
+site_revenue <- calculate_site_annual_revenue(
+  site_revenue_fixture
+)
+
+
+stopifnot(
+  nrow(site_revenue) == 2L,
+  !any(
+    site_revenue$site == "Monash Sport"
+  )
+)
+
+
+hf_revenue_2025 <- site_revenue[
+  site_revenue$report_year == 2025L &
+    site_revenue$site == "H&F Clayton",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(hf_revenue_2025) == 1L,
+  hf_revenue_2025$actual_income[[1L]] == 120,
+  hf_revenue_2025$discount_opportunity[[1L]] == 30,
+  hf_revenue_2025$potential_revenue[[1L]] == 150,
+  hf_revenue_2025$reported_total_revenue[[1L]] == 150,
+  hf_revenue_2025$validation_difference[[1L]] == 0,
+  hf_revenue_2025$capture_rate[[1L]] == 0.8,
+  hf_revenue_2025$validation_status[[1L]] == "pass",
+  hf_revenue_2025$aggregation_source[[1L]] ==
+    "Site YTD Summary"
+)
+
+
+stopifnot(
+  nrow(
+    calculate_site_annual_revenue(NULL)
+  ) == 0L
+)
 
 # -------------------------------------------------------------------------
 # Site metric extraction
@@ -337,12 +448,48 @@ stopifnot(
 unlink(site_budget_file)
 
 # -------------------------------------------------------------------------
+# Site Revenue Opportunity plot
+# -------------------------------------------------------------------------
+
+site_revenue_file <- tempfile(
+  fileext = ".png"
+)
+
+grDevices::png(
+  site_revenue_file,
+  width = 1100,
+  height = 550,
+  res = 96
+)
+
+plot_site_revenue_opportunity(
+  site_revenue
+)
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(site_revenue_file),
+  file.info(site_revenue_file)$size > 0L
+)
+
+
+unlink(site_revenue_file)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
+site_dashboard_reports <- list(
+  finance = site_finance_fixture$finance,
+  total_revenue = site_revenue_fixture$total_revenue
+)
+
+
 site_dashboard_data <- shiny::reactiveVal(
   list(
-    monthly_reports = site_finance_fixture
+    monthly_reports = site_dashboard_reports
   )
 )
 
@@ -373,6 +520,9 @@ shiny::testServer(
       ),
       !is.null(
         output$site_budget_performance
+      ),
+      !is.null(
+        output$site_revenue_opportunity
       )
     )
   }

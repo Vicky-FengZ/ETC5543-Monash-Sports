@@ -181,13 +181,6 @@ mod_site_comparison_ui <- function(id) {
             "Compare potential revenue and identify whether student,",
             "staff or other discounts drive the opportunity gap."
           )
-        ),
-
-        prototype_note(
-          paste(
-            "These views will activate after the DISCOUNTS",
-            "import is connected"
-          )
         )
       ),
 
@@ -209,12 +202,9 @@ mod_site_comparison_ui <- function(id) {
             )
           ),
 
-          placeholder_chart(
-            "Actual income and discount opportunity by site",
-            paste(
-              "Stacked values show potential revenue; sites can be",
-              "ranked by opportunity rate"
-            )
+          plotOutput(
+            ns("site_revenue_opportunity"),
+            height = "480px"
           )
         ),
 
@@ -523,6 +513,12 @@ mod_site_comparison_server <- function(
         )
       })
 
+      site_annual_revenue <- reactive({
+        calculate_site_annual_revenue(
+          monthly_reports()
+        )
+      })
+
 
       available_years <- reactive({
 
@@ -709,6 +705,17 @@ mod_site_comparison_server <- function(
         x <- site_annual_finance()
         selected_period <- period()
 
+        x[
+          x$report_year == selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_site_revenue <- reactive({
+        x <- site_annual_revenue()
+        selected_period <- period()
+        
         x[
           x$report_year == selected_period$to,
           ,
@@ -982,6 +989,7 @@ mod_site_comparison_server <- function(
 
       # Revenue opportunity is fixed to the latest selected year and is not
       # controlled by the standard Income / Expenses / Net Result selector.
+      
       output$site_opportunity_subtitle <- renderUI({
 
         x <- period()
@@ -993,6 +1001,68 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      output$site_revenue_opportunity <- renderPlot(
+        {
+          
+          x <- snapshot_site_revenue()
+          reports <- monthly_reports()
+          
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload at least one Monthly Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              length(duplicate_years()) == 0L,
+              paste0(
+                "More than one Monthly Site Report is active for: ",
+                paste(
+                  duplicate_years(),
+                  collapse = ", "
+                ),
+                ". Delete the superseded file on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No site revenue opportunity data is available",
+                "for the selected year."
+              )
+            )
+          )
+          
+          complete <- is.finite(
+            x$actual_income
+          ) &
+            is.finite(
+              x$discount_opportunity
+            ) &
+            is.finite(
+              x$potential_revenue
+            )
+          
+          validate(
+            need(
+              any(complete),
+              paste(
+                "No complete revenue opportunity values",
+                "are available for the selected year."
+              )
+            )
+          )
+          
+          plot_site_revenue_opportunity(
+            x
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$site_discount_mix_subtitle <- renderUI({
 

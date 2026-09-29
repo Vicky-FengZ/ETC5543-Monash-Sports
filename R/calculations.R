@@ -861,3 +861,235 @@ site_finance_values <- function(
     as.numeric(site_finance[[column]])
   )
 }
+
+empty_site_annual_revenue <- function() {
+
+  data.frame(
+    report_year = integer(),
+    site = character(),
+    actual_income = double(),
+    discount_opportunity = double(),
+    potential_revenue = double(),
+    reported_total_revenue = double(),
+    validation_difference = double(),
+    validation_status = character(),
+    capture_rate = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_site_annual_revenue <- function(
+    monthly_reports
+) {
+
+  if (is.null(monthly_reports)) {
+    return(
+      empty_site_annual_revenue()
+    )
+  }
+
+  total_revenue <- monthly_reports$total_revenue
+
+  required_columns <- c(
+    "report_year",
+    "site",
+    "is_summary",
+    "actual_income",
+    "discount_opportunity",
+    "reported_total_revenue",
+    "validation_status"
+  )
+
+  if (
+    is.null(total_revenue) ||
+      !is.data.frame(total_revenue) ||
+      nrow(total_revenue) == 0L
+  ) {
+    return(
+      empty_site_annual_revenue()
+    )
+  }
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(total_revenue)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly Site Report Total Revenue data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  total_revenue <- total_revenue[
+    total_revenue$is_summary %in% TRUE,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(total_revenue) == 0L) {
+    return(
+      empty_site_annual_revenue()
+    )
+  }
+
+  total_revenue$report_year <- as.integer(
+    total_revenue$report_year
+  )
+
+  total_revenue$site <- trimws(
+    as.character(
+      total_revenue$site
+    )
+  )
+
+  # Monash Sport is the organisation total, not another site.
+  total_revenue <- total_revenue[
+    !is.na(total_revenue$site) &
+      nzchar(total_revenue$site) &
+      tolower(total_revenue$site) != "monash sport",
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(total_revenue) == 0L) {
+    return(
+      empty_site_annual_revenue()
+    )
+  }
+
+  keys <- unique(
+    total_revenue[
+      c(
+        "report_year",
+        "site"
+      )
+    ]
+  )
+
+  keys <- keys[
+    order(
+      keys$report_year,
+      keys$site
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rows <- vector(
+    "list",
+    nrow(keys)
+  )
+
+  for (index in seq_len(nrow(keys))) {
+
+    year <- keys$report_year[[index]]
+    site <- keys$site[[index]]
+
+    selected <- total_revenue[
+      total_revenue$report_year == year &
+        total_revenue$site == site,
+      ,
+      drop = FALSE
+    ]
+
+    actual_income <- sum_available_finance_values(
+      selected$actual_income
+    )
+
+    discount_opportunity <- sum_available_finance_values(
+      selected$discount_opportunity
+    )
+
+    potential_revenue <- if (
+      is.na(actual_income) ||
+        is.na(discount_opportunity)
+    ) {
+      NA_real_
+    } else {
+      actual_income +
+        discount_opportunity
+    }
+
+    reported_total_revenue <- sum_available_finance_values(
+      selected$reported_total_revenue
+    )
+
+    validation_difference <- if (
+      is.na(potential_revenue) ||
+        is.na(reported_total_revenue)
+    ) {
+      NA_real_
+    } else {
+      reported_total_revenue -
+        potential_revenue
+    }
+
+    statuses <- unique(
+      as.character(
+        selected$validation_status
+      )
+    )
+
+    statuses <- statuses[
+      !is.na(statuses) &
+        nzchar(statuses)
+    ]
+
+    validation_status <- if (
+      length(statuses) > 0L &&
+        all(statuses == "pass")
+    ) {
+      "pass"
+    } else if (
+      any(statuses == "fail")
+    ) {
+      "fail"
+    } else {
+      "incomplete"
+    }
+
+    capture_rate <- if (
+      is.na(actual_income) ||
+        is.na(potential_revenue) ||
+        potential_revenue == 0
+    ) {
+      NA_real_
+    } else {
+      actual_income /
+        potential_revenue
+    }
+
+    rows[[index]] <- data.frame(
+      report_year = year,
+      site = site,
+      actual_income = actual_income,
+      discount_opportunity = discount_opportunity,
+      potential_revenue = potential_revenue,
+      reported_total_revenue = reported_total_revenue,
+      validation_difference = validation_difference,
+      validation_status = validation_status,
+      capture_rate = capture_rate,
+      aggregation_source = "Site YTD Summary",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  result <- do.call(
+    rbind,
+    rows
+  )
+
+  rownames(result) <- NULL
+
+  result
+}

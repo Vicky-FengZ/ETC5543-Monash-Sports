@@ -1526,3 +1526,288 @@ plot_site_budget_performance <- function(
 
   invisible(NULL)
 }
+
+plot_site_revenue_opportunity <- function(
+    site_revenue
+) {
+
+  if (
+    is.null(site_revenue) ||
+      !is.data.frame(site_revenue) ||
+      nrow(site_revenue) == 0L
+  ) {
+    stop(
+      "No site revenue values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "site",
+    "actual_income",
+    "discount_opportunity",
+    "potential_revenue",
+    "capture_rate"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(site_revenue)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Site revenue data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  actual_income <- as.numeric(
+    site_revenue$actual_income
+  )
+
+  discount_opportunity <- as.numeric(
+    site_revenue$discount_opportunity
+  )
+
+  potential_revenue <- as.numeric(
+    site_revenue$potential_revenue
+  )
+
+  capture_rate <- as.numeric(
+    site_revenue$capture_rate
+  )
+
+  sites <- trimws(
+    as.character(
+      site_revenue$site
+    )
+  )
+
+  keep <- is.finite(actual_income) &
+    is.finite(discount_opportunity) &
+    is.finite(potential_revenue) &
+    !is.na(sites) &
+    nzchar(sites)
+
+  actual_income <- actual_income[keep]
+  discount_opportunity <- discount_opportunity[keep]
+  potential_revenue <- potential_revenue[keep]
+  capture_rate <- capture_rate[keep]
+  sites <- sites[keep]
+
+  if (length(actual_income) == 0L) {
+    stop(
+      "No complete site revenue values are available.",
+      call. = FALSE
+    )
+  }
+
+  opportunity_rate <- ifelse(
+    potential_revenue == 0,
+    NA_real_,
+    discount_opportunity /
+      potential_revenue
+  )
+
+  plot_data <- data.frame(
+    site = sites,
+    actual_income = actual_income,
+    discount_opportunity = discount_opportunity,
+    potential_revenue = potential_revenue,
+    capture_rate = capture_rate,
+    opportunity_rate = opportunity_rate,
+    stringsAsFactors = FALSE
+  )
+
+  # Lowest opportunity rate is drawn first, so the largest
+  # revenue opportunity appears at the top of the horizontal chart.
+  plot_data <- plot_data[
+    order(
+      plot_data$opportunity_rate,
+      na.last = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  values <- rbind(
+    "Actual Income" =
+      plot_data$actual_income,
+    "Discount Opportunity" =
+      plot_data$discount_opportunity
+  )
+
+  max_value <- max(
+    plot_data$potential_revenue,
+    na.rm = TRUE
+  )
+
+  x_limit <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.28
+  }
+
+  max_label_width <- max(
+    nchar(plot_data$site),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    8,
+    min(
+      15,
+      max_label_width * 0.65
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      left_margin,
+      4.2,
+      2.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = plot_data$site,
+    las = 1,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      x_limit
+    ),
+    xlab = ""
+  )
+
+  x_ticks <- pretty(
+    c(
+      0,
+      max_value
+    ),
+    n = 5
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format_compact_currency(
+      x_ticks
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = plot_data$site,
+    las = 1,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      x_limit
+    ),
+    add = TRUE
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Actual Income",
+      "Discount Opportunity"
+    ),
+    fill = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.82,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.08
+    ),
+    xpd = NA
+  )
+
+  label_offset <- x_limit * 0.015
+
+  for (index in seq_along(positions)) {
+
+    opportunity_label <- if (
+      is.finite(
+        plot_data$opportunity_rate[[index]]
+      )
+    ) {
+      paste0(
+        " · ",
+        sprintf(
+          "%.1f%% opportunity",
+          100 *
+            plot_data$opportunity_rate[[index]]
+        )
+      )
+    } else {
+      ""
+    }
+
+    text(
+      plot_data$potential_revenue[[index]] +
+        label_offset,
+      positions[[index]],
+      labels = paste0(
+        format_compact_currency(
+          plot_data$potential_revenue[[index]]
+        ),
+        opportunity_label
+      ),
+      pos = 4,
+      cex = 0.72,
+      col = "#475569",
+      xpd = NA
+    )
+  }
+
+  invisible(NULL)
+}
