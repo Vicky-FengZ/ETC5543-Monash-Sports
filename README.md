@@ -14,9 +14,11 @@ renv::restore()
 shiny::runApp()
 ```
 
-The dashboard shell and upload interface are available. The import functions
-are complete, but the dashboard modules are still using prototype inputs; the
-upload module currently returns file metadata rather than imported data.
+The dashboard includes working Excel import pipelines, session-only file
+uploads, cleaned-data inspection and Excel export. Successfully parsed uploads
+are shared with the dashboard modules during the current Shiny session. The
+Overview page uses Monthly Site Report data; the remaining analytical pages can
+be connected progressively as their charts are completed.
 
 ## Project structure
 
@@ -268,31 +270,91 @@ appropriate raw-data folder and run its loader again.
 If a future workbook changes its structure, inspect the returned `validation`
 table before using the new year in the dashboard.
 
-## Uploaded files
+## Data upload and review workflow
 
-Shiny stores uploaded files under temporary paths that do not retain the
-original report name. Always pass both `datapath` and `name` to a loader:
+The Data page provides two clearly separated tasks:
+
+- **Upload & Manage**: upload, parse and remove Excel workbooks.
+- **View Cleaned Data**: inspect and download the standardised tables produced
+  by successful imports.
+
+### Uploading files
+
+Upload each workbook through the matching report family:
+
+| Upload area | Expected workbook |
+|---|---|
+| Monthly Site Reports | Annual Monthly Site Report workbooks used by Overview and site comparison |
+| Detailed Site Reports | Business Unit Template site or program reports |
+| Venues Tracking Reports | Annual Venues Tracking Report workbooks |
+
+One or more `.xlsx` or `.xls` files can be selected at a time. The module copies
+each file into a temporary session directory, preserves its original filename
+for traceability, and then runs the appropriate import, cleaning and validation
+pipeline. The original workbook on the user's computer is never modified.
+
+Files are processed one at a time. The page shows overall parsing progress and
+an individual status row for every uploaded file:
+
+| Upload status | Meaning and action |
+|---|---|
+| `queued` or `parsing` | The workbook is waiting or is currently being read, cleaned and validated |
+| `ready` | Parsing completed without validation errors; the cleaned data are available to the dashboard |
+| `ready` with warnings | Data are available, but the warning count should be reviewed before analysis |
+| `failed` | The file type, workbook structure, parser or validation produced a blocking error; its data are excluded from the dashboard |
+
+The status row displays the relevant warning count or error message. A warning
+does not block a file. A validation error or parser exception does block it,
+because continuing could silently mislabel data.
+
+If a successfully parsed file has the same report family and filename as an
+existing upload, it replaces the older session copy only after the new file has
+parsed and validated successfully. If the replacement fails, the previous
+ready file and its dashboard data remain available.
+
+Use the remove button beside a status row to delete that temporary upload and
+its parsed result. This does not delete or change the original Excel file.
+
+### Viewing cleaned data
+
+Open **View Cleaned Data** and select the report family. The preview supports:
+
+- multiple reporting years;
+- worksheet-style navigation based on `source_sheet`;
+- Measure and Value type filters for Monthly Site Reports;
+- free-text search across displayed columns;
+- column sorting and adjustable row pagination; and
+- downloading the filtered result as an Excel workbook, with one worksheet per
+  represented `source_sheet`.
+
+The preview is built from the already parsed R objects. Changing a filter,
+sorting a column or moving between pages does not read the Excel files again.
+
+The current interface is a cleaned-data viewer rather than a cell-for-cell raw
+Excel viewer. To investigate a value in its original context, use
+`source_file`, `source_sheet`, `source_row` and `source_column` to locate the
+corresponding cell in the source workbook.
+
+### Session scope
+
+Uploads are deliberately session-only in the current version. Refreshing or
+closing the dashboard clears the temporary files and their parsed results.
+Persistent per-user storage, cached RDS files and background import workers are
+reserved for a later deployment stage.
+
+For custom Shiny upload code, remember that Shiny's temporary `datapath` does
+not retain the user's filename. Pass both values to a loader:
 
 ```r
 monthly_reports <- load_monthly_site_reports(
   paths = input$monthly_reports$datapath,
-  source_names = input$monthly_reports$name
-)
-
-venues_reports <- load_venues_tracking_reports(
-  paths = input$venues_reports$datapath,
-  source_names = input$venues_reports$name
-)
-
-site_reports <- load_business_unit_template_reports(
-  paths = input$site_reports$datapath,
-  source_names = input$site_reports$name
+  source_names = input$monthly_reports$name,
+  strict = FALSE
 )
 ```
 
-Uploaded workbooks should be imported only after an explicit user action, such
-as clicking a Validate or Refresh button. Chart filters should operate on the
-already imported R object and must not trigger another Excel import.
+Dashboard filters and charts should operate on the imported R object rather
+than calling a loader again.
 
 ## Performance and website deployment
 
