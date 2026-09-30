@@ -1236,6 +1236,285 @@ unlink(
 )
 
 # -------------------------------------------------------------------------
+# Facility monthly discount opportunity
+# -------------------------------------------------------------------------
+
+make_facility_monthly_discount_row <- function(
+    year,
+    month,
+    report_unit,
+    campus,
+    business_unit,
+    is_summary,
+    discount_type,
+    value
+) {
+
+  data.frame(
+    report_year = as.integer(year),
+    date = as.Date(
+      sprintf(
+        "%04d-%02d-01",
+        year,
+        month
+      )
+    ),
+    month = as.integer(month),
+    month_label = month.abb[[month]],
+    period_type = "Month",
+    report_unit = report_unit,
+    campus = campus,
+    business_unit = business_unit,
+    is_summary = is_summary,
+    discount_type = discount_type,
+    value = value,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+facility_monthly_discount_fixture <- list(
+  discounts = rbind(
+
+    # January - Swim School
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Student",
+      30
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Staff",
+      10
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Other",
+      5
+    ),
+
+    # February - Swim School
+    make_facility_monthly_discount_row(
+      2025,
+      2,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Student",
+      40
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      2,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Staff",
+      12
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      2,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      FALSE,
+      "Other",
+      8
+    ),
+
+    # January - Pool Hire
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      FALSE,
+      "Student",
+      12
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      FALSE,
+      "Staff",
+      4
+    ),
+
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      FALSE,
+      "Other",
+      2
+    ),
+
+    # Summary row must not become a facility.
+    make_facility_monthly_discount_row(
+      2025,
+      1,
+      "Aquatics",
+      "Clayton",
+      "YTD Summary",
+      TRUE,
+      "Student",
+      999
+    )
+  )
+)
+
+
+facility_monthly_discounts <-
+  calculate_facility_monthly_discounts(
+    facility_monthly_discount_fixture
+  )
+
+
+stopifnot(
+  nrow(facility_monthly_discounts) == 3L,
+  !any(
+    facility_monthly_discounts$business_unit ==
+      "YTD Summary"
+  )
+)
+
+
+swim_school_january <-
+  facility_monthly_discounts[
+    facility_monthly_discounts$business_unit ==
+      "Swim School" &
+      facility_monthly_discounts$month == 1L,
+    ,
+    drop = FALSE
+  ]
+
+
+stopifnot(
+  nrow(swim_school_january) == 1L,
+  swim_school_january$student_discount[[1L]] == 30,
+  swim_school_january$staff_discount[[1L]] == 10,
+  swim_school_january$other_discount[[1L]] == 5,
+  swim_school_january$total_discount[[1L]] == 45
+)
+
+
+swim_school_february <-
+  facility_monthly_discounts[
+    facility_monthly_discounts$business_unit ==
+      "Swim School" &
+      facility_monthly_discounts$month == 2L,
+    ,
+    drop = FALSE
+  ]
+
+
+stopifnot(
+  nrow(swim_school_february) == 1L,
+  swim_school_february$total_discount[[1L]] == 60
+)
+
+
+filtered_monthly_aquatics <-
+  filter_facility_monthly_discounts_by_site(
+    facility_monthly_discounts,
+    "Aquatics Clayton"
+  )
+
+
+stopifnot(
+  nrow(filtered_monthly_aquatics) == 3L,
+  all(
+    filtered_monthly_aquatics$report_unit ==
+      "Aquatics"
+  ),
+  all(
+    filtered_monthly_aquatics$campus ==
+      "Clayton"
+  )
+)
+
+
+stopifnot(
+  nrow(
+    calculate_facility_monthly_discounts(NULL)
+  ) == 0L,
+  nrow(
+    filter_facility_monthly_discounts_by_site(
+      facility_monthly_discounts,
+      "Unknown Site"
+    )
+  ) == 0L
+)
+
+# -------------------------------------------------------------------------
+# Facility Discount Opportunity Trend plot
+# -------------------------------------------------------------------------
+
+facility_discount_trend_file <- tempfile(
+  fileext = ".png"
+)
+
+
+grDevices::png(
+  facility_discount_trend_file,
+  width = 1000,
+  height = 560,
+  res = 96
+)
+
+
+plot_facility_discount_trend(
+  filtered_monthly_aquatics
+)
+
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_discount_trend_file
+  ),
+  file.info(
+    facility_discount_trend_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_discount_trend_file
+)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
@@ -1245,9 +1524,41 @@ site_dashboard_reports <- list(
   discounts = site_discount_fixture$discounts
 )
 
+facility_dashboard_annual_discounts <-
+  facility_discount_fixture$discounts[
+    facility_discount_fixture$discounts$period_type ==
+      "Reported Total",
+    ,
+    drop = FALSE
+  ]
+
+facility_dashboard_annual_discounts$date <-
+  as.Date(NA)
+
+facility_dashboard_annual_discounts$month <-
+  NA_integer_
+
+facility_dashboard_annual_discounts$month_label <-
+  "Reported Total"
+
+
+facility_dashboard_annual_discounts <-
+  facility_dashboard_annual_discounts[
+    names(
+      facility_monthly_discount_fixture$discounts
+    )
+  ]
+
+
+facility_dashboard_discounts <- rbind(
+  facility_dashboard_annual_discounts,
+  facility_monthly_discount_fixture$discounts
+)
+
+
 facility_dashboard_reports <- list(
   finance = facility_finance_fixture$finance,
-  discounts = facility_discount_fixture$discounts
+  discounts = facility_dashboard_discounts
 )
 
 site_dashboard_data <- shiny::reactiveVal(
@@ -1295,7 +1606,10 @@ shiny::testServer(
         output$facility_ranking
       ),
       !is.null(
-        output$facility_ranking
+        output$facility_discount_mix
+      ),
+      !is.null(
+        output$facility_discount_trend
       )
     )
   }

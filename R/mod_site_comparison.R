@@ -388,8 +388,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                "Track facility-level discount opportunity over time"
+              plotOutput(
+                ns("facility_discount_trend"),
+                height = "480px"
               )
             ),
 
@@ -576,6 +577,12 @@ mod_site_comparison_server <- function(
           site_reports()
         )
 
+      })
+
+      facility_monthly_discounts <- reactive({
+        calculate_facility_monthly_discounts(
+          site_reports()
+        )
       })
 
       snapshot_site_discounts <- reactive({
@@ -825,6 +832,29 @@ mod_site_comparison_server <- function(
         x <- facility_annual_discounts()
 
         x <- filter_facility_discounts_by_site(
+          x,
+          input$selected_site
+        )
+
+        selected_period <- period()
+
+        x[
+          x$report_year ==
+            selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_facility_monthly_discounts <- reactive({
+
+        req(
+          input$selected_site
+        )
+
+        x <- facility_monthly_discounts()
+
+        x <- filter_facility_monthly_discounts_by_site(
           x,
           input$selected_site
         )
@@ -1443,11 +1473,62 @@ mod_site_comparison_server <- function(
         chart_subtitle(
           paste0(
             input$selected_site,
-            " · Discount opportunity · ",
-            x$label
+            " · Monthly discount opportunity · ",
+            x$to
           )
         )
       })
+
+      output$facility_discount_trend <- renderPlot(
+        {
+
+          reports <- site_reports()
+          x <- snapshot_facility_monthly_discounts()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste0(
+                "No monthly facility discount data is available for ",
+                input$selected_site,
+                " in ",
+                period()$to,
+                "."
+              )
+            )
+          )
+
+          complete <- !is.na(
+            x$date
+          ) &
+            is.finite(
+              x$total_discount
+            )
+
+          validate(
+            need(
+              any(complete),
+              paste(
+                "No complete monthly discount opportunity values",
+                "are available for this site and year."
+              )
+            )
+          )
+
+          plot_facility_discount_trend(
+            x
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$facility_revenue_gap_subtitle <- renderUI({
 

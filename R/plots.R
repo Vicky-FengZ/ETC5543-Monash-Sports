@@ -2657,3 +2657,286 @@ plot_facility_discount_mix <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Facility Discount Opportunity Trend
+# -------------------------------------------------------------------------
+
+plot_facility_discount_trend <- function(
+    facility_monthly_discounts
+) {
+
+  if (
+    is.null(facility_monthly_discounts) ||
+      !is.data.frame(facility_monthly_discounts) ||
+      nrow(facility_monthly_discounts) == 0L
+  ) {
+    stop(
+      "No monthly facility discount values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "business_unit",
+    "total_discount"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_monthly_discounts)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Monthly facility discount data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    facility_monthly_discounts$date
+  )
+
+  business_units <- trimws(
+    as.character(
+      facility_monthly_discounts$business_unit
+    )
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      facility_monthly_discounts$total_discount
+    )
+  )
+
+  keep <- !is.na(dates) &
+    !is.na(business_units) &
+    nzchar(business_units) &
+    is.finite(values)
+
+  dates <- dates[keep]
+  business_units <- business_units[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      paste(
+        "No complete monthly facility discount",
+        "values are available."
+      ),
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    date = dates,
+    business_unit = business_units,
+    value = values,
+    stringsAsFactors = FALSE
+  )
+
+  plot_data <- plot_data[
+    order(
+      plot_data$date,
+      plot_data$business_unit
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  facility_names <- sort(
+    unique(
+      plot_data$business_unit
+    )
+  )
+
+  date_values <- sort(
+    unique(
+      plot_data$date
+    )
+  )
+
+  y_limits <- overview_plot_limits(
+    plot_data$value
+  )
+
+  x_limits <- range(
+    date_values
+  )
+
+  if (
+    x_limits[[1L]] ==
+      x_limits[[2L]]
+  ) {
+    x_limits <- x_limits +
+      c(
+        -15,
+        15
+      )
+  } else {
+    x_limits <- x_limits +
+      c(
+        -8,
+        8
+      )
+  }
+
+  colours <- grDevices::hcl.colors(
+    length(facility_names),
+    palette = "Dark 3"
+  )
+
+  # Allow additional space above the chart for the facility legend.
+  legend_rows <- ceiling(
+    length(facility_names) / 2
+  )
+
+  top_margin <- max(
+    4.8,
+    2.8 + legend_rows * 0.8
+  )
+
+  old_par <- par(
+    mar = c(
+      5,
+      5.8,
+      top_margin,
+      1.2
+    ),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = y_limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    y_limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= y_limits[[1L]] &
+      y_ticks <= y_limits[[2L]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  for (index in seq_along(facility_names)) {
+
+    facility_name <- facility_names[[index]]
+
+    facility_rows <- plot_data[
+      plot_data$business_unit ==
+        facility_name,
+      ,
+      drop = FALSE
+    ]
+
+    facility_rows <- facility_rows[
+      order(
+        facility_rows$date
+      ),
+      ,
+      drop = FALSE
+    ]
+
+    if (nrow(facility_rows) > 1L) {
+      lines(
+        facility_rows$date,
+        facility_rows$value,
+        col = colours[[index]],
+        lwd = 2.2
+      )
+    }
+
+    points(
+      facility_rows$date,
+      facility_rows$value,
+      pch = 21,
+      cex = 0.9,
+      lwd = 1.5,
+      col = colours[[index]],
+      bg = "white"
+    )
+  }
+
+  # Use the actual available monthly dates for the x-axis.
+  axis.Date(
+    1,
+    at = date_values,
+    format = "%b",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format_compact_currency(
+      y_ticks
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = facility_names,
+    col = colours,
+    lty = 1,
+    lwd = 2.2,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    ncol = min(
+      2L,
+      length(facility_names)
+    ),
+    cex = 0.68,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.04
+    ),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
