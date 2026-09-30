@@ -1418,6 +1418,67 @@ unlink(
 )
 
 # -------------------------------------------------------------------------
+# Facility Performance Over Time plot
+# -------------------------------------------------------------------------
+
+facility_trend_2024 <- filtered_aquatics
+
+facility_trend_2024$report_year <- 2024L
+
+facility_trend_2024$income_actual <-
+  facility_trend_2024$income_actual * 0.85
+
+facility_trend_2024$expenses_actual <-
+  facility_trend_2024$expenses_actual * 0.90
+
+facility_trend_2024$net_actual <-
+  facility_trend_2024$income_actual -
+    facility_trend_2024$expenses_actual
+
+
+facility_trend_fixture <- rbind(
+  facility_trend_2024,
+  filtered_aquatics
+)
+
+
+facility_trend_file <- tempfile(
+  fileext = ".png"
+)
+
+
+grDevices::png(
+  facility_trend_file,
+  width = 950,
+  height = 520,
+  res = 96
+)
+
+
+plot_facility_performance_over_time(
+  facility_trend_fixture,
+  "Income"
+)
+
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_trend_file
+  ),
+  file.info(
+    facility_trend_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_trend_file
+)
+
+# -------------------------------------------------------------------------
 # Facility monthly discount opportunity
 # -------------------------------------------------------------------------
 
@@ -1737,9 +1798,20 @@ facility_dashboard_discounts <- rbind(
   facility_monthly_discount_fixture$discounts
 )
 
+facility_dashboard_finance_2024 <-
+  facility_finance_fixture$finance
+
+facility_dashboard_finance_2024$report_year <-
+  2024L
+
+
+facility_dashboard_finance <- rbind(
+  facility_dashboard_finance_2024,
+  facility_finance_fixture$finance
+)
 
 facility_dashboard_reports <- list(
-  finance = facility_finance_fixture$finance,
+  finance = facility_dashboard_finance,
   discounts = facility_dashboard_discounts
 )
 
@@ -1798,6 +1870,9 @@ shiny::testServer(
       ),
       !is.null(
         output$facility_capture_rate
+      ),
+      !is.null(
+        output$facility_performance_trend
       )
     )
   }

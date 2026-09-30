@@ -3546,3 +3546,268 @@ plot_facility_capture_rate <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Facility Performance Over Time
+# -------------------------------------------------------------------------
+
+plot_facility_performance_over_time <- function(
+    facility_finance,
+    metric
+) {
+
+  if (
+    is.null(facility_finance) ||
+      !is.data.frame(facility_finance) ||
+      nrow(facility_finance) == 0L
+  ) {
+    stop(
+      "No facility finance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "report_year",
+    "business_unit"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_finance)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Facility finance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  values <- facility_finance_values(
+    facility_finance,
+    metric,
+    "Actual"
+  )
+
+  years <- suppressWarnings(
+    as.integer(
+      facility_finance$report_year
+    )
+  )
+
+  business_units <- trimws(
+    as.character(
+      facility_finance$business_unit
+    )
+  )
+
+  keep <- is.finite(values) &
+    !is.na(years) &
+    !is.na(business_units) &
+    nzchar(business_units)
+
+  values <- values[keep]
+  years <- years[keep]
+  business_units <- business_units[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      paste(
+        "No complete facility values are available",
+        "for the selected metric."
+      ),
+      call. = FALSE
+    )
+  }
+
+  year_values <- sort(
+    unique(years)
+  )
+
+  if (length(year_values) < 2L) {
+    stop(
+      "Multiple Detailed Site Report years are required.",
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    report_year = years,
+    business_unit = business_units,
+    value = values,
+    stringsAsFactors = FALSE
+  )
+
+  facility_names <- sort(
+    unique(
+      plot_data$business_unit
+    )
+  )
+
+  y_limits <- overview_plot_limits(
+    plot_data$value
+  )
+
+  x_limits <- range(
+    year_values
+  ) + c(
+    -0.25,
+    0.25
+  )
+
+  colours <- grDevices::hcl.colors(
+    length(facility_names),
+    palette = "Dark 3"
+  )
+
+  legend_rows <- ceiling(
+    length(facility_names) / 2
+  )
+
+  top_margin <- max(
+    4.8,
+    2.8 + legend_rows * 0.8
+  )
+
+  old_par <- par(
+    mar = c(
+      4.2,
+      5.8,
+      top_margin,
+      1.2
+    ),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = y_limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    y_limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= y_limits[[1L]] &
+      y_ticks <= y_limits[[2L]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  for (index in seq_along(facility_names)) {
+
+    facility_name <- facility_names[[index]]
+
+    facility_rows <- plot_data[
+      plot_data$business_unit ==
+        facility_name,
+      ,
+      drop = FALSE
+    ]
+
+    facility_rows <- facility_rows[
+      order(
+        facility_rows$report_year
+      ),
+      ,
+      drop = FALSE
+    ]
+
+    if (nrow(facility_rows) > 1L) {
+      lines(
+        facility_rows$report_year,
+        facility_rows$value,
+        col = colours[[index]],
+        lwd = 2.4
+      )
+    }
+
+    points(
+      facility_rows$report_year,
+      facility_rows$value,
+      pch = 21,
+      cex = 1,
+      lwd = 1.6,
+      col = colours[[index]],
+      bg = "white"
+    )
+  }
+
+  axis(
+    1,
+    at = year_values,
+    labels = year_values,
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.88
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format_compact_currency(
+      y_ticks
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = facility_names,
+    col = colours,
+    lty = 1,
+    lwd = 2.4,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    ncol = min(
+      2L,
+      length(facility_names)
+    ),
+    cex = 0.68,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.04
+    ),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}

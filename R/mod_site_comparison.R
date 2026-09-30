@@ -337,11 +337,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                paste(
-                  "Compare facility and business-unit performance",
-                  "across the selected year range"
-                )
+              plotOutput(
+                ns("facility_performance_trend"),
+                height = "480px"
               )
           ),
 
@@ -823,6 +821,31 @@ mod_site_comparison_server <- function(
         x[
           x$report_year ==
             selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      filtered_facility_finance <- reactive({
+
+        req(
+          input$selected_site
+        )
+
+        x <- facility_annual_finance()
+
+        x <- filter_facility_finance_by_site(
+          x,
+          input$selected_site
+        )
+
+        selected_period <- period()
+
+        x[
+          x$report_year >=
+            selected_period$from &
+            x$report_year <=
+              selected_period$to,
           ,
           drop = FALSE
         ]
@@ -1408,6 +1431,8 @@ mod_site_comparison_server <- function(
       
       output$facility_trend_subtitle <- renderUI({
 
+        x <- period()
+
         req(
           input$selected_site,
           input$metric
@@ -1416,12 +1441,85 @@ mod_site_comparison_server <- function(
         chart_subtitle(
           paste0(
             input$selected_site,
-            " · ",
+            " · Actual ",
             input$metric,
-            " · Multiple Detailed Site Report years required"
+            " · ",
+            x$label
           )
         )
       })
+
+      output$facility_performance_trend <- renderPlot(
+        {
+
+          reports <- site_reports()
+          x <- filtered_facility_finance()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Reports",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste(
+                "No facility finance data is available",
+                "for this site and period."
+              )
+            )
+          )
+
+          years <- sort(
+            unique(
+              x$report_year[
+                !is.na(
+                  x$report_year
+                )
+              ]
+            )
+          )
+
+          validate(
+            need(
+              length(years) >= 2L,
+              paste(
+                "Multiple Detailed Site Report years are required",
+                "to show facility performance over time."
+              )
+            )
+          )
+
+          values <- facility_finance_values(
+            x,
+            input$metric,
+            "Actual"
+          )
+
+          validate(
+            need(
+              any(
+                is.finite(values)
+              ),
+              paste(
+                "No complete Actual",
+                input$metric,
+                "values are available for this site and period."
+              )
+            )
+          )
+
+          plot_facility_performance_over_time(
+            x,
+            input$metric
+          )
+
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$facility_discount_mix_subtitle <- renderUI({
 
