@@ -2328,3 +2328,332 @@ plot_facility_ranking <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Facility Discount Mix
+# -------------------------------------------------------------------------
+
+plot_facility_discount_mix <- function(
+    facility_discounts
+) {
+
+  if (
+    is.null(facility_discounts) ||
+      !is.data.frame(facility_discounts) ||
+      nrow(facility_discounts) == 0L
+  ) {
+    stop(
+      "No facility discount values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "business_unit",
+    "student_discount",
+    "staff_discount",
+    "other_discount",
+    "total_discount"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_discounts)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Facility discount data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  labels <- trimws(
+    as.character(
+      facility_discounts$business_unit
+    )
+  )
+
+  student <- as.numeric(
+    facility_discounts$student_discount
+  )
+
+  staff <- as.numeric(
+    facility_discounts$staff_discount
+  )
+
+  other <- as.numeric(
+    facility_discounts$other_discount
+  )
+
+  total <- as.numeric(
+    facility_discounts$total_discount
+  )
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(student) &
+    is.finite(staff) &
+    is.finite(other) &
+    is.finite(total) &
+    total > 0
+
+  labels <- labels[keep]
+  student <- student[keep]
+  staff <- staff[keep]
+  other <- other[keep]
+  total <- total[keep]
+
+  if (length(labels) == 0L) {
+    stop(
+      paste(
+        "No complete facility discount mix",
+        "values are available."
+      ),
+      call. = FALSE
+    )
+  }
+
+  proportions <- rbind(
+    Student = student / total,
+    Staff = staff / total,
+    Other = other / total
+  )
+
+  # Highest total discount opportunity appears at the top.
+  order_index <- order(
+    total,
+    decreasing = FALSE
+  )
+
+  labels <- labels[order_index]
+  total <- total[order_index]
+
+  proportions <- proportions[
+    ,
+    order_index,
+    drop = FALSE
+  ]
+
+  # Wrap long facility/business-unit labels so they remain
+  # readable inside the half-width dashboard card.
+  wrapped_labels <- vapply(
+    labels,
+    function(label) {
+
+      label <- gsub(
+        "/",
+        "/ ",
+        label,
+        fixed = TRUE
+      )
+
+      paste(
+        strwrap(
+          label,
+          width = 18
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  label_lines <- unlist(
+    strsplit(
+      wrapped_labels,
+      "\n",
+      fixed = TRUE
+    )
+  )
+
+  max_label_width <- max(
+    nchar(label_lines),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    5.5,
+    min(
+      8,
+      max_label_width * 0.45
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4,
+      left_margin,
+      3,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    proportions,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    )
+  )
+
+  ticks <- seq(
+    0,
+    1,
+    by = 0.25
+  )
+
+  axis(
+    1,
+    at = ticks,
+    labels = paste0(
+      round(
+        ticks * 100
+      ),
+      "%"
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  # Redraw bars so grid lines remain behind them.
+  barplot(
+    proportions,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    ),
+    add = TRUE
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Student",
+      "Staff",
+      "Other"
+    ),
+    fill = c(
+      "#2563EB",
+      "#0F766E",
+      "#F59E0B"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.8,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.08
+    ),
+    xpd = NA
+  )
+
+  # Percentage labels are shown only when the segment
+  # is large enough to remain readable.
+  cumulative <- apply(
+    proportions,
+    2,
+    cumsum
+  )
+
+  starts <- rbind(
+    rep(
+      0,
+      ncol(proportions)
+    ),
+    cumulative[
+      -nrow(cumulative),
+      ,
+      drop = FALSE
+    ]
+  )
+
+  centres <- starts +
+    proportions / 2
+
+  for (row_index in seq_len(nrow(proportions))) {
+
+    for (column_index in seq_len(ncol(proportions))) {
+
+      share <- proportions[
+        row_index,
+        column_index
+      ]
+
+      if (
+        is.finite(share) &&
+          share >= 0.03
+      ) {
+
+        text(
+          centres[
+            row_index,
+            column_index
+          ],
+          positions[[column_index]],
+          labels = paste0(
+            round(
+              share * 100
+            ),
+            "%"
+          ),
+          cex = if (
+            share < 0.08
+          ) {
+            0.6
+          } else {
+            0.7
+          },
+          col = "white"
+        )
+      }
+    }
+  }
+
+  invisible(NULL)
+}

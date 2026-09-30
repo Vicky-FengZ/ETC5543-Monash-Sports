@@ -1009,6 +1009,233 @@ unlink(
 )
 
 # -------------------------------------------------------------------------
+# Facility annual discount calculations
+# -------------------------------------------------------------------------
+
+make_facility_discount_row <- function(
+    year,
+    report_unit,
+    campus,
+    business_unit,
+    period_type,
+    is_summary,
+    discount_type,
+    value
+) {
+
+  data.frame(
+    report_year = as.integer(year),
+    period_type = period_type,
+    report_unit = report_unit,
+    campus = campus,
+    business_unit = business_unit,
+    is_summary = is_summary,
+    discount_type = discount_type,
+    value = value,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+facility_discount_fixture <- list(
+  discounts = rbind(
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Student",
+      30
+    ),
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Staff",
+      10
+    ),
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Reported Total",
+      FALSE,
+      "Other",
+      5
+    ),
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Student",
+      12
+    ),
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Staff",
+      4
+    ),
+
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Pool Hire",
+      "Reported Total",
+      FALSE,
+      "Other",
+      2
+    ),
+
+    # Summary value must not be treated as a facility.
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "YTD Summary",
+      "Reported Total",
+      TRUE,
+      "Student",
+      999
+    ),
+
+    # Monthly value must not be added to the reported annual total.
+    make_facility_discount_row(
+      2025,
+      "Aquatics",
+      "Clayton",
+      "Swim School",
+      "Month",
+      FALSE,
+      "Student",
+      999
+    )
+  )
+)
+
+
+facility_discounts <- calculate_facility_annual_discounts(
+  facility_discount_fixture
+)
+
+
+stopifnot(
+  nrow(facility_discounts) == 2L,
+  !any(
+    facility_discounts$business_unit ==
+      "YTD Summary"
+  )
+)
+
+
+swim_school_discounts <- facility_discounts[
+  facility_discounts$business_unit ==
+    "Swim School",
+  ,
+  drop = FALSE
+]
+
+
+stopifnot(
+  nrow(swim_school_discounts) == 1L,
+  swim_school_discounts$student_discount[[1L]] == 30,
+  swim_school_discounts$staff_discount[[1L]] == 10,
+  swim_school_discounts$other_discount[[1L]] == 5,
+  swim_school_discounts$total_discount[[1L]] == 45
+)
+
+
+filtered_aquatics_discounts <-
+  filter_facility_discounts_by_site(
+    facility_discounts,
+    "Aquatics Clayton"
+  )
+
+
+stopifnot(
+  nrow(filtered_aquatics_discounts) == 2L,
+  all(
+    filtered_aquatics_discounts$report_unit ==
+      "Aquatics"
+  ),
+  all(
+    filtered_aquatics_discounts$campus ==
+      "Clayton"
+  )
+)
+
+
+stopifnot(
+  nrow(
+    calculate_facility_annual_discounts(NULL)
+  ) == 0L,
+  nrow(
+    filter_facility_discounts_by_site(
+      facility_discounts,
+      "Unknown Site"
+    )
+  ) == 0L
+)
+
+# -------------------------------------------------------------------------
+# Facility Discount Mix plot
+# -------------------------------------------------------------------------
+
+facility_discount_mix_file <- tempfile(
+  fileext = ".png"
+)
+
+
+grDevices::png(
+  facility_discount_mix_file,
+  width = 900,
+  height = 520,
+  res = 96
+)
+
+
+plot_facility_discount_mix(
+  filtered_aquatics_discounts
+)
+
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_discount_mix_file
+  ),
+  file.info(
+    facility_discount_mix_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_discount_mix_file
+)
+
+# -------------------------------------------------------------------------
 # Site Comparison module
 # -------------------------------------------------------------------------
 
@@ -1018,11 +1245,15 @@ site_dashboard_reports <- list(
   discounts = site_discount_fixture$discounts
 )
 
+facility_dashboard_reports <- list(
+  finance = facility_finance_fixture$finance,
+  discounts = facility_discount_fixture$discounts
+)
 
 site_dashboard_data <- shiny::reactiveVal(
   list(
     monthly_reports = site_dashboard_reports,
-    site_reports = facility_finance_fixture
+    site_reports = facility_dashboard_reports
   )
 )
 
@@ -1059,6 +1290,9 @@ shiny::testServer(
       ),
       !is.null(
         output$site_discount_mix
+      ),
+      !is.null(
+        output$facility_ranking
       ),
       !is.null(
         output$facility_ranking

@@ -368,11 +368,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                paste(
-                  "Student, staff and other discount composition",
-                  "by facility"
-                )
+              plotOutput(
+                ns("facility_discount_mix"),
+                height = "480px"
               )
             ),
 
@@ -571,6 +569,13 @@ mod_site_comparison_server <- function(
         calculate_facility_annual_finance(
           site_reports()
         )
+      })
+
+      facility_annual_discounts <- reactive({
+        calculate_facility_annual_discounts(
+          site_reports()
+        )
+
       })
 
       snapshot_site_discounts <- reactive({
@@ -797,6 +802,29 @@ mod_site_comparison_server <- function(
         x <- facility_annual_finance()
 
         x <- filter_facility_finance_by_site(
+          x,
+          input$selected_site
+        )
+
+        selected_period <- period()
+
+        x[
+          x$report_year ==
+            selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_facility_discounts <- reactive({
+
+        req(
+          input$selected_site
+        )
+
+        x <- facility_annual_discounts()
+
+        x <- filter_facility_discounts_by_site(
           x,
           input$selected_site
         )
@@ -1349,6 +1377,63 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      output$facility_discount_mix <- renderPlot(
+        {
+          reports <- site_reports()
+          x <- snapshot_facility_discounts()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste0(
+                "No facility discount data is available for ",
+                input$selected_site,
+                " in ",
+                period()$to,
+                "."
+              )
+            )
+          )
+
+          complete <- is.finite(
+            x$student_discount
+          ) &
+            is.finite(
+              x$staff_discount
+            ) &
+            is.finite(
+              x$other_discount
+            ) &
+            is.finite(
+              x$total_discount
+            ) &
+            x$total_discount > 0
+
+          validate(
+            need(
+              any(complete),
+              paste(
+                "No complete facility discount mix values",
+                "are available for this site and year."
+              )
+            )
+          )
+
+          plot_facility_discount_mix(
+            x
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$facility_discount_trend_subtitle <- renderUI({
 

@@ -1692,3 +1692,267 @@ facility_finance_values <- function(
     facility_finance[[column_name]]
   )
 }
+
+# -------------------------------------------------------------------------
+# Facility annual discount calculations
+# -------------------------------------------------------------------------
+
+empty_facility_annual_discounts <- function() {
+
+  data.frame(
+    report_year = integer(),
+    report_unit = character(),
+    campus = character(),
+    business_unit = character(),
+    student_discount = double(),
+    staff_discount = double(),
+    other_discount = double(),
+    total_discount = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_facility_annual_discounts <- function(
+    site_reports
+) {
+
+  if (is.null(site_reports)) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  discounts <- site_reports$discounts
+
+  required_columns <- c(
+    "report_year",
+    "period_type",
+    "report_unit",
+    "campus",
+    "business_unit",
+    "is_summary",
+    "discount_type",
+    "value"
+  )
+
+  if (
+    is.null(discounts) ||
+      !is.data.frame(discounts) ||
+      nrow(discounts) == 0L
+  ) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(discounts)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Detailed Site Report discount data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Use annual reported totals only.
+  # Summary rows are excluded because this view compares
+  # individual facilities/business units.
+  discounts <- discounts[
+    discounts$period_type == "Reported Total" &
+      !(discounts$is_summary %in% TRUE) &
+      discounts$discount_type %in%
+        c(
+          "Student",
+          "Staff",
+          "Other"
+        ),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(discounts) == 0L) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  discounts$report_year <- as.integer(
+    discounts$report_year
+  )
+
+  discounts$report_unit <- trimws(
+    as.character(
+      discounts$report_unit
+    )
+  )
+
+  discounts$campus <- trimws(
+    as.character(
+      discounts$campus
+    )
+  )
+
+  discounts$business_unit <- trimws(
+    as.character(
+      discounts$business_unit
+    )
+  )
+
+  discounts <- discounts[
+    !is.na(discounts$business_unit) &
+      nzchar(discounts$business_unit),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(discounts) == 0L) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  keys <- unique(
+    discounts[
+      c(
+        "report_year",
+        "report_unit",
+        "campus",
+        "business_unit"
+      )
+    ]
+  )
+
+  keys <- keys[
+    order(
+      keys$report_year,
+      keys$report_unit,
+      keys$business_unit
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rows <- vector(
+    "list",
+    nrow(keys)
+  )
+
+  for (index in seq_len(nrow(keys))) {
+
+    key <- keys[
+      index,
+      ,
+      drop = FALSE
+    ]
+
+    selected <- discounts[
+      discounts$report_year ==
+        key$report_year[[1L]] &
+        discounts$report_unit ==
+          key$report_unit[[1L]] &
+        discounts$campus ==
+          key$campus[[1L]] &
+        discounts$business_unit ==
+          key$business_unit[[1L]],
+      ,
+      drop = FALSE
+    ]
+
+    discount_value <- function(type) {
+
+      sum_available_finance_values(
+        selected$value[
+          selected$discount_type == type
+        ]
+      )
+    }
+
+    student_discount <- discount_value(
+      "Student"
+    )
+
+    staff_discount <- discount_value(
+      "Staff"
+    )
+
+    other_discount <- discount_value(
+      "Other"
+    )
+
+    total_discount <- sum_available_finance_values(
+      selected$value
+    )
+
+    rows[[index]] <- data.frame(
+      report_year =
+        key$report_year[[1L]],
+      report_unit =
+        key$report_unit[[1L]],
+      campus =
+        key$campus[[1L]],
+      business_unit =
+        key$business_unit[[1L]],
+      student_discount = student_discount,
+      staff_discount = staff_discount,
+      other_discount = other_discount,
+      total_discount = total_discount,
+      aggregation_source =
+        "Detailed Site Report Reported Total",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  result <- do.call(
+    rbind,
+    rows
+  )
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+filter_facility_discounts_by_site <- function(
+    facility_discounts,
+    site
+) {
+
+  if (
+    is.null(facility_discounts) ||
+      !is.data.frame(facility_discounts) ||
+      nrow(facility_discounts) == 0L
+  ) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  key <- facility_site_key(site)
+
+  if (is.null(key)) {
+    return(
+      empty_facility_annual_discounts()
+    )
+  }
+
+  facility_discounts[
+    facility_discounts$report_unit ==
+      key$report_unit &
+      facility_discounts$campus ==
+        key$campus,
+    ,
+    drop = FALSE
+  ]
+}
