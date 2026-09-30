@@ -1236,6 +1236,149 @@ unlink(
 )
 
 # -------------------------------------------------------------------------
+# Facility annual revenue opportunity
+# -------------------------------------------------------------------------
+
+facility_revenue <-
+  calculate_facility_annual_revenue(
+    list(
+      finance =
+        facility_finance_fixture$finance,
+      discounts =
+        facility_discount_fixture$discounts
+    )
+  )
+
+
+stopifnot(
+  nrow(facility_revenue) == 2L
+)
+
+
+swim_school_revenue <-
+  facility_revenue[
+    facility_revenue$business_unit ==
+      "Swim School",
+    ,
+    drop = FALSE
+  ]
+
+
+stopifnot(
+  nrow(swim_school_revenue) == 1L,
+  swim_school_revenue$actual_income[[1L]] == 120,
+  swim_school_revenue$discount_opportunity[[1L]] == 45,
+  swim_school_revenue$potential_revenue[[1L]] == 165,
+  isTRUE(
+    all.equal(
+      swim_school_revenue$capture_rate[[1L]],
+      120 / 165
+    )
+  ),
+  isTRUE(
+    all.equal(
+      swim_school_revenue$opportunity_rate[[1L]],
+      45 / 165
+    )
+  )
+)
+
+
+pool_hire_revenue <-
+  facility_revenue[
+    facility_revenue$business_unit ==
+      "Pool Hire",
+    ,
+    drop = FALSE
+  ]
+
+
+stopifnot(
+  nrow(pool_hire_revenue) == 1L,
+  pool_hire_revenue$actual_income[[1L]] == 80,
+  pool_hire_revenue$discount_opportunity[[1L]] == 18,
+  pool_hire_revenue$potential_revenue[[1L]] == 98,
+  isTRUE(
+    all.equal(
+      pool_hire_revenue$capture_rate[[1L]],
+      80 / 98
+    )
+  )
+)
+
+
+filtered_aquatics_revenue <-
+  filter_facility_revenue_by_site(
+    facility_revenue,
+    "Aquatics Clayton"
+  )
+
+
+stopifnot(
+  nrow(filtered_aquatics_revenue) == 2L,
+  all(
+    filtered_aquatics_revenue$report_unit ==
+      "Aquatics"
+  ),
+  all(
+    filtered_aquatics_revenue$campus ==
+      "Clayton"
+  )
+)
+
+
+stopifnot(
+  nrow(
+    calculate_facility_annual_revenue(NULL)
+  ) == 0L,
+  nrow(
+    filter_facility_revenue_by_site(
+      facility_revenue,
+      "Unknown Site"
+    )
+  ) == 0L
+)
+
+# -------------------------------------------------------------------------
+# Facility Revenue Opportunity plot
+# -------------------------------------------------------------------------
+
+facility_revenue_file <- tempfile(
+  fileext = ".png"
+)
+
+
+grDevices::png(
+  facility_revenue_file,
+  width = 950,
+  height = 520,
+  res = 96
+)
+
+
+plot_facility_revenue_opportunity(
+  filtered_aquatics_revenue
+)
+
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_revenue_file
+  ),
+  file.info(
+    facility_revenue_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_revenue_file
+)
+
+# -------------------------------------------------------------------------
 # Facility monthly discount opportunity
 # -------------------------------------------------------------------------
 
@@ -1610,6 +1753,9 @@ shiny::testServer(
       ),
       !is.null(
         output$facility_discount_trend
+      ),
+      !is.null(
+        output$facility_revenue_opportunity
       )
     )
   }

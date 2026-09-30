@@ -2940,3 +2940,320 @@ plot_facility_discount_trend <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Facility Revenue Opportunity
+# -------------------------------------------------------------------------
+
+plot_facility_revenue_opportunity <- function(
+    facility_revenue
+) {
+
+  if (
+    is.null(facility_revenue) ||
+      !is.data.frame(facility_revenue) ||
+      nrow(facility_revenue) == 0L
+  ) {
+    stop(
+      "No facility revenue opportunity values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "business_unit",
+    "actual_income",
+    "discount_opportunity",
+    "potential_revenue"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_revenue)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Facility revenue data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  labels <- trimws(
+    as.character(
+      facility_revenue$business_unit
+    )
+  )
+
+  actual_income <- suppressWarnings(
+    as.numeric(
+      facility_revenue$actual_income
+    )
+  )
+
+  discount_opportunity <- suppressWarnings(
+    as.numeric(
+      facility_revenue$discount_opportunity
+    )
+  )
+
+  potential_revenue <- suppressWarnings(
+    as.numeric(
+      facility_revenue$potential_revenue
+    )
+  )
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(actual_income) &
+    is.finite(discount_opportunity) &
+    is.finite(potential_revenue) &
+    actual_income >= 0 &
+    discount_opportunity >= 0 &
+    potential_revenue > 0
+
+  labels <- labels[keep]
+  actual_income <- actual_income[keep]
+  discount_opportunity <- discount_opportunity[keep]
+  potential_revenue <- potential_revenue[keep]
+
+  if (length(labels) == 0L) {
+    stop(
+      "No complete facility revenue opportunity values are available.",
+      call. = FALSE
+    )
+  }
+
+  opportunity_rate <-
+    discount_opportunity /
+      potential_revenue
+
+  plot_data <- data.frame(
+    business_unit = labels,
+    actual_income = actual_income,
+    discount_opportunity = discount_opportunity,
+    potential_revenue = potential_revenue,
+    opportunity_rate = opportunity_rate,
+    stringsAsFactors = FALSE
+  )
+
+  # Horizontal bars draw the final row at the top.
+  # Sort ascending so the largest relative revenue opportunity
+  # appears at the top of the chart.
+  order_index <- order(
+    plot_data$opportunity_rate,
+    plot_data$potential_revenue,
+    na.last = TRUE
+  )
+
+  plot_data <- plot_data[
+    order_index,
+    ,
+    drop = FALSE
+  ]
+
+  values <- rbind(
+    "Actual Income" =
+      plot_data$actual_income,
+    "Discount Opportunity" =
+      plot_data$discount_opportunity
+  )
+
+  wrapped_labels <- vapply(
+    plot_data$business_unit,
+    function(label) {
+
+      label <- gsub(
+        "/",
+        "/ ",
+        label,
+        fixed = TRUE
+      )
+
+      paste(
+        strwrap(
+          label,
+          width = 18
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  label_lines <- unlist(
+    strsplit(
+      wrapped_labels,
+      "\n",
+      fixed = TRUE
+    )
+  )
+
+  max_label_width <- max(
+    nchar(label_lines),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    5.5,
+    min(
+      8,
+      max_label_width * 0.45
+    )
+  )
+
+  max_value <- max(
+    plot_data$potential_revenue,
+    na.rm = TRUE
+  )
+
+  x_limit <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.35
+  }
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      left_margin,
+      4.2,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      x_limit
+    ),
+    xlab = ""
+  )
+
+  x_ticks <- pretty(
+    c(
+      0,
+      max_value
+    ),
+    n = 5
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format_compact_currency(
+      x_ticks
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  # Redraw the bars so the grid stays behind them.
+  barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      x_limit
+    ),
+    add = TRUE
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Actual Income",
+      "Discount Opportunity"
+    ),
+    fill = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.78,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.08
+    ),
+    xpd = NA
+  )
+
+  label_offset <- x_limit * 0.015
+
+  for (index in seq_along(positions)) {
+
+    opportunity_label <- paste0(
+      " · ",
+      sprintf(
+        "%.1f%% opportunity",
+        100 *
+          plot_data$opportunity_rate[[index]]
+      )
+    )
+
+    text(
+      plot_data$potential_revenue[[index]] +
+        label_offset,
+      positions[[index]],
+      labels = paste0(
+        format_compact_currency(
+          plot_data$potential_revenue[[index]]
+        ),
+        opportunity_label
+      ),
+      pos = 4,
+      cex = 0.68,
+      col = "#475569",
+      xpd = NA
+    )
+  }
+
+  invisible(NULL)
+}

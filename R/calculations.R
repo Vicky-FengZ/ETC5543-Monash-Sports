@@ -1958,6 +1958,194 @@ filter_facility_discounts_by_site <- function(
 }
 
 # -------------------------------------------------------------------------
+# Facility annual revenue opportunity
+# -------------------------------------------------------------------------
+
+empty_facility_annual_revenue <- function() {
+
+  data.frame(
+    report_year = integer(),
+    report_unit = character(),
+    campus = character(),
+    business_unit = character(),
+    actual_income = double(),
+    discount_opportunity = double(),
+    potential_revenue = double(),
+    capture_rate = double(),
+    opportunity_rate = double(),
+    aggregation_source = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+calculate_facility_annual_revenue <- function(
+    site_reports
+) {
+
+  if (is.null(site_reports)) {
+    return(
+      empty_facility_annual_revenue()
+    )
+  }
+
+  finance <- calculate_facility_annual_finance(
+    site_reports
+  )
+
+  discounts <- calculate_facility_annual_discounts(
+    site_reports
+  )
+
+  if (
+    nrow(finance) == 0L &&
+      nrow(discounts) == 0L
+  ) {
+    return(
+      empty_facility_annual_revenue()
+    )
+  }
+
+  key_columns <- c(
+    "report_year",
+    "report_unit",
+    "campus",
+    "business_unit"
+  )
+
+  finance_values <- finance[
+    c(
+      key_columns,
+      "income_actual"
+    )
+  ]
+
+  names(finance_values)[
+    names(finance_values) ==
+      "income_actual"
+  ] <- "actual_income"
+
+  discount_values <- discounts[
+    c(
+      key_columns,
+      "total_discount"
+    )
+  ]
+
+  names(discount_values)[
+    names(discount_values) ==
+      "total_discount"
+  ] <- "discount_opportunity"
+
+  # Keep facilities even if one side is incomplete.
+  # This avoids silently dropping a facility when either
+  # finance or discount data is missing.
+  result <- merge(
+    finance_values,
+    discount_values,
+    by = key_columns,
+    all = TRUE,
+    sort = FALSE
+  )
+
+  result$actual_income <- suppressWarnings(
+    as.numeric(
+      result$actual_income
+    )
+  )
+
+  result$discount_opportunity <- suppressWarnings(
+    as.numeric(
+      result$discount_opportunity
+    )
+  )
+
+  complete <- is.finite(
+    result$actual_income
+  ) &
+    is.finite(
+      result$discount_opportunity
+    )
+
+  result$potential_revenue <- NA_real_
+
+  result$potential_revenue[complete] <-
+    result$actual_income[complete] +
+      result$discount_opportunity[complete]
+
+  valid_potential <- complete &
+    is.finite(
+      result$potential_revenue
+    ) &
+    result$potential_revenue != 0
+
+  result$capture_rate <- NA_real_
+
+  result$capture_rate[valid_potential] <-
+    result$actual_income[valid_potential] /
+      result$potential_revenue[valid_potential]
+
+  result$opportunity_rate <- NA_real_
+
+  result$opportunity_rate[valid_potential] <-
+    result$discount_opportunity[valid_potential] /
+      result$potential_revenue[valid_potential]
+
+  result$aggregation_source <-
+    "Detailed Site Report Reported Total"
+
+  result <- result[
+    order(
+      result$report_year,
+      result$report_unit,
+      result$business_unit
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+filter_facility_revenue_by_site <- function(
+    facility_revenue,
+    site
+) {
+
+  if (
+    is.null(facility_revenue) ||
+      !is.data.frame(facility_revenue) ||
+      nrow(facility_revenue) == 0L
+  ) {
+    return(
+      empty_facility_annual_revenue()
+    )
+  }
+
+  key <- facility_site_key(
+    site
+  )
+
+  if (is.null(key)) {
+    return(
+      empty_facility_annual_revenue()
+    )
+  }
+
+  facility_revenue[
+    facility_revenue$report_unit ==
+      key$report_unit &
+      facility_revenue$campus ==
+        key$campus,
+    ,
+    drop = FALSE
+  ]
+}
+
+# -------------------------------------------------------------------------
 # Facility monthly discount opportunity
 # -------------------------------------------------------------------------
 

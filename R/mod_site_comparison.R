@@ -343,7 +343,7 @@ mod_site_comparison_ui <- function(id) {
                   "across the selected year range"
                 )
               )
-            ),
+          ),
 
             col_widths = c(6, 6)
           )
@@ -417,11 +417,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                paste(
-                  "Compare actual income and discount opportunity",
-                  "within the selected site"
-                )
+              plotOutput(
+                ns("facility_revenue_opportunity"),
+                height ="480px"
               )
             ),
 
@@ -577,6 +575,12 @@ mod_site_comparison_server <- function(
           site_reports()
         )
 
+      })
+
+      facility_annual_revenue <- reactive({
+        calculate_facility_annual_revenue(
+          site_reports()
+        )
       })
 
       facility_monthly_discounts <- reactive({
@@ -855,6 +859,29 @@ mod_site_comparison_server <- function(
         x <- facility_monthly_discounts()
 
         x <- filter_facility_monthly_discounts_by_site(
+          x,
+          input$selected_site
+        )
+
+        selected_period <- period()
+
+        x[
+          x$report_year ==
+            selected_period$to,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      snapshot_facility_revenue <- reactive({
+
+        req(
+          input$selected_site
+        )
+
+        x <- facility_annual_revenue()
+
+        x <- filter_facility_revenue_by_site(
           x,
           input$selected_site
         )
@@ -1544,6 +1571,60 @@ mod_site_comparison_server <- function(
           )
         )
       })
+
+      output$facility_revenue_opportunity <- renderPlot(
+        {
+          reports <- site_reports()
+          x <- snapshot_facility_revenue()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste0(
+                "No facility revenue opportunity data is available for ",
+                input$selected_site,
+                " in ",
+                period()$to,
+                "."
+              )
+            )
+          )
+
+          complete <- is.finite(
+            x$actual_income
+          ) &
+            is.finite(
+              x$discount_opportunity
+            ) &
+            is.finite(
+              x$potential_revenue
+            )
+
+          validate(
+            need(
+              any(complete),
+              paste(
+                "No complete facility revenue opportunity values",
+                "are available for this site and year."
+              )
+            )
+          )
+
+          plot_facility_revenue_opportunity(
+            x
+          )
+
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$facility_capture_trend_subtitle <- renderUI({
 
