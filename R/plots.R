@@ -3257,3 +3257,292 @@ plot_facility_revenue_opportunity <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Facility Revenue Capture Rate
+# -------------------------------------------------------------------------
+
+plot_facility_capture_rate <- function(
+    facility_revenue
+) {
+
+  if (
+    is.null(facility_revenue) ||
+      !is.data.frame(facility_revenue) ||
+      nrow(facility_revenue) == 0L
+  ) {
+    stop(
+      "No facility revenue capture values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "business_unit",
+    "capture_rate",
+    "opportunity_rate"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(facility_revenue)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Facility revenue data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  labels <- trimws(
+    as.character(
+      facility_revenue$business_unit
+    )
+  )
+
+  capture_rate <- suppressWarnings(
+    as.numeric(
+      facility_revenue$capture_rate
+    )
+  )
+
+  opportunity_rate <- suppressWarnings(
+    as.numeric(
+      facility_revenue$opportunity_rate
+    )
+  )
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(capture_rate) &
+    is.finite(opportunity_rate) &
+    capture_rate >= 0 &
+    opportunity_rate >= 0
+
+  labels <- labels[keep]
+  capture_rate <- capture_rate[keep]
+  opportunity_rate <- opportunity_rate[keep]
+
+  if (length(labels) == 0L) {
+    stop(
+      "No complete facility revenue capture values are available.",
+      call. = FALSE
+    )
+  }
+
+  plot_data <- data.frame(
+    business_unit = labels,
+    capture_rate = capture_rate,
+    opportunity_rate = opportunity_rate,
+    stringsAsFactors = FALSE
+  )
+
+  # Horizontal barplots draw the final row at the top,
+  # so ascending order places the highest capture rate at the top.
+  order_index <- order(
+    plot_data$capture_rate,
+    decreasing = FALSE
+  )
+
+  plot_data <- plot_data[
+    order_index,
+    ,
+    drop = FALSE
+  ]
+
+  values <- rbind(
+    "Captured Revenue" =
+      plot_data$capture_rate,
+    "Opportunity Gap" =
+      plot_data$opportunity_rate
+  )
+
+  wrapped_labels <- vapply(
+    plot_data$business_unit,
+    function(label) {
+
+      label <- gsub(
+        "/",
+        "/ ",
+        label,
+        fixed = TRUE
+      )
+
+      paste(
+        strwrap(
+          label,
+          width = 18
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  label_lines <- unlist(
+    strsplit(
+      wrapped_labels,
+      "\n",
+      fixed = TRUE
+    )
+  )
+
+  max_label_width <- max(
+    nchar(label_lines),
+    na.rm = TRUE
+  )
+
+  left_margin <- max(
+    5.5,
+    min(
+      8,
+      max_label_width * 0.45
+    )
+  )
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      left_margin,
+      4.2,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    )
+  )
+
+  ticks <- seq(
+    0,
+    1,
+    by = 0.25
+  )
+
+  axis(
+    1,
+    at = ticks,
+    labels = paste0(
+      round(
+        ticks * 100
+      ),
+      "%"
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  abline(
+    v = ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  # Redraw bars so the grid remains behind them.
+  barplot(
+    values,
+    horiz = TRUE,
+    beside = FALSE,
+    names.arg = wrapped_labels,
+    las = 1,
+    cex.names = 0.78,
+    border = NA,
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    axes = FALSE,
+    xlim = c(
+      0,
+      1
+    ),
+    add = TRUE
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Captured Revenue",
+      "Opportunity Gap"
+    ),
+    fill = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.78,
+    text.col = "#475569",
+    inset = c(
+      0,
+      -0.08
+    ),
+    xpd = NA
+  )
+
+  for (index in seq_along(positions)) {
+
+    rate <- plot_data$capture_rate[[index]]
+
+    if (rate >= 0.12) {
+
+      text(
+        rate / 2,
+        positions[[index]],
+        labels = format_percentage(
+          rate,
+          digits = 1L
+        ),
+        cex = 0.72,
+        col = "white"
+      )
+
+    } else {
+
+      text(
+        rate + 0.015,
+        positions[[index]],
+        labels = format_percentage(
+          rate,
+          digits = 1L
+        ),
+        pos = 4,
+        cex = 0.72,
+        col = "#334155",
+        xpd = NA
+      )
+    }
+  }
+
+  invisible(NULL)
+}

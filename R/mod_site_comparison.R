@@ -437,8 +437,9 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              placeholder_chart(
-                "Track the share of potential revenue captured over time"
+              plotOutput(
+                ns("facility_capture_rate"),
+                height = "480px"
               )
             ),
 
@@ -1629,18 +1630,72 @@ mod_site_comparison_server <- function(
       output$facility_capture_trend_subtitle <- renderUI({
 
         x <- period()
-        req(input$selected_site)
+        req(
+          input$selected_site
+        )
 
         chart_subtitle(
           paste0(
             input$selected_site,
             " · Revenue capture rate · ",
-            x$label
+            x$to
           )
         )
       })
+
+      output$facility_capture_rate <- renderPlot(
+        {
+
+          reports <- site_reports()
+          x <- snapshot_facility_revenue()
+
+          validate(
+            need(
+              !is.null(reports),
+              paste(
+                "Upload the relevant Detailed Site Report",
+                "on the Data page."
+              )
+            ),
+            need(
+              nrow(x) > 0L,
+              paste0(
+                "No facility revenue capture data is available for ",
+                input$selected_site,
+                " in ",
+                period()$to,
+                "."
+              )
+            )
+          )
+
+          complete <- is.finite(
+            x$capture_rate
+          ) &
+            is.finite(
+              x$opportunity_rate
+            )
+
+          validate(
+            need(
+              any(complete),
+              paste(
+                "No complete facility revenue capture values",
+                "are available for this site and year."
+              )
+            )
+          )
+
+          plot_facility_capture_rate(
+            x
+          )
+
+        },
+        res = 96,
+        bg = "white"
+      )
       
-            invisible(
+      invisible(
         list(
           period = period,
           selected_site = reactive(

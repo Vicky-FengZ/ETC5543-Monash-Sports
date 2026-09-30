@@ -1379,6 +1379,45 @@ unlink(
 )
 
 # -------------------------------------------------------------------------
+# Facility Revenue Capture Rate plot
+# -------------------------------------------------------------------------
+
+facility_capture_rate_file <- tempfile(
+  fileext = ".png"
+)
+
+
+grDevices::png(
+  facility_capture_rate_file,
+  width = 950,
+  height = 520,
+  res = 96
+)
+
+
+plot_facility_capture_rate(
+  filtered_aquatics_revenue
+)
+
+
+grDevices::dev.off()
+
+
+stopifnot(
+  file.exists(
+    facility_capture_rate_file
+  ),
+  file.info(
+    facility_capture_rate_file
+  )$size > 0L
+)
+
+
+unlink(
+  facility_capture_rate_file
+)
+
+# -------------------------------------------------------------------------
 # Facility monthly discount opportunity
 # -------------------------------------------------------------------------
 
@@ -1756,6 +1795,9 @@ shiny::testServer(
       ),
       !is.null(
         output$facility_revenue_opportunity
+      ),
+      !is.null(
+        output$facility_capture_rate
       )
     )
   }
