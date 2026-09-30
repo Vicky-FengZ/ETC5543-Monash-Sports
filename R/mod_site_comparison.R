@@ -1379,17 +1379,18 @@ mod_site_comparison_server <- function(
       )
       
       output$facility_trend_subtitle <- renderUI({
-        
-        x <- period()
-        req(input$selected_site)
-        
+
+        req(
+          input$selected_site,
+          input$metric
+        )
+
         chart_subtitle(
           paste0(
             input$selected_site,
-            " · Actual ",
-            x$metric,
             " · ",
-            x$label
+            input$metric,
+            " · Multiple Detailed Site Report years required"
           )
         )
       })
