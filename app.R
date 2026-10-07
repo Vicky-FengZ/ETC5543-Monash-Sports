@@ -21,6 +21,8 @@ source("R/ui_helpers.R")
 source("R/data/load.R")
 source("R/calculations.R")
 source("R/plots.R")
+source("R/forecasting.R")
+source("R/forecast_plots.R")
 
 source("R/mod_overview.R")
 source("R/mod_site_comparison.R")

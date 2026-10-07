@@ -356,6 +356,24 @@ monthly_reports <- load_monthly_site_reports(
 Dashboard filters and charts should operate on the imported R object rather
 than calling a loader again.
 
+## Forecasting and business planning
+
+The **Forecasting** page now uses Monthly Site Reports to forecast monthly
+Income and Expenses for 3, 6 or 12 months. It supports an organisation or site
+scope, historical cutoff selection, statistical baselines, wage adjustments,
+price changes, repriceable income share and demand scenarios. Net Result is not
+a forecast target.
+
+The page calculates the minimum income growth and price increase needed to cover
+the selected period's expenses, including any pre-existing shortfall. Payroll
+share is a user input because Monthly Site Reports do not provide a separate
+payroll expense series. Model accuracy is displayed only when enough continuous
+history exists for rolling-origin validation. Missing years are not joined or
+filled with zero.
+
+See [Forecasting and practical planning](docs/forecasting.md) for the formulas,
+data checks, limitations, model comparison and testing instructions.
+
 ## Performance and website deployment
 
 This project is a Shiny application rather than a self-contained static HTML

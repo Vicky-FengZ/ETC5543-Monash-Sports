@@ -2,6 +2,81 @@ body {
   background-color: #F6F8FB;
 }
 
+/* Forecasting: a planning workflow with clearly separated assumptions. */
+.forecasting-page .filter-section-title {
+  font-size: 1.05rem;
+  margin-bottom: 16px;
+}
+
+.forecast-secondary-settings {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.forecast-secondary-settings > .form-group:first-child {
+  min-width: 290px;
+  flex: 0 1 340px;
+}
+
+.forecast-status {
+  border: 1px solid #D8E5F3;
+  background: #EEF5FC;
+  color: #334155;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+}
+
+.forecast-status-title,
+.forecast-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.forecast-status-title { margin-bottom: 8px; }
+.forecast-status p { margin-bottom: 8px; }
+.forecast-status ul { margin-bottom: 0; padding-left: 22px; }
+.forecast-status li + li { margin-top: 4px; }
+.forecast-status-empty { display: flex; gap: 12px; align-items: center; }
+.forecast-status-warning { background: #FFFBEB; border-color: #FDE68A; }
+.forecast-warning { color: #92400E; }
+
+.forecasting-page .bslib-grid { margin-bottom: 20px; }
+.forecast-assumption-card { height: 100%; }
+.forecast-assumption-card .bslib-grid { margin-bottom: 0; }
+.forecast-help { color: #64748B; font-size: 0.85rem; line-height: 1.6; }
+.forecast-interval-note { margin: -4px 0 22px; }
+.forecast-break-even-copy { padding: 8px 10px; }
+.forecast-break-even-copy > p { margin-top: 16px; }
+.forecast-required-income { font-size: 2.1rem; font-weight: 600; color: #243B53; }
+
+.forecast-result-positive,
+.forecast-result-action {
+  display: inline-block;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.forecast-result-positive { background: #D1FAE5; color: #065F46; }
+.forecast-result-action { background: #FEF3C7; color: #92400E; }
+.forecast-table-scroll { overflow-x: auto; }
+.forecast-table-scroll table { white-space: nowrap; font-size: 0.88rem; }
+.forecast-table-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+.forecast-details-card .nav-link { font-weight: 500; }
+
+@media (max-width: 767px) {
+  .forecast-secondary-settings { gap: 8px; }
+  .forecast-secondary-settings > .form-group:first-child { width: 100%; min-width: 0; flex-basis: 100%; }
+  .forecast-status { padding: 14px 16px; }
+  .forecast-required-income { font-size: 1.7rem; }
+}
+
 .navbar {
   border-bottom: 1px solid #E5E7EB;
 }
