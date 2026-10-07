@@ -22,6 +22,7 @@ source("R/data/load.R")
 source("R/calculations.R")
 source("R/plots.R")
 
+source("R/mod_executive_dashboard.R")
 source("R/mod_overview.R")
 source("R/mod_site_comparison.R")
 source("R/mod_site_detail.R")
@@ -52,6 +53,8 @@ ui <- page_navbar(
     )
   ),
 
+  mod_executive_dashboard_ui("executive_dashboard"),
+
   mod_overview_ui("overview"),
 
   mod_site_comparison_ui("site_comparison"),
@@ -77,6 +80,11 @@ server <- function(input, output, session) {
   # Uploaded workbooks are parsed once, then shared with the dashboard and
   # the cleaned-data preview through this session-level reactive source.
   dashboard_data <- mod_data_upload_server("data_upload")
+
+  mod_executive_dashboard_server(
+    "executive_dashboard",
+    data = dashboard_data
+  )
 
   mod_overview_server(
     "overview",
