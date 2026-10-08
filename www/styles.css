@@ -1059,8 +1059,8 @@ body {
 .executive-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(
-    4,
-    minmax(0, 1fr)
+    auto-fit,
+    minmax(300px, 1fr)
   );
   gap: 10px;
   margin-bottom: 10px;
@@ -1128,32 +1128,11 @@ body {
   font-size: 0.86rem;
 }
 
-
-/* Large laptop / smaller desktop --------------------------------------- */
-
-@media (max-width: 1450px) {
-
-  .executive-dashboard-grid {
-    grid-template-columns: repeat(
-      3,
-      minmax(0, 1fr)
-    );
-  }
-}
-
-
 /* Tablet / narrow laptop ------------------------------------------------ */
 
 @media (max-width: 1100px) {
 
   .executive-kpi-grid {
-    grid-template-columns: repeat(
-      2,
-      minmax(0, 1fr)
-    );
-  }
-
-  .executive-dashboard-grid {
     grid-template-columns: repeat(
       2,
       minmax(0, 1fr)
@@ -1404,4 +1383,36 @@ body {
     padding-left: 23px;
     text-align: left;
   }
+}
+
+.executive-dashboard-grid-empty {
+  min-height: 220px;
+  margin-bottom: 10px;
+  padding: 30px;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  background: #F8FAFC;
+  color: #64748B;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  text-align: left;
+}
+
+.executive-dashboard-grid-empty strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #334155;
+}
+
+.executive-dashboard-grid-empty p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.executive-dashboard-bottom-grid.single-component {
+  grid-template-columns: 1fr;
 }

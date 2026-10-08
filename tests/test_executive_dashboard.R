@@ -14,13 +14,14 @@ registry <- executive_registry_table()
 
 stopifnot(
   is.data.frame(registry),
-  nrow(registry) == 15L,
+  nrow(registry) == 17L,
   length(unique(registry$id)) == nrow(registry),
   all(
     c(
       "id",
       "title",
       "category",
+      "component_type",
       "source_group",
       "source_label",
       "required_data",
@@ -44,7 +45,7 @@ detailed_ids <- executive_visual_ids(
 )
 
 stopifnot(
-  length(monthly_ids) == 9L,
+  length(monthly_ids) == 10L,
   length(detailed_ids) == 6L,
   length(
     intersect(
@@ -52,6 +53,39 @@ stopifnot(
       detailed_ids
     )
   ) == 0L
+)
+
+supporting_ids <- executive_visual_ids(
+  source_group = "supporting"
+)
+
+stopifnot(
+  identical(
+    supporting_ids,
+    "key_insights"
+  )
+)
+
+stopifnot(
+  length(
+    executive_visual_ids(
+      component_type = "graph"
+    )
+  ) == 15L,
+
+  identical(
+    executive_visual_ids(
+      component_type = "table"
+    ),
+    "site_values"
+  ),
+
+  identical(
+    executive_visual_ids(
+      component_type = "insight"
+    ),
+    "key_insights"
+  )
 )
 
 stopifnot(
@@ -62,6 +96,10 @@ stopifnot(
   identical(
     executive_visual_source_label("detailed"),
     "Detailed Site Reports"
+  ),
+  identical(
+    executive_visual_source_label("supporting"),
+    "Supporting Components"
   )
 )
 
@@ -75,7 +113,9 @@ expected_defaults <- c(
   "site_ranking",
   "site_revenue_opportunity",
   "site_discount_mix",
-  "revenue_capture"
+  "revenue_capture",
+  "site_values",
+  "key_insights"
 )
 
 stopifnot(
@@ -96,7 +136,19 @@ empty_summary <-
   )
 
 stopifnot(
-  nrow(empty_summary) == 2L
+  nrow(empty_summary) == 3L
+)
+
+empty_supporting <- empty_summary[
+  empty_summary$source_group == "supporting",
+  ,
+  drop = FALSE
+]
+
+stopifnot(
+  nrow(empty_supporting) == 1L,
+  empty_supporting$available_visuals[[1L]] == 1L,
+  empty_supporting$total_visuals[[1L]] == 1L
 )
 
 empty_monthly <- empty_summary[
@@ -114,7 +166,7 @@ empty_detailed <- empty_summary[
 stopifnot(
   nrow(empty_monthly) == 1L,
   empty_monthly$available_visuals[[1L]] == 0L,
-  empty_monthly$total_visuals[[1L]] == 9L,
+  empty_monthly$total_visuals[[1L]] == 10L,
 
   nrow(empty_detailed) == 1L,
   empty_detailed$available_visuals[[1L]] == 0L,
@@ -164,8 +216,8 @@ detailed_row <- monthly_summary[
 ]
 
 stopifnot(
-  monthly_row$available_visuals[[1L]] == 9L,
-  monthly_row$total_visuals[[1L]] == 9L,
+  monthly_row$available_visuals[[1L]] == 10L,
+  monthly_row$total_visuals[[1L]] == 10L,
 
   detailed_row$available_visuals[[1L]] == 0L,
   detailed_row$total_visuals[[1L]] == 6L
@@ -295,8 +347,8 @@ complete_detailed <- complete_summary[
 ]
 
 stopifnot(
-  complete_monthly$available_visuals[[1L]] == 9L,
-  complete_monthly$total_visuals[[1L]] == 9L,
+  complete_monthly$available_visuals[[1L]] == 10L,
+  complete_monthly$total_visuals[[1L]] == 10L,
 
   complete_detailed$available_visuals[[1L]] == 6L,
   complete_detailed$total_visuals[[1L]] == 6L
@@ -384,7 +436,7 @@ shiny::testServer(
 
 
     # ---------------------------------------------------------------------
-    # Default seven visuals are retained
+    # Default seven graphs + table + insight are retained
     # ---------------------------------------------------------------------
 
     stopifnot(
@@ -396,7 +448,7 @@ shiny::testServer(
 
 
     # ---------------------------------------------------------------------
-    # Monthly data makes all 9 Monthly Site visuals available
+    # Monthly data makes all 10 Monthly Site visuals available
     # ---------------------------------------------------------------------
 
     finance_registry <- picker_registry()
@@ -416,13 +468,26 @@ shiny::testServer(
     ]
 
     stopifnot(
-      nrow(monthly_registry) == 9L,
+      nrow(monthly_registry) == 10L,
       all(monthly_registry$available),
 
       nrow(detailed_registry) == 6L,
       !any(detailed_registry$available)
     )
 
+    supporting_registry <- finance_registry[
+      finance_registry$source_group ==
+        "supporting",
+      ,
+      drop = FALSE
+    ]
+
+    stopifnot(
+      nrow(supporting_registry) == 1L,
+      supporting_registry$available[[1L]],
+      supporting_registry$component_type[[1L]] ==
+        "insight"
+    )
 
     # ---------------------------------------------------------------------
     # Apply a custom visual selection
@@ -448,6 +513,29 @@ shiny::testServer(
       )
     )
 
+    # ---------------------------------------------------------------------
+    # Table and insight components can be selected
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      visuals_monthly = "site_values",
+      visuals_supporting = "key_insights",
+      visuals_detailed = character(),
+      apply_visuals = 2
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        selected_visuals$Finance,
+        c(
+          "site_values",
+          "key_insights"
+        )
+      )
+    )
+
 
     # ---------------------------------------------------------------------
     # Unavailable visuals must not be applied
@@ -459,7 +547,8 @@ shiny::testServer(
     session$setInputs(
       visuals_monthly = "site_ranking",
       visuals_detailed = "facility_ranking",
-      apply_visuals = 2
+      visuals_supporting = character(),
+      apply_visuals = 3
     )
 
     session$flushReact()

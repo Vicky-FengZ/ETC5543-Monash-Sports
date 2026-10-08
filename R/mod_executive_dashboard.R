@@ -2,6 +2,367 @@
 # Executive Dashboard module
 # -------------------------------------------------------------------------
 
+# -------------------------------------------------------------------------
+# Executive Dashboard visual UI helpers
+# -------------------------------------------------------------------------
+
+executive_visual_context_label <- function(
+    view_mode,
+    year,
+    site
+) {
+
+  parts <- character()
+
+  if (
+    !is.null(view_mode) &&
+      length(view_mode) > 0L &&
+      !is.na(view_mode[[1L]]) &&
+      nzchar(as.character(view_mode[[1L]]))
+  ) {
+    parts <- c(
+      parts,
+      as.character(view_mode[[1L]])
+    )
+  }
+
+  if (
+    !is.null(year) &&
+      length(year) > 0L &&
+      !is.na(year[[1L]]) &&
+      nzchar(as.character(year[[1L]]))
+  ) {
+    parts <- c(
+      parts,
+      as.character(year[[1L]])
+    )
+  }
+
+  if (
+    !is.null(site) &&
+      length(site) > 0L &&
+      !is.na(site[[1L]]) &&
+      nzchar(as.character(site[[1L]]))
+  ) {
+    parts <- c(
+      parts,
+      as.character(site[[1L]])
+    )
+  }
+
+  paste(
+    parts,
+    collapse = " · "
+  )
+}
+
+
+executive_visual_card_ui <- function(
+    visual_id,
+    context_label = NULL
+) {
+
+  if (
+    length(visual_id) != 1L ||
+      !visual_id %in%
+        names(EXECUTIVE_VISUAL_REGISTRY)
+  ) {
+    return(NULL)
+  }
+
+  visual <-
+    EXECUTIVE_VISUAL_REGISTRY[[visual_id]]
+
+  source_label <-
+    executive_visual_source_label(
+      visual$source_group
+    )
+
+  subtitle_ui <- NULL
+
+  if (
+    !is.null(context_label) &&
+      length(context_label) > 0L &&
+      nzchar(context_label[[1L]])
+  ) {
+
+    subtitle_ui <- div(
+      class = "chart-header-subtitle",
+      context_label[[1L]]
+    )
+  }
+
+  card(
+    class = paste(
+      "executive-visual-card",
+      paste0(
+        "executive-visual-size-",
+        visual$preferred_size
+      )
+    ),
+
+    full_screen = TRUE,
+
+    card_header(
+      div(
+        div(
+          class = "chart-header-title",
+          visual$title
+        ),
+
+        subtitle_ui
+      )
+    ),
+
+    placeholder_chart(
+      visual$title,
+      paste0(
+        source_label,
+        " · Chart data will be connected in the next stage"
+      )
+    )
+  )
+}
+
+executive_visual_grid_ui <- function(
+    visual_ids,
+    context_label = NULL
+) {
+
+  all_visual_ids <- unique(
+    as.character(
+      visual_ids
+    )
+  )
+
+  all_visual_ids <- all_visual_ids[
+    all_visual_ids %in%
+      names(EXECUTIVE_VISUAL_REGISTRY)
+  ]
+
+  # Nothing at all has been selected.
+  if (length(all_visual_ids) == 0L) {
+
+    return(
+      div(
+        class = "executive-dashboard-grid-empty",
+
+        bs_icon(
+          "grid",
+          size = "26px"
+        ),
+
+        div(
+          tags$strong(
+            "No visuals selected"
+          ),
+
+          tags$p(
+            paste(
+              "Choose Visuals to add content",
+              "to this Executive Dashboard."
+            )
+          )
+        )
+      )
+    )
+  }
+
+  # Keep only graph-type components for the graph grid.
+  graph_ids <- all_visual_ids[
+    vapply(
+      all_visual_ids,
+      function(visual_id) {
+
+        identical(
+          executive_visual_component_type(
+            EXECUTIVE_VISUAL_REGISTRY[[visual_id]]
+          ),
+          "graph"
+        )
+      },
+      logical(1)
+    )
+  ]
+
+  # Tables/insights may be intentionally selected without any graphs.
+  if (length(graph_ids) == 0L) {
+    return(NULL)
+  }
+
+  div(
+    class = "executive-dashboard-grid",
+
+    tagList(
+      lapply(
+        graph_ids,
+        function(visual_id) {
+
+          executive_visual_card_ui(
+            visual_id = visual_id,
+            context_label = context_label
+          )
+        }
+      )
+    )
+  )
+}
+
+executive_site_values_card_ui <- function(
+    ns
+) {
+
+  card(
+    class = "executive-dashboard-table-card",
+    full_screen = TRUE,
+
+    card_header(
+      div(
+        class = "chart-header-layout",
+
+        div(
+          div(
+            class = "chart-header-title",
+            "Site Values"
+          ),
+
+          div(
+            class = "chart-header-subtitle",
+            "Exact values supporting the dashboard charts"
+          )
+        ),
+
+        div(
+          class = "chart-header-control",
+
+          selectInput(
+            ns("table_metric"),
+            "Table metric",
+            choices = c(
+              "Income",
+              "Expenses",
+              "Net Result",
+              "Budget Variance",
+              "Discount Opportunity",
+              "Potential Revenue",
+              "Revenue Capture Rate"
+            ),
+            selected = "Income"
+          )
+        )
+      )
+    ),
+
+    placeholder_chart(
+      "Site performance table",
+      paste(
+        "Exact site values will be connected",
+        "after the dashboard shell is complete"
+      )
+    )
+  )
+}
+
+
+executive_key_insights_card_ui <- function() {
+
+  card(
+    class = "executive-insights-card",
+    full_screen = TRUE,
+
+    card_header(
+      "Key Insights"
+    ),
+
+    div(
+      class = "executive-insights-placeholder",
+
+      bs_icon(
+        "lightbulb",
+        size = "24px"
+      ),
+
+      div(
+        tags$strong(
+          "Presentation talking points will appear here."
+        ),
+
+        tags$p(
+          paste(
+            "The dashboard will automatically highlight",
+            "important performance movements, risks and opportunities."
+          )
+        )
+      )
+    )
+  )
+}
+
+
+executive_supporting_components_ui <- function(
+    visual_ids,
+    ns
+) {
+
+  visual_ids <- unique(
+    as.character(
+      visual_ids
+    )
+  )
+
+  supporting_ids <- visual_ids[
+    visual_ids %in%
+      c(
+        "site_values",
+        "key_insights"
+      )
+  ]
+
+  if (length(supporting_ids) == 0L) {
+    return(NULL)
+  }
+
+  components <- lapply(
+    supporting_ids,
+    function(visual_id) {
+
+      switch(
+        visual_id,
+
+        site_values =
+          executive_site_values_card_ui(
+            ns
+          ),
+
+        key_insights =
+          executive_key_insights_card_ui(),
+
+        NULL
+      )
+    }
+  )
+
+  components <- Filter(
+    Negate(is.null),
+    components
+  )
+
+  layout_class <- if (
+    length(components) == 1L
+  ) {
+    "executive-dashboard-bottom-grid single-component"
+  } else {
+    "executive-dashboard-bottom-grid"
+  }
+
+  div(
+    class = layout_class,
+    tagList(
+      components
+    )
+  )
+}
+
 mod_executive_dashboard_ui <- function(id) {
 
   ns <- NS(id)
@@ -203,182 +564,47 @@ mod_executive_dashboard_ui <- function(id) {
               ),
 
               # Responsive visual board -----------------------------------
-              div(
-                class = "executive-dashboard-grid",
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Income vs Expenses"),
-                  placeholder_chart(
-                    "Monthly Income and Expenses"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Annual Performance Trend"),
-                  placeholder_chart(
-                    "Performance across reporting years"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Budget vs Actual"),
-                  placeholder_chart(
-                    "Budget and actual performance"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Site Ranking"),
-                  placeholder_chart(
-                    "Performance across sites"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Revenue Opportunity"),
-                  placeholder_chart(
-                    "Actual and potential revenue"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Discount Mix"),
-                  placeholder_chart(
-                    "Student, staff and other discounts"
-                  )
-                ),
-
-                card(
-                  full_screen = TRUE,
-                  card_header("Revenue Capture"),
-                  placeholder_chart(
-                    "Share of potential revenue captured"
-                  )
-                )
+              uiOutput(
+                ns("finance_visual_grid")
               ),
 
-              # Bottom analysis area --------------------------------------
-              div(
-                class = "executive-dashboard-bottom-grid",
+              # Optional table / insight components -----------------------
+              uiOutput(
+                ns("finance_supporting_components")
+              )
+            )
+          ),
 
-                # Site values table ---------------------------------------
+          nav_panel(
+            "Metrics",
+              value = "metrics",
+
+              div(
+                class = "pt-3",
+
                 card(
-                  class = "executive-dashboard-table-card",
                   full_screen = TRUE,
 
                   card_header(
-                    div(
-                      class = "chart-header-layout",
-
-                      div(
-                        div(
-                          class = "chart-header-title",
-                          "Site Values"
-                        ),
-
-                        div(
-                          class = "chart-header-subtitle",
-                          "Exact values supporting the dashboard charts"
-                        )
-                      ),
-
-                      div(
-                        class = "chart-header-control",
-
-                        selectInput(
-                          ns("table_metric"),
-                          "Table metric",
-                          choices = c(
-                            "Income",
-                            "Expenses",
-                            "Net Result",
-                            "Budget Variance",
-                            "Discount Opportunity",
-                            "Potential Revenue",
-                            "Revenue Capture Rate"
-                          ),
-                          selected = "Income"
-                        )
-                      )
-                    )
+                    "Metrics Dashboard"
                   ),
-                  
+
                   placeholder_chart(
-                    "Site performance table",
-                    "Exact site values will be connected after the dashboard shell is complete"
-                  )
-                ),
-                
-                # Key insights --------------------------------------------
-                card(
-                  class = "executive-insights-card",
-
-                  card_header(
-                    "Key Insights"
-                  ),
-
-                  div(
-                    class = "executive-insights-placeholder",
-
-                    bs_icon(
-                      "lightbulb",
-                      size = "24px"
-                    ),
-
-                    div(
-                      tags$strong(
-                        "Presentation talking points will appear here."
-                      ),
-
-                      tags$p(
-                        paste(
-                          "The dashboard will automatically highlight",
-                          "important performance movements, risks and opportunities."
-                        )
-                      )
+                    "Operational and participation metrics",
+                    paste(
+                      "Direct Visits, Indirect Visits, memberships,",
+                      "enrolments and venue metrics will be added",
+                      "as those dashboard sections are completed."
                     )
                   )
                 )
               )
             )
-          ),
-
-                        nav_panel(
-                          "Metrics",
-                          value = "metrics",
-
-                          div(
-                            class = "pt-3",
-
-                            card(
-                              full_screen = TRUE,
-
-                              card_header(
-                                "Metrics Dashboard"
-                              ),
-
-                              placeholder_chart(
-                                "Operational and participation metrics",
-                                paste(
-                                  "Direct Visits, Indirect Visits, memberships,",
-                                  "enrolments and venue metrics will be added",
-                                  "as those dashboard sections are completed."
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              }
+          )
+        )
+      )
+    )
+  }
 
 mod_executive_dashboard_server <- function(
     id,
@@ -467,6 +693,39 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      # -------------------------------------------------------------------
+      # Dynamic Finance visual grid
+      # -------------------------------------------------------------------
+
+      output$finance_visual_grid <- renderUI({
+
+        context_label <-
+          executive_visual_context_label(
+            view_mode = input$view_mode,
+            year = input$year,
+            site = input$site
+          )
+
+        executive_visual_grid_ui(
+          visual_ids =
+            selected_visuals$Finance,
+          context_label =
+            context_label
+        )
+      })
+
+      # -------------------------------------------------------------------
+      # Dynamic Finance table / insight components
+      # -------------------------------------------------------------------
+
+      output$finance_supporting_components <- renderUI({
+
+        executive_supporting_components_ui(
+          visual_ids =
+            selected_visuals$Finance,
+          ns = ns
+        )
+      })
 
       # -------------------------------------------------------------------
       # Visual picker contents
@@ -567,11 +826,30 @@ mod_executive_dashboard_server <- function(
             current_selection <-
               selected_visuals[[category]]
 
-            available_choices <-
+            available_choices <- if (
+              available_count > 0L
+            ) {
+
+              available_labels <- paste0(
+                available_rows$title,
+                " · ",
+                toupper(
+                  available_rows$component_type
+                )
+              )
+
               stats::setNames(
                 available_rows$id,
-                available_rows$title
+                available_labels
               )
+
+            } else {
+
+              stats::setNames(
+                character(),
+                character()
+              )
+            }
 
 
             available_ui <- if (
@@ -728,6 +1006,12 @@ mod_executive_dashboard_server <- function(
                           "financial performance"
                         ),
 
+                      supporting = 
+                        paste(
+                          "Presentation tables",
+                          "and insights"
+                        ),
+
                       "Dashboard visuals"
                     )
                   )
@@ -818,9 +1102,9 @@ mod_executive_dashboard_server <- function(
 
                     tags$p(
                       paste(
-                        "Choose the charts to include in the",
+                        "Choose graphs, tables and insights to include in the",
                         "Executive Dashboard.",
-                        "Visuals are grouped by their data source."
+                        "Components are grouped by their data source."
                       )
                     )
                   ),

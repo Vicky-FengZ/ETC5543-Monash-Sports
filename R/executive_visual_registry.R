@@ -20,7 +20,8 @@ EXECUTIVE_SOURCE_LABELS <- c(
   monthly = "Monthly Site Reports",
   detailed = "Detailed Site Reports",
   venues = "Venues Tracking Reports",
-  forecasting = "Forecasting"
+  forecasting = "Forecasting",
+  supporting = "Supporting Components"
 )
 
 
@@ -144,6 +145,19 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     supports_comparison = TRUE
   ),
 
+    site_values = list(
+    id = "site_values",
+    title = "Site Values",
+    category = "Finance",
+    source_group = "monthly",
+    component_type = "table",
+    required_data = "finance",
+    default_selected = TRUE,
+    preferred_size = "wide",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
+  ),
+
 
   # -----------------------------------------------------------------------
   # Detailed Site Reports
@@ -225,6 +239,23 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
+  ),
+
+  # -----------------------------------------------------------------------
+  # Supporting components
+  # -----------------------------------------------------------------------
+
+  key_insights = list(
+    id = "key_insights",
+    title = "Key Insights",
+    category = "Finance",
+    source_group = "supporting",
+    component_type = "insight",
+    required_data = character(),
+    default_selected = TRUE,
+    preferred_size = "supporting",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
   )
 )
 
@@ -233,9 +264,53 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
 # Registry helpers
 # -------------------------------------------------------------------------
 
+executive_visual_component_type <- function(
+    visual
+) {
+
+  component_type <- visual$component_type
+
+  if (
+    is.null(component_type) ||
+      length(component_type) == 0L ||
+      is.na(component_type[[1L]]) ||
+      !nzchar(
+        trimws(
+          as.character(
+            component_type[[1L]]
+          )
+        )
+      )
+  ) {
+    return("graph")
+  }
+
+  component_type <- tolower(
+    trimws(
+      as.character(
+        component_type[[1L]]
+      )
+    )
+  )
+
+  if (
+    !component_type %in%
+      c(
+        "graph",
+        "table",
+        "insight"
+      )
+  ) {
+    return("graph")
+  }
+
+  component_type
+}
+
 executive_visual_ids <- function(
     category = NULL,
-    source_group = NULL
+    source_group = NULL,
+    component_type = NULL
 ) {
 
   visuals <- EXECUTIVE_VISUAL_REGISTRY
@@ -273,9 +348,28 @@ executive_visual_ids <- function(
     )
   }
 
+  if (!is.null(component_type)) {
+
+    component_type <- tolower(
+      as.character(
+        component_type[[1L]]
+      )
+    )
+
+    keep <- keep & vapply(
+      visuals,
+      function(x) {
+        identical(
+          executive_visual_component_type(x),
+          component_type
+        )
+      },
+      logical(1)
+    )
+  }
+
   names(visuals)[keep]
 }
-
 
 executive_default_visual_ids <- function(
     category = "Finance"
@@ -332,6 +426,7 @@ executive_registry_table <- function() {
         id = x$id,
         title = x$title,
         category = x$category,
+        component_type = executive_visual_component_type(x),
         source_group = x$source_group,
         source_label =
           executive_visual_source_label(
@@ -507,12 +602,30 @@ executive_visual_availability <- function(
   }
 
   visual <-
-    EXECUTIVE_VISUAL_REGISTRY[[visual_id]]
+  EXECUTIVE_VISUAL_REGISTRY[[visual_id]]
 
-  source_data <- executive_source_data(
-    dashboard_data = dashboard_data,
-    source_group = visual$source_group
+  required_data <-
+    as.character(
+      visual$required_data
+    )
+
+  # Some supporting components do not require a specific uploaded table.
+  if (length(required_data) == 0L) {
+
+  return(
+    list(
+      available = TRUE,
+      source_available = TRUE,
+      missing_data = character(),
+      reason = "Available"
+    )
   )
+}
+
+source_data <- executive_source_data(
+  dashboard_data = dashboard_data,
+  source_group = visual$source_group
+)
 
   source_label <-
     executive_visual_source_label(
@@ -536,11 +649,6 @@ executive_visual_availability <- function(
       )
     )
   }
-
-  required_data <-
-    as.character(
-      visual$required_data
-    )
 
   available_flags <- vapply(
     required_data,
