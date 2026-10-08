@@ -1,3 +1,9 @@
+suppressPackageStartupMessages({
+  library(shiny)
+  library(bslib)
+  library(bsicons)
+})
+
 # -------------------------------------------------------------------------
 # Executive Dashboard registry tests
 # -------------------------------------------------------------------------
@@ -323,4 +329,197 @@ stopifnot(
 
 cat(
   "PASS Executive Dashboard visual registry\n"
+)
+
+# -------------------------------------------------------------------------
+# Executive Dashboard visual picker
+# -------------------------------------------------------------------------
+
+picker_test_data <- shiny::reactiveVal(
+  list(
+
+    monthly_reports = list(
+
+      finance = data.frame(
+        value = 1,
+        stringsAsFactors = FALSE
+      ),
+
+      discounts = data.frame(
+        value = 1,
+        stringsAsFactors = FALSE
+      )
+    ),
+
+    site_reports = NULL,
+
+    venues_reports = NULL
+  )
+)
+
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = picker_test_data
+  ),
+  {
+
+    # ---------------------------------------------------------------------
+    # Finance is the default Executive Dashboard category
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      dashboard_section = "finance"
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        active_category(),
+        "Finance"
+      )
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Default seven visuals are retained
+    # ---------------------------------------------------------------------
+
+    stopifnot(
+      identical(
+        selected_visuals$Finance,
+        expected_defaults
+      )
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Monthly data makes all 9 Monthly Site visuals available
+    # ---------------------------------------------------------------------
+
+    finance_registry <- picker_registry()
+
+    monthly_registry <- finance_registry[
+      finance_registry$source_group ==
+        "monthly",
+      ,
+      drop = FALSE
+    ]
+
+    detailed_registry <- finance_registry[
+      finance_registry$source_group ==
+        "detailed",
+      ,
+      drop = FALSE
+    ]
+
+    stopifnot(
+      nrow(monthly_registry) == 9L,
+      all(monthly_registry$available),
+
+      nrow(detailed_registry) == 6L,
+      !any(detailed_registry$available)
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Apply a custom visual selection
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      visuals_monthly = c(
+        "site_performance",
+        "site_ranking"
+      ),
+      apply_visuals = 1
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        selected_visuals$Finance,
+        c(
+          "site_performance",
+          "site_ranking"
+        )
+      )
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Unavailable visuals must not be applied
+    # ---------------------------------------------------------------------
+    # Facility Ranking requires Detailed Site Report finance data.
+    # It is intentionally supplied here even though Detailed Site Reports
+    # are absent, to ensure the module removes unavailable selections.
+
+    session$setInputs(
+      visuals_monthly = "site_ranking",
+      visuals_detailed = "facility_ranking",
+      apply_visuals = 2
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        selected_visuals$Finance,
+        "site_ranking"
+      )
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Finance and Metrics maintain independent selections
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      dashboard_section = "metrics"
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        active_category(),
+        "Metrics"
+      ),
+
+      length(
+        selected_visuals$Metrics
+      ) == 0L,
+
+      nrow(
+        picker_registry()
+      ) == 0L,
+
+      identical(
+        selected_visuals$Finance,
+        "site_ranking"
+      )
+    )
+
+
+    # Return to Finance and confirm its selection was preserved.
+    session$setInputs(
+      dashboard_section = "finance"
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        selected_visuals$Finance,
+        "site_ranking"
+      )
+    )
+  }
+)
+
+
+cat(
+  "PASS Executive Dashboard visual picker\n"
 )

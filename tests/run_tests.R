@@ -24,6 +24,8 @@ source(file.path("R", "ui_helpers.R"))
 
 source(file.path("R", "mod_overview.R"))
 source(file.path("R", "mod_site_comparison.R"))
+source(file.path("R", "mod_executive_dashboard.R"))
+
 
 source(file.path("tests", "test_data_pipeline_regressions.R"))
 source(file.path("tests", "test_venues_tracking_extensions.R"))
