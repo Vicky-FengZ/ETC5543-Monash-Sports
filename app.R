@@ -21,6 +21,7 @@ source("R/ui_helpers.R")
 source("R/data/load.R")
 source("R/calculations.R")
 source("R/plots.R")
+source("R/executive_visual_registry.R")
 
 source("R/mod_executive_dashboard.R")
 source("R/mod_overview.R")
