@@ -482,8 +482,7 @@ shiny::testServer(
       view_mode = "Year Review",
       year = "2026",
       comparison_year = "2025",
-      site = "All Monash Sport",
-      metric = "Net Result"
+      site = "All Monash Sport"
     )
 
     session$flushReact()
@@ -506,10 +505,8 @@ shiny::testServer(
         year_review_context$site,
         "All Monash Sport"
       ),
-      identical(
-        year_review_context$metric,
-        "Net Result"
-      )
+      !"metric" %in%
+        names(year_review_context)
     )
 
 
@@ -543,12 +540,51 @@ shiny::testServer(
         comparison_context$site,
         "All Monash Sport"
       ),
-      identical(
-        comparison_context$metric,
-        "Net Result"
-      )
+      !"metric" %in%
+        names(comparison_context)
     )
 
+    # ---------------------------------------------------------------------
+    # Visual metrics are independent of the dashboard context
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      metric_annual_performance_trend = c(
+        "Income",
+        "Expenses",
+        "Net Result"
+      ),
+      metric_budget_vs_actual = "Expenses",
+      metric_site_ranking = "Income"
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        input$metric_annual_performance_trend,
+        c(
+          "Income",
+          "Expenses",
+          "Net Result"
+        )
+      ),
+
+      identical(
+        input$metric_budget_vs_actual,
+        "Expenses"
+      ),
+
+      identical(
+        input$metric_site_ranking,
+        "Income"
+      ),
+
+      !"metric" %in%
+        names(
+          executive_context()
+        )
+    )
 
     # ---------------------------------------------------------------------
     # Default seven graphs + table + insight are retained

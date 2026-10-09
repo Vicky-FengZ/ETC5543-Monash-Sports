@@ -201,9 +201,212 @@ executive_default_comparison_year <- function(
   candidates[[1L]]
 }
 
+executive_filter_monthly_reports_by_site <- function(
+    monthly_reports,
+    site
+) {
+
+  if (
+    is.null(monthly_reports) ||
+      !is.list(monthly_reports)
+  ) {
+    return(monthly_reports)
+  }
+
+  if (
+    is.null(site) ||
+      length(site) == 0L ||
+      identical(
+        as.character(site[[1L]]),
+        "All Monash Sport"
+      )
+  ) {
+    return(monthly_reports)
+  }
+
+  selected_site <-
+    as.character(site[[1L]])
+
+  result <- monthly_reports
+
+  for (
+    dataset in c(
+      "finance",
+      "discounts",
+      "total_revenue"
+    )
+  ) {
+
+    x <- result[[dataset]]
+
+    if (
+      is.null(x) ||
+        !is.data.frame(x) ||
+        !"site" %in% names(x)
+    ) {
+      next
+    }
+
+    site_values <-
+      trimws(
+        as.character(
+          x$site
+        )
+      )
+
+    result[[dataset]] <-
+      x[
+        !is.na(site_values) &
+          site_values == selected_site,
+        ,
+        drop = FALSE
+      ]
+  }
+
+  class(result) <-
+    class(monthly_reports)
+
+  result
+}
+
+
+executive_context_years <- function(
+    context
+) {
+
+  if (
+    is.null(context) ||
+      is.null(context$year)
+  ) {
+    return(integer())
+  }
+
+  years <- context$year
+
+  if (
+    identical(
+      context$view_mode,
+      "Comparison"
+    ) &&
+      !is.null(
+        context$comparison_year
+      )
+  ) {
+
+    years <- c(
+      years,
+      context$comparison_year
+    )
+  }
+
+  years <-
+    suppressWarnings(
+      as.integer(
+        years
+      )
+    )
+
+  sort(
+    unique(
+      years[
+        !is.na(years)
+      ]
+    )
+  )
+}
+
+executive_visual_metric_control_ui <- function(
+    visual_id,
+    ns
+) {
+
+  metric_choices <- FINANCE_METRICS
+
+  switch(
+    visual_id,
+
+    annual_performance_trend =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectizeInput(
+          ns("metric_annual_performance_trend"),
+          label = NULL,
+          choices = metric_choices,
+          selected = c(
+            "Income",
+            "Expenses",
+            "Net Result"
+          ),
+          multiple = TRUE,
+          options = list(
+            maxItems = 3,
+            placeholder = "Choose metrics"
+          )
+        )
+      ),
+
+    budget_vs_actual =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_budget_vs_actual"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),
+
+    site_performance =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_site_performance"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),
+
+    site_ranking =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_site_ranking"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),
+
+    site_budget_performance =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_site_budget_performance"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),
+
+    NULL
+  )
+}
+
 executive_visual_card_ui <- function(
     visual_id,
-    context_label = NULL
+    context_label = NULL,
+    ns
 ) {
 
   if (
@@ -236,6 +439,12 @@ executive_visual_card_ui <- function(
     )
   }
 
+  metric_control <-
+  executive_visual_metric_control_ui(
+    visual_id = visual_id,
+    ns = ns
+  )
+
   card(
     class = paste(
       "executive-visual-card",
@@ -249,28 +458,39 @@ executive_visual_card_ui <- function(
 
     card_header(
       div(
+        class = "executive-visual-card-header",
+
         div(
-          class = "chart-header-title",
-          visual$title
+          class = "executive-visual-card-heading",
+
+          div(
+            class = "chart-header-title",
+            visual$title
+          ),
+
+          subtitle_ui
         ),
 
-        subtitle_ui
+        metric_control
       )
     ),
 
-    placeholder_chart(
-      visual$title,
-      paste0(
-        source_label,
-        " · Chart data will be connected in the next stage"
-      )
+    plotOutput(
+      ns(
+        paste0(
+          "executive_plot_",
+          visual_id
+        )
+      ),
+      height = "320px"
     )
   )
 }
 
 executive_visual_grid_ui <- function(
     visual_ids,
-    context_label = NULL
+    context_label = NULL,
+    ns
 ) {
 
   all_visual_ids <- unique(
@@ -344,7 +564,8 @@ executive_visual_grid_ui <- function(
 
           executive_visual_card_ui(
             visual_id = visual_id,
-            context_label = context_label
+            context_label = context_label,
+            ns = ns
           )
         }
       )
@@ -560,7 +781,7 @@ mod_executive_dashboard_ui <- function(id) {
                 ),
 
                 layout_columns(
-                  
+
                   selectInput(
                     ns("view_mode"),
                     "View",
@@ -570,33 +791,37 @@ mod_executive_dashboard_ui <- function(id) {
                     ),
                     selected = "Year Review"
                   ),
-                  
-                  selectInput(
-                    ns("year"),
-                    "Year",
-                    choices = APP_YEARS,
-                    selected = LATEST_APP_YEAR
-                  ),
-                  
-                  conditionalPanel(
-                    condition =
-                      "input.view_mode == 'Comparison'",
+
+                  div(
+                    class = "executive-dashboard-year-controls",
 
                     selectInput(
-                      ns("comparison_year"),
-                      "Compare To",
-                      choices = setdiff(
-                        APP_YEARS,
-                        LATEST_APP_YEAR
-                      ),
-                      selected =
-                        executive_default_comparison_year(
-                          year = LATEST_APP_YEAR,
-                          years = APP_YEARS
-                        )
+                      ns("year"),
+                      "Year",
+                      choices = APP_YEARS,
+                      selected = LATEST_APP_YEAR
                     ),
 
-                    ns = ns
+                    conditionalPanel(
+                      condition =
+                        "input.view_mode == 'Comparison'",
+
+                      selectInput(
+                        ns("comparison_year"),
+                        "Compare To",
+                        choices = setdiff(
+                          APP_YEARS,
+                          LATEST_APP_YEAR
+                        ),
+                        selected =
+                          executive_default_comparison_year(
+                            year = LATEST_APP_YEAR,
+                            years = APP_YEARS
+                          )
+                      ),
+
+                      ns = ns
+                    )
                   ),
 
                   selectInput(
@@ -607,13 +832,6 @@ mod_executive_dashboard_ui <- function(id) {
                       SITE_NAMES
                     ),
                     selected = "All Monash Sport"
-                  ),
-
-                  selectInput(
-                    ns("metric"),
-                    "Metric",
-                    choices = FINANCE_METRICS,
-                    selected = "Net Result"
                   ),
 
                   div(
@@ -635,11 +853,9 @@ mod_executive_dashboard_ui <- function(id) {
 
                   col_widths = c(
                     2,
+                    4,
                     2,
-                    2,
-                    2,
-                    2,
-                    2
+                    4
                   )
                 ),
                 
@@ -902,10 +1118,7 @@ mod_executive_dashboard_server <- function(
             comparison_year,
 
           site =
-            input$site,
-
-          metric =
-            input$metric
+            input$site
         )
       })
 
@@ -943,6 +1156,370 @@ mod_executive_dashboard_server <- function(
       )
 
       # -------------------------------------------------------------------
+      # Executive Finance data
+      # -------------------------------------------------------------------
+
+      executive_monthly_reports <- reactive({
+
+        executive_source_data(
+          dashboard_data =
+            dashboard_data_value(),
+          source_group =
+            "monthly"
+        )
+      })
+
+
+      executive_scoped_monthly_reports <- reactive({
+
+        context <- executive_context()
+
+        executive_filter_monthly_reports_by_site(
+          monthly_reports =
+            executive_monthly_reports(),
+          site =
+            context$site
+        )
+      })
+
+
+      executive_selected_years <- reactive({
+
+        executive_context_years(
+          executive_context()
+        )
+      })
+
+
+      executive_monthly_finance <- reactive({
+
+        x <-
+          calculate_overview_monthly_finance(
+            executive_scoped_monthly_reports()
+          )
+
+        years <- executive_selected_years()
+
+        if (length(years) == 0L) {
+          return(x[0, , drop = FALSE])
+        }
+
+        x[
+          x$report_year %in% years,
+          ,
+          drop = FALSE
+        ]
+      })
+
+
+      executive_annual_finance <- reactive({
+
+        x <-
+          calculate_overview_annual_finance(
+            executive_scoped_monthly_reports()
+          )
+
+        years <- executive_selected_years()
+
+        if (length(years) == 0L) {
+          return(x[0, , drop = FALSE])
+        }
+
+        x[
+          x$report_year %in% years,
+          ,
+          drop = FALSE
+        ]
+      })
+
+
+      executive_annual_revenue <- reactive({
+
+        x <-
+          calculate_overview_annual_revenue(
+            executive_scoped_monthly_reports()
+          )
+
+        years <- executive_selected_years()
+
+        if (length(years) == 0L) {
+          return(x[0, , drop = FALSE])
+        }
+
+        x[
+          x$report_year %in% years,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      validate_executive_monthly_data <- function(
+          x
+      ) {
+
+        reports <-
+          executive_monthly_reports()
+
+        duplicate_years <-
+          overview_duplicate_report_years(
+            reports
+          )
+
+        validate(
+          need(
+            !is.null(reports),
+            paste(
+              "Upload at least one Monthly Site Report",
+              "on the Data page."
+            )
+          ),
+
+          need(
+            length(
+              duplicate_years
+            ) == 0L,
+            paste0(
+              "More than one Monthly Site Report is active for: ",
+              paste(
+                duplicate_years,
+                collapse = ", "
+              ),
+              ". Delete the superseded file on the Data page."
+            )
+          ),
+
+          need(
+            nrow(x) > 0L,
+            paste(
+              "No finance data is available",
+              "for the selected Executive Dashboard context."
+            )
+          )
+        )
+      }
+
+      # -------------------------------------------------------------------
+      # Executive Overview plots
+      # -------------------------------------------------------------------
+
+      output$executive_plot_monthly_income_expenses <-
+        renderPlot(
+          {
+
+            x <- executive_monthly_finance()
+
+            validate_executive_monthly_data(
+              x
+            )
+
+            available_values <-
+              is.finite(
+                x$income_actual
+              ) |
+              is.finite(
+                x$expenses_actual
+              )
+
+            validate(
+              need(
+                any(
+                  available_values
+                ),
+                paste(
+                  "No monthly Income or Expenses values",
+                  "are available for this selection."
+                )
+              )
+            )
+
+            plot_monthly_income_expenses(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+
+
+      output$executive_plot_annual_performance_trend <-
+        renderPlot(
+          {
+
+            x <- executive_annual_finance()
+
+            validate_executive_monthly_data(
+              x
+            )
+
+            metrics <-
+              input$metric_annual_performance_trend
+
+            if (
+              is.null(metrics) ||
+                length(metrics) == 0L
+            ) {
+
+              metrics <- c(
+                "Income",
+                "Expenses",
+                "Net Result"
+              )
+            }
+
+            values <- unlist(
+              lapply(
+                metrics,
+                function(metric) {
+
+                  overview_metric_values(
+                    x,
+                    metric
+                  )
+                }
+              ),
+              use.names = FALSE
+            )
+
+            validate(
+              need(
+                any(
+                  is.finite(values)
+                ),
+                paste(
+                  "No values are available for",
+                  "the selected performance metrics."
+                )
+              )
+            )
+
+            plot_annual_performance_trend(
+              x,
+              metrics
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+
+      output$executive_plot_budget_vs_actual <-
+        renderPlot(
+          {
+
+            x <- executive_monthly_finance()
+
+            validate_executive_monthly_data(
+              x
+            )
+
+            metric <-
+              input$metric_budget_vs_actual
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            columns <- switch(
+              metric,
+
+              "Income" = c(
+                "income_actual",
+                "income_budget"
+              ),
+
+              "Expenses" = c(
+                "expenses_actual",
+                "expenses_budget"
+              ),
+
+              "Net Result" = c(
+                "net_actual",
+                "net_budget"
+              )
+            )
+
+            actual <-
+              x[[columns[[1L]]]]
+
+            budget <-
+              x[[columns[[2L]]]]
+
+            complete <-
+              is.finite(actual) &
+              is.finite(budget)
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "Complete monthly Budget and Actual",
+                  metric,
+                  "values are not available for this selection."
+                )
+              )
+            )
+
+            plot_data <- x
+
+            # Reuse the existing Budget vs Actual plotting function.
+            plot_data$net_actual <-
+              actual
+
+            plot_data$net_budget <-
+              budget
+
+            plot_monthly_budget_vs_actual_net_result(
+              plot_data
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+
+      output$executive_plot_revenue_capture <-
+        renderPlot(
+          {
+
+            x <- executive_annual_revenue()
+
+            validate_executive_monthly_data(
+              x
+            )
+
+            complete <-
+              is.finite(
+                x$actual_income
+              ) &
+              is.finite(
+                x$discount_opportunity
+              ) &
+              is.finite(
+                x$capture_rate
+              )
+
+            validate(
+              need(
+                any(
+                  complete
+                ),
+                paste(
+                  "No complete revenue capture values",
+                  "are available for this selection."
+                )
+              )
+            )
+
+            plot_revenue_capture_over_time(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+
+      # -------------------------------------------------------------------
       # Dynamic Finance visual grid
       # -------------------------------------------------------------------
 
@@ -962,17 +1539,15 @@ mod_executive_dashboard_server <- function(
               context$site,
 
             comparison_year =
-              context$comparison_year,
-
-            metric =
-              context$metric
+              context$comparison_year
           )
 
         executive_visual_grid_ui(
           visual_ids =
             selected_visuals$Finance,
           context_label =
-            context_label
+            context_label,
+          ns = ns
         )
       })
 

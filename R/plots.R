@@ -280,36 +280,154 @@ plot_monthly_income_expenses <- function(monthly_finance) {
   invisible(NULL)
 }
 
-plot_annual_performance_trend <- function(annual_finance, metric) {
-  values <- overview_metric_values(annual_finance, metric)
-  keep <- is.finite(values) & is.finite(annual_finance$report_year)
-  years <- annual_finance$report_year[keep]
-  values <- values[keep]
+plot_annual_performance_trend <- function(
+    annual_finance,
+    metric
+) {
 
-  if (length(values) == 0L) {
-    stop("No finite values are available for the selected metric.", call. = FALSE)
+  metrics <- unique(
+    as.character(metric)
+  )
+
+  valid_metrics <- c(
+    "Income",
+    "Expenses",
+    "Net Result",
+    "Budget Variance"
+  )
+
+  metrics <- metrics[
+    metrics %in% valid_metrics
+  ]
+
+  if (length(metrics) == 0L) {
+    stop(
+      "Select at least one valid performance metric.",
+      call. = FALSE
+    )
   }
 
-  limits <- overview_plot_limits(values)
+  years <- suppressWarnings(
+    as.integer(
+      annual_finance$report_year
+    )
+  )
+
+  series <- lapply(
+    metrics,
+    function(metric_name) {
+
+      overview_metric_values(
+        annual_finance,
+        metric_name
+      )
+    }
+  )
+
+  names(series) <- metrics
+
+  valid_year <- !is.na(years)
+
+  years <- years[valid_year]
+
+  series <- lapply(
+    series,
+    function(values) {
+      values[valid_year]
+    }
+  )
+
+  finite_any <- Reduce(
+    `|`,
+    lapply(
+      series,
+      is.finite
+    )
+  )
+
+  years <- years[finite_any]
+
+  series <- lapply(
+    series,
+    function(values) {
+      values[finite_any]
+    }
+  )
+
+  if (
+    length(years) == 0L ||
+      !any(
+        is.finite(
+          unlist(series)
+        )
+      )
+  ) {
+    stop(
+      "No finite values are available for the selected metric.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(years)
+
+  years <- years[order_index]
+
+  series <- lapply(
+    series,
+    function(values) {
+      values[order_index]
+    }
+  )
+
+  all_values <- unlist(
+    series,
+    use.names = FALSE
+  )
+
+  limits <- overview_plot_limits(
+    all_values
+  )
+
   x_limits <- range(years)
 
   if (diff(x_limits) == 0) {
-    x_limits <- x_limits + c(-0.5, 0.5)
+    x_limits <-
+      x_limits +
+      c(-0.5, 0.5)
   } else {
-    x_limits <- x_limits + c(-0.25, 0.25)
+    x_limits <-
+      x_limits +
+      c(-0.25, 0.25)
+  }
+
+  top_margin <- if (
+    length(metrics) > 1L
+  ) {
+    4.5
+  } else {
+    1.2
   }
 
   old_par <- par(
-    mar = c(3.8, 5.8, 1.2, 1.2),
+    mar = c(
+      3.8,
+      5.8,
+      top_margin,
+      1.2
+    ),
     xaxs = "i",
     yaxs = "i",
     family = "sans"
   )
-  on.exit(par(old_par), add = TRUE)
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
 
   plot(
     years,
-    values,
+    rep(NA_real_, length(years)),
     type = "n",
     xlim = x_limits,
     ylim = limits,
@@ -318,19 +436,99 @@ plot_annual_performance_trend <- function(annual_finance, metric) {
     ylab = ""
   )
 
-  ticks <- pretty(limits, n = 5)
-  ticks <- ticks[ticks >= limits[[1]] & ticks <= limits[[2]]]
-  abline(h = ticks, col = "#E2E8F0", lwd = 1)
-  abline(h = 0, col = "#94A3B8", lwd = 1.1)
+  ticks <- pretty(
+    limits,
+    n = 5
+  )
 
-  if (length(values) > 1L) {
-    polygon(
-      c(years, rev(years)),
-      c(values, rep(0, length(values))),
-      border = NA,
-      col = grDevices::adjustcolor("#2563EB", alpha.f = 0.08)
+  ticks <- ticks[
+    ticks >= limits[[1L]] &
+      ticks <= limits[[2L]]
+  ]
+
+  abline(
+    h = ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  colours <- if (
+    length(metrics) == 1L
+  ) {
+
+    "#2563EB"
+
+  } else {
+
+    grDevices::hcl.colors(
+      length(metrics),
+      palette = "Dark 3"
     )
-    lines(years, values, col = "#2563EB", lwd = 2.8)
+  }
+
+  if (
+    length(metrics) == 1L &&
+      length(years) > 1L
+  ) {
+
+    values <- series[[1L]]
+
+    polygon(
+      c(
+        years,
+        rev(years)
+      ),
+      c(
+        values,
+        rep(
+          0,
+          length(values)
+        )
+      ),
+      border = NA,
+      col =
+        grDevices::adjustcolor(
+          colours[[1L]],
+          alpha.f = 0.08
+        )
+    )
+  }
+
+  for (
+    index in seq_along(metrics)
+  ) {
+
+    values <- series[[index]]
+
+    if (
+      sum(
+        is.finite(values)
+      ) > 1L
+    ) {
+
+      lines(
+        years,
+        values,
+        col = colours[[index]],
+        lwd = 2.6
+      )
+    }
+
+    points(
+      years,
+      values,
+      pch = 21,
+      cex = 1.1,
+      lwd = 1.8,
+      col = colours[[index]],
+      bg = "white"
+    )
   }
 
   axis(
@@ -342,10 +540,14 @@ plot_annual_performance_trend <- function(annual_finance, metric) {
     col.axis = "#64748B",
     cex.axis = 0.88
   )
+
   axis(
     2,
     at = ticks,
-    labels = format_compact_currency(ticks),
+    labels =
+      format_compact_currency(
+        ticks
+      ),
     las = 1,
     tick = FALSE,
     line = -0.5,
@@ -353,33 +555,64 @@ plot_annual_performance_trend <- function(annual_finance, metric) {
     cex.axis = 0.82
   )
 
-  points(
-    years,
-    values,
-    pch = 21,
-    cex = 1.25,
-    lwd = 2,
-    col = "#2563EB",
-    bg = "white"
-  )
+  if (length(metrics) == 1L) {
 
-  label_offset <- diff(limits) * 0.045
-  label_y <- values + ifelse(values >= 0, label_offset, -label_offset)
+    values <- series[[1L]]
 
-  text(
-    years,
-    label_y,
-    labels = format_compact_currency(values),
-    pos = ifelse(values >= 0, 3, 1),
-    offset = 0.15,
-    cex = 0.8,
-    col = "#334155",
-    xpd = NA
-  )
+    label_offset <-
+      diff(limits) * 0.045
+
+    label_y <-
+      values +
+      ifelse(
+        values >= 0,
+        label_offset,
+        -label_offset
+      )
+
+    text(
+      years,
+      label_y,
+      labels =
+        format_compact_currency(
+          values
+        ),
+      pos =
+        ifelse(
+          values >= 0,
+          3,
+          1
+        ),
+      offset = 0.15,
+      cex = 0.8,
+      col = "#334155",
+      xpd = NA
+    )
+
+  } else {
+
+    legend(
+      "top",
+      legend = metrics,
+      col = colours,
+      lty = 1,
+      lwd = 2.6,
+      pch = 21,
+      pt.bg = "white",
+      bty = "n",
+      horiz = TRUE,
+      cex = 0.76,
+      text.col = "#475569",
+      inset = c(
+        0,
+        -0.03
+      ),
+      xpd = NA
+    )
+  }
 
   invisible(NULL)
 }
-
 
 plot_budget_vs_actual_net_result <- function(annual_finance) {
   values <- rbind(

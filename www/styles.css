@@ -1416,3 +1416,181 @@ body {
 .executive-dashboard-bottom-grid.single-component {
   grid-template-columns: 1fr;
 }
+
+/* Executive Dashboard control bar -------------------------------------- */
+
+.executive-dashboard-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+  padding-top: 24px;
+}
+
+.executive-dashboard-actions .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+/* Executive visual-specific controls ---------------------------------- */
+
+.executive-visual-card .chart-header-layout {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.executive-visual-card .chart-header-layout > div:first-child {
+  width: 100%;
+  min-width: 0;
+}
+
+.executive-visual-metric-control {
+  width: 100%;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.executive-visual-metric-control .form-group,
+.executive-visual-metric-control .shiny-input-container {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.executive-visual-metric-control .selectize-control {
+  width: 100%;
+}
+
+.executive-visual-metric-control .selectize-input {
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
+.executive-visual-metric-control .selectize-input .item {
+  font-size: 0.76rem;
+}
+
+@media (max-width: 1100px) {
+
+  .executive-dashboard-actions {
+    padding-top: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .executive-dashboard-actions .btn {
+    flex: 0 1 auto;
+  }
+}
+
+.executive-dashboard-year-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.executive-dashboard-year-controls > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.executive-dashboard-year-controls .form-group {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+
+  .executive-dashboard-year-controls {
+    flex-wrap: wrap;
+  }
+
+  .executive-dashboard-year-controls > * {
+    flex: 1 1 180px;
+  }
+}
+
+/* Executive visual card headers - force controls below titles -------- */
+
+.executive-dashboard-grid
+.executive-visual-card
+.card-header
+.chart-header-layout {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+}
+
+.executive-dashboard-grid
+.executive-visual-card
+.card-header
+.chart-header-layout > * {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.executive-dashboard-grid
+.executive-visual-card
+.executive-visual-metric-control {
+  width: 100% !important;
+  max-width: none !important;
+  flex: none !important;
+}
+
+.executive-dashboard-grid
+.executive-visual-card
+.executive-visual-metric-control
+.shiny-input-container {
+  width: 100% !important;
+  margin-bottom: 0 !important;
+}
+
+.executive-dashboard-grid
+.executive-visual-card
+.executive-visual-metric-control
+.selectize-control,
+.executive-dashboard-grid
+.executive-visual-card
+.executive-visual-metric-control
+.form-select {
+  width: 100% !important;
+}
+
+/* Executive visual card headers -------------------------------------- */
+
+.executive-visual-card-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.executive-visual-card-heading {
+  width: 100%;
+  min-width: 0;
+}
+
+.executive-visual-card-header .executive-visual-metric-control {
+  width: 100% !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+  min-width: 0;
+}
+
+.executive-visual-card-header
+.executive-visual-metric-control
+.shiny-input-container,
+.executive-visual-card-header
+.executive-visual-metric-control
+.selectize-control,
+.executive-visual-card-header
+.executive-visual-metric-control
+.form-select {
+  width: 100% !important;
+  margin-bottom: 0;
+}
