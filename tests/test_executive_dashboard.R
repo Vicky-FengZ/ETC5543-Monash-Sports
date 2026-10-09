@@ -384,6 +384,46 @@ cat(
 )
 
 # -------------------------------------------------------------------------
+# Executive Dashboard context helpers
+# -------------------------------------------------------------------------
+
+stopifnot(
+  identical(
+    executive_default_comparison_year(
+      "2026",
+      c("2024", "2025", "2026")
+    ),
+    "2025"
+  ),
+
+  identical(
+    executive_visual_context_label(
+      view_mode = "Year Review",
+      year = "2026",
+      site = "All Monash Sport",
+      comparison_year = NULL,
+      metric = "Net Result"
+    ),
+    "Year Review · 2026 · All Monash Sport · Net Result"
+  ),
+
+  identical(
+    executive_visual_context_label(
+      view_mode = "Comparison",
+      year = "2026",
+      site = "All Monash Sport",
+      comparison_year = "2025",
+      metric = "Net Result"
+    ),
+    "Comparison · 2026 vs 2025 · All Monash Sport · Net Result"
+  )
+)
+
+cat(
+  "PASS Executive Dashboard context helpers\n"
+)
+
+# -------------------------------------------------------------------------
 # Executive Dashboard visual picker
 # -------------------------------------------------------------------------
 
@@ -431,6 +471,81 @@ shiny::testServer(
       identical(
         active_category(),
         "Finance"
+      )
+    )
+
+    # ---------------------------------------------------------------------
+    # Year Review context
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2026",
+      comparison_year = "2025",
+      site = "All Monash Sport",
+      metric = "Net Result"
+    )
+
+    session$flushReact()
+
+    year_review_context <- executive_context()
+
+    stopifnot(
+      identical(
+        year_review_context$view_mode,
+        "Year Review"
+      ),
+      identical(
+        year_review_context$year,
+        "2026"
+      ),
+      is.null(
+        year_review_context$comparison_year
+      ),
+      identical(
+        year_review_context$site,
+        "All Monash Sport"
+      ),
+      identical(
+        year_review_context$metric,
+        "Net Result"
+      )
+    )
+
+
+    # ---------------------------------------------------------------------
+    # Comparison context
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      view_mode = "Comparison",
+      comparison_year = "2025"
+    )
+
+    session$flushReact()
+
+    comparison_context <- executive_context()
+
+    stopifnot(
+      identical(
+        comparison_context$view_mode,
+        "Comparison"
+      ),
+      identical(
+        comparison_context$year,
+        "2026"
+      ),
+      identical(
+        comparison_context$comparison_year,
+        "2025"
+      ),
+      identical(
+        comparison_context$site,
+        "All Monash Sport"
+      ),
+      identical(
+        comparison_context$metric,
+        "Net Result"
       )
     )
 

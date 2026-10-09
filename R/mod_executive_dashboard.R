@@ -9,10 +9,14 @@
 executive_visual_context_label <- function(
     view_mode,
     year,
-    site
+    site,
+    comparison_year = NULL,
+    metric = NULL
 ) {
 
   parts <- character()
+
+  view_mode_value <- NULL
 
   if (
     !is.null(view_mode) &&
@@ -20,11 +24,19 @@ executive_visual_context_label <- function(
       !is.na(view_mode[[1L]]) &&
       nzchar(as.character(view_mode[[1L]]))
   ) {
+
+    view_mode_value <-
+      as.character(
+        view_mode[[1L]]
+      )
+
     parts <- c(
       parts,
-      as.character(view_mode[[1L]])
+      view_mode_value
     )
   }
+
+  year_value <- NULL
 
   if (
     !is.null(year) &&
@@ -32,9 +44,55 @@ executive_visual_context_label <- function(
       !is.na(year[[1L]]) &&
       nzchar(as.character(year[[1L]]))
   ) {
+
+    year_value <-
+      as.character(
+        year[[1L]]
+      )
+  }
+
+  comparison_value <- NULL
+
+  if (
+    !is.null(comparison_year) &&
+      length(comparison_year) > 0L &&
+      !is.na(comparison_year[[1L]]) &&
+      nzchar(
+        as.character(
+          comparison_year[[1L]]
+        )
+      )
+  ) {
+
+    comparison_value <-
+      as.character(
+        comparison_year[[1L]]
+      )
+  }
+
+  if (
+    identical(
+      view_mode_value,
+      "Comparison"
+    ) &&
+      !is.null(year_value) &&
+      !is.null(comparison_value)
+  ) {
+
     parts <- c(
       parts,
-      as.character(year[[1L]])
+      paste0(
+        year_value,
+        " vs ",
+        comparison_value
+      )
+    )
+
+  } else if (!is.null(year_value)) {
+
+    parts <- c(
+      parts,
+      year_value
     )
   }
 
@@ -44,9 +102,27 @@ executive_visual_context_label <- function(
       !is.na(site[[1L]]) &&
       nzchar(as.character(site[[1L]]))
   ) {
+
     parts <- c(
       parts,
-      as.character(site[[1L]])
+      as.character(
+        site[[1L]]
+      )
+    )
+  }
+
+  if (
+    !is.null(metric) &&
+      length(metric) > 0L &&
+      !is.na(metric[[1L]]) &&
+      nzchar(as.character(metric[[1L]]))
+  ) {
+
+    parts <- c(
+      parts,
+      as.character(
+        metric[[1L]]
+      )
     )
   }
 
@@ -56,6 +132,74 @@ executive_visual_context_label <- function(
   )
 }
 
+executive_default_comparison_year <- function(
+    year,
+    years
+) {
+
+  if (
+    is.null(year) ||
+      length(year) == 0L ||
+      is.na(year[[1L]])
+  ) {
+    return(NULL)
+  }
+
+  year_value <-
+    as.character(
+      year[[1L]]
+    )
+
+  candidates <- setdiff(
+    unique(
+      as.character(
+        years
+      )
+    ),
+    year_value
+  )
+
+  if (length(candidates) == 0L) {
+    return(NULL)
+  }
+
+  year_number <-
+    suppressWarnings(
+      as.numeric(
+        year_value
+      )
+    )
+
+  candidate_numbers <-
+    suppressWarnings(
+      as.numeric(
+        candidates
+      )
+    )
+
+  if (
+    !is.na(year_number) &&
+      all(
+        !is.na(
+          candidate_numbers
+        )
+      )
+  ) {
+
+    return(
+      candidates[
+        which.min(
+          abs(
+            candidate_numbers -
+              year_number
+          )
+        )
+      ]
+    )
+  }
+
+  candidates[[1L]]
+}
 
 executive_visual_card_ui <- function(
     visual_id,
@@ -416,7 +560,7 @@ mod_executive_dashboard_ui <- function(id) {
                 ),
 
                 layout_columns(
-
+                  
                   selectInput(
                     ns("view_mode"),
                     "View",
@@ -426,12 +570,33 @@ mod_executive_dashboard_ui <- function(id) {
                     ),
                     selected = "Year Review"
                   ),
-
+                  
                   selectInput(
                     ns("year"),
                     "Year",
                     choices = APP_YEARS,
                     selected = LATEST_APP_YEAR
+                  ),
+                  
+                  conditionalPanel(
+                    condition =
+                      "input.view_mode == 'Comparison'",
+
+                    selectInput(
+                      ns("comparison_year"),
+                      "Compare To",
+                      choices = setdiff(
+                        APP_YEARS,
+                        LATEST_APP_YEAR
+                      ),
+                      selected =
+                        executive_default_comparison_year(
+                          year = LATEST_APP_YEAR,
+                          years = APP_YEARS
+                        )
+                    ),
+
+                    ns = ns
                   ),
 
                   selectInput(
@@ -442,6 +607,13 @@ mod_executive_dashboard_ui <- function(id) {
                       SITE_NAMES
                     ),
                     selected = "All Monash Sport"
+                  ),
+
+                  selectInput(
+                    ns("metric"),
+                    "Metric",
+                    choices = FINANCE_METRICS,
+                    selected = "Net Result"
                   ),
 
                   div(
@@ -461,10 +633,16 @@ mod_executive_dashboard_ui <- function(id) {
                     )
                   ),
 
-                  col_widths = c(2, 2, 3, 5)
-                )
-              ),
-
+                  col_widths = c(
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2
+                  )
+                ),
+                
               # KPI strip -------------------------------------------------
               
               div(
@@ -604,6 +782,7 @@ mod_executive_dashboard_ui <- function(id) {
         )
       )
     )
+  )
   }
 
 mod_executive_dashboard_server <- function(
@@ -694,16 +873,99 @@ mod_executive_dashboard_server <- function(
       })
 
       # -------------------------------------------------------------------
+      # Executive Dashboard context
+      # -------------------------------------------------------------------
+
+      executive_context <- reactive({
+
+        comparison_year <- NULL
+
+        if (
+          identical(
+            input$view_mode,
+            "Comparison"
+          )
+        ) {
+
+          comparison_year <-
+            input$comparison_year
+        }
+
+        list(
+          view_mode =
+            input$view_mode,
+
+          year =
+            input$year,
+
+          comparison_year =
+            comparison_year,
+
+          site =
+            input$site,
+
+          metric =
+            input$metric
+        )
+      })
+
+      observeEvent(
+        input$year,
+        {
+
+          choices <- setdiff(
+            as.character(APP_YEARS),
+            as.character(input$year)
+          )
+
+          current_value <- input$comparison_year
+
+          if (
+            is.null(current_value) ||
+              !current_value %in% choices
+          ) {
+
+            current_value <-
+              executive_default_comparison_year(
+                year = input$year,
+                years = APP_YEARS
+              )
+          }
+
+          updateSelectInput(
+            session,
+            "comparison_year",
+            choices = choices,
+            selected = current_value
+          )
+        },
+        ignoreInit = FALSE
+      )
+
+      # -------------------------------------------------------------------
       # Dynamic Finance visual grid
       # -------------------------------------------------------------------
 
       output$finance_visual_grid <- renderUI({
 
+        context <- executive_context()
+
         context_label <-
           executive_visual_context_label(
-            view_mode = input$view_mode,
-            year = input$year,
-            site = input$site
+            view_mode =
+              context$view_mode,
+
+            year =
+              context$year,
+
+            site =
+              context$site,
+
+            comparison_year =
+              context$comparison_year,
+
+            metric =
+              context$metric
           )
 
         executive_visual_grid_ui(
@@ -1428,7 +1690,10 @@ mod_executive_dashboard_server <- function(
             active_category,
 
           registry =
-            picker_registry
+            picker_registry,
+
+          context =
+            executive_context
         )
       )
     }
