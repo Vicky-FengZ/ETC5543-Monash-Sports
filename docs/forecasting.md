@@ -12,8 +12,8 @@ as a future budget. Original Excel files and extracted data remain unchanged.
 2. Choose the forecast horizon (3/6/12 months) and price rise (%). The default
    **Quick estimate** mode needs only the casual pay rise (%); its reference is
    the predicted Venues-reported payroll for the selected future period.
-3. For a roster you know better than the historical reports, select **Advanced
-   pay & hours**. Add or remove casual staff categories, then enter each
+3. For a roster you know better than the historical reports, open **More options**
+   and select **Advanced pay & hours**. Add or remove casual staff categories, then enter each
    category's current hourly wage, total monthly paid hours, pay rise and
    hours change. Optional future monthly hours override the percentage; use
    them when a new category has zero current hours.
@@ -26,14 +26,17 @@ as a future budget. Original Excel files and extracted data remain unchanged.
    sensitivity** is visible beside the break-even explanation, not inside a
    collapsed details tab. **Use this minimum price** applies the rounded-up
    requirement; it does not infer a demand response to the price.
-6. Expand **More options** and enable custom settings only if needed: scope,
-   history, demand, repriceable income share or effective month. Disabling
-   custom settings restores these defaults without changing the chosen
-   payroll mode. Changing scope or the finance history resets the advanced
-   cost-inclusion confirmation.
-7. Expand **Explore the details** for monthly values, CSV downloads, model
-   checks and methodology. The assumptions CSV records the active mode and,
-   in advanced mode, category inputs and the confirmation. **Reset plan**
+6. **More options** also contains scope, history, demand, repriceable income
+   share and effective month. Edits apply directly; no separate enable switch
+   is required. Closing the panel keeps all settings, including the selected
+   payroll mode. The panel header shows the active payroll mode, with a shortcut
+   from Your plan when Advanced payroll is active. Changing scope or the finance
+   history resets the advanced cost-inclusion confirmation.
+7. Read **Monthly plan** directly below the results; it is not collapsed.
+   Its two CSV downloads save monthly values and assumptions. The assumptions
+   CSV records the active mode and, in advanced mode, category inputs and the
+   confirmation. Technical checks and methodology are documented here, not
+   separate page tabs. **Reset plan**
    restores Quick estimate, a 12-month horizon, zero price/pay changes,
    automatic settings and one blank staff category.
 
@@ -73,10 +76,10 @@ history. Empty or invalid categories are not treated as zero costs.
   staff or apportioned to sites. Use Advanced pay & hours with site-specific categories for site planning.
   Confirm reporting scope and payroll on-cost treatment with the report owner
   before relying on this component for operational decisions.
-- **Predicted casual payroll (before your changes)** is the sum of model
+- **Predicted casual payroll** (before your changes) is the sum of model
   predictions for the selected future months, not a chosen historical annual
-  total, an individual's wage or a fixed-headcount budget. **Historical wage
-  actuals through** identifies the last observed month, not the future period.
+  total, an individual's wage or a fixed-headcount budget. **Last actual**
+  identifies the last observed month, not the future period.
 - Historical payroll mixes hours, headcounts and pay rates, and its forecast
   may continue those trends. Quick mode applies **only** an additional pay rise
   to the predicted payroll. It does not assume a future headcount, derive a
@@ -127,10 +130,10 @@ months are modelled for alignment before the January 2026 planning period.
   months. The held-out horizon is at most 12 months, shortened to retain at
   least 6 forecast origins; at most the most recent 12 origins are scored.
 - RMSE selects the automatic model separately for Income and Expenses. MAE,
-  fold count and held-out horizon are displayed. Candidates that fail on a
+  fold count and held-out horizon are retained internally. Candidates that fail on a
   fold are excluded rather than scored on an easier subset. Selection is always
-  automatic in the page; model names, scores and selected methods remain
-  available under **Explore the details -> Forecast checks** and in exports.
+  automatic in the page; model names and selected methods are recorded in the
+  assumptions CSV. The technical checks tab is no longer displayed.
   The main chart headers do not ask users to interpret model names.
 - Prediction intervals use benchmark residual variance or the Holt-Winters
   prediction method. Monthly 80% and 95% baseline intervals are shown when
@@ -138,7 +141,9 @@ months are modelled for alignment before the January 2026 planning period.
   uncorrelated model errors; no aggregate-period confidence interval is claimed.
 - Financial point forecasts and interval lower bounds are constrained to zero.
   Negative historical gross totals require review of accounting adjustments.
-  Uploaded validation warnings remain visible in the planning-basis note.
+  Uploaded validation warnings can be reviewed in Data. Long-form notes and
+  limitations are not displayed in Forecasting; missing data and invalid input
+  errors still block affected calculations, and limited history has a short notice.
 
 Current files contain 2021, 2022, 2023 and 2025. With December 2025 as cutoff,
 the missing 2024 year means training uses only January–December 2025. Upload
@@ -212,7 +217,7 @@ or add the uncertainty of the separately predicted casual wage component.
 - `R/forecasting.R`: cleaned-data selection, continuity checks, benchmark
   prediction, rolling-origin tests and scenario equations.
 - `R/forecast_plots.R`: historical/baseline/scenario charts and price sensitivity.
-- `R/mod_forecasting.R`: inputs, reactive wiring, results, model checks and CSVs.
+- `R/mod_forecasting.R`: streamlined inputs, reactive wiring, results and CSVs.
 - `tests/test_forecasting.R`: aggregation, gaps, duplicates, interval availability,
   known payroll examples, delayed timing, demand, break-even boundaries and
   reactive upload/removal states.
@@ -222,6 +227,9 @@ or add the uncertainty of the separately predicted casual wage component.
 - `tests/test_forecasting_tiered.R`: category validation, optional future-hours
   targets, exact payroll differences and break-even thresholds, mode exclusivity,
   dynamic add/remove, missing wages, confirmation reset and cleared-input reset.
+- `tests/test_forecasting_layout.R`: settings grouped under More options,
+  directly visible monthly results, removed technical tabs, direct settings
+  application, unchanged models and both CSV downloads in either payroll mode.
 
 From the project root in RStudio:
 

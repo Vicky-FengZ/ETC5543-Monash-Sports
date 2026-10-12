@@ -367,7 +367,7 @@ Choose a 3/6/12-month horizon, price rise (%) and one casual-payroll mode:
 - **Quick estimate** (default): Venues Tracking Reports provide the historical
   Casual Salaries reference; enter only the additional pay rise (%). Its
   predicted payroll is not a headcount budget or all staff costs.
-- **Advanced pay & hours**: add/remove staff categories and enter current hourly
+- **Advanced pay & hours** (inside **More options**): add/remove staff categories and enter current hourly
   wage, total monthly paid hours, pay rise and hours change. Optional future
   hours support new categories. Review current cost, planned cost and the
   difference, and confirm the selected Expenses scope before using the result.
@@ -381,11 +381,13 @@ confirmation.
 
 The page calculates minimum income growth and price increase needed to cover
 the selected period's costs, including an existing shortfall. **Price sensitivity**
-is visible inside **Income needed to cover costs**. Optional scope/history,
-pricing, demand and timing remain in More options; monthly values, assumption
-CSVs and model checks are collapsed by default. Missing years are not joined
-or filled with zero, and model accuracy is displayed only when continuous
-history supports rolling-origin validation.
+is visible inside **Income needed to cover costs**. Advanced payroll, scope/history,
+pricing, demand and timing are grouped in **More options**; edited settings apply
+directly, without a separate enable switch. Closing that panel does not reset
+the plan. **Monthly plan** and both CSV downloads are always visible below the
+results. Validation runs internally and model names are recorded in the assumptions CSV.
+Missing years are not joined or filled with zero, and model accuracy is assessed
+only when continuous history supports rolling-origin validation.
 
 See [Forecasting and practical planning](docs/forecasting.md) for the formulas,
 data checks, limitations, model comparison and testing instructions.

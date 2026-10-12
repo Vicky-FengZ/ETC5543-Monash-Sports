@@ -114,7 +114,7 @@ stopifnot(!grepl("Net Result|Forecast Prototype|Forecast vs Budget", ui_text),
           !grepl('id="forecast_test-wage_mode"', ui_text, fixed = TRUE))
 data_source <- reactiveVal(list(monthly = fixture))
 shiny::testServer(mod_forecasting_server, args = list(data = data_source), {
-  session$setInputs(custom_settings = TRUE, site = "Overall", horizon = "12",
+  session$setInputs(site = "Overall", horizon = "12",
                     cutoff = "2025-12-01", from_year = "2022", payroll_mode = "advanced",
                     group_1_category = "Casual staff", group_1_hourly_wage = 20,
                     group_1_monthly_hours = 20, group_1_pay_increase_pct = 0,

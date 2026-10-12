@@ -138,7 +138,7 @@ shiny::testServer(mod_forecasting_server, args = list(data = tiered_data), {
     group_3_hours_change_pct = 0, group_3_future_monthly_hours = 10)
   stopifnot(abs(scenario()$extra_wage_cost - 3648) < 1e-8)
   session$setInputs(remove_payroll_group = 3)
-  session$setInputs(custom_settings = TRUE, site = "Site A",
+  session$setInputs(site = "Site A",
                     from_year = "2022", cutoff = "2025-12-01", effective_month = "7")
   stopifnot(is.null(confirmed_payroll_scope()),
             grepl("Confirm", scenario()$error, fixed = TRUE))
@@ -148,7 +148,7 @@ shiny::testServer(mod_forecasting_server, args = list(data = tiered_data), {
             identical(confirmed_payroll_scope(), "Site A"))
   session$setInputs(payroll_mode = "quick", casual_wage_pct = 5)
   stopifnot(grepl("individual site", scenario()$error))
-  session$setInputs(custom_settings = FALSE)
+  session$setInputs(site = "Overall", effective_month = "1")
   stopifnot(is.null(scenario()$error), abs(scenario()$extra_wage_cost - quick_cost) < 1e-8,
             identical(original_finance, baseline()), identical(original_wages, casual_baseline()))
   # No Venues data is needed in manual mode, but a changed finance basis must be confirmed.
@@ -157,7 +157,8 @@ shiny::testServer(mod_forecasting_server, args = list(data = tiered_data), {
   session$setInputs(payroll_in_expenses = FALSE)
   session$setInputs(payroll_in_expenses = TRUE)
   stopifnot(is.null(scenario()$error), abs(scenario()$extra_wage_cost - 1248) < 1e-8,
-            !any(grepl("Casual payroll", output$model_table, fixed = TRUE)))
+            grepl("Payroll reference: your inputs", output$data_health$html, fixed = TRUE),
+            scenario()$assumptions$value[scenario()$assumptions$assumption == "wage_mode"] == "manual_categories")
   modified_finance <- fixture
   modified_finance$finance$value[1] <- modified_finance$finance$value[1] + 1
   tiered_data(list(monthly = modified_finance, venues = NULL))

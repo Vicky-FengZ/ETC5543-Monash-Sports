@@ -28,7 +28,7 @@ body {
   cursor: pointer;
   font-weight: 600;
 }
-.forecast-advanced > summary span {
+.forecast-advanced > summary .forecast-options-description {
   margin-left: 12px;
   font-size: 0.85rem;
   font-weight: 400;
@@ -36,9 +36,27 @@ body {
 }
 .forecast-advanced[open] > summary { margin-bottom: 20px; }
 .forecast-advanced h5 { font-size: 1rem; margin: 16px 0; }
-.forecast-data-notes { margin-top: 8px; }
-.forecast-data-notes > summary { cursor: pointer; font-size: 0.85rem; color: #475569; }
-.forecast-data-notes[open] > summary { margin-bottom: 10px; }
+.forecast-options-section + .forecast-options-section {
+  border-top: 1px solid #E2E8F0;
+  margin-top: 20px;
+  padding-top: 8px;
+}
+.forecast-mode-badge {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #EFF6FF;
+  color: #1E40AF;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.forecast-options-shortcut {
+  display: block;
+  padding: 6px 0 0;
+  text-align: left;
+  font-size: 0.85rem;
+}
 .forecast-manual-mode {
   color: #334155;
   background: #EFF6FF;
@@ -151,13 +169,21 @@ body {
 .forecast-table-scroll { overflow-x: auto; }
 .forecast-table-scroll table { white-space: nowrap; font-size: 0.88rem; }
 .forecast-table-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
-.forecast-details-card .nav-link { font-weight: 500; }
+.forecast-monthly-plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.forecast-monthly-plan-header .forecast-table-actions { margin: 0; }
 
 @media (max-width: 767px) {
   .forecast-payroll-heading { flex-direction: column; }
   .forecast-payroll-summary { grid-template-columns: 1fr; }
   .forecast-control-footer { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .forecast-advanced > summary span { display: block; margin: 8px 0 0 18px; }
+  .forecast-advanced > summary .forecast-options-description { display: block; margin: 8px 0 0 18px; }
+  .forecast-advanced > summary .forecast-mode-badge { margin-top: 8px; }
   .forecast-secondary-settings { gap: 8px; }
   .forecast-secondary-settings > .form-group:first-child { width: 100%; min-width: 0; flex-basis: 100%; }
   .forecast-status { padding: 14px 16px; }

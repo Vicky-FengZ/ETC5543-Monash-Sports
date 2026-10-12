@@ -145,10 +145,10 @@ shiny::testServer(mod_forecasting_server, args = list(data = simple_data), {
   stopifnot(identical(financial_base, baseline()), identical(payroll_base, casual_baseline()),
             abs(scenario()$extra_wage_cost - sum(payroll_base$forecast$baseline) * 0.10) < 1e-8,
             grepl("Predicted casual payroll", output$data_health$html, fixed = TRUE))
-  session$setInputs(custom_settings = TRUE, site = "Site A", from_year = "2022",
+  session$setInputs(site = "Site A", from_year = "2022",
                     cutoff = "2025-12-01", effective_month = "7")
   stopifnot(grepl("individual site", scenario()$error))
-  session$setInputs(custom_settings = FALSE)
+  session$setInputs(site = "Overall", effective_month = "1")
   stopifnot(is.null(scenario()$error), selected_scope() == "Overall",
             scenario()$table$extra_wage_cost[1] > 0,
             scenario()$assumptions$value[scenario()$assumptions$assumption == "repriceable_income_share_pct"] == "100")
@@ -168,7 +168,7 @@ shiny::testServer(mod_forecasting_server, args = list(data = simple_data), {
 })
 ui_simple <- as.character(mod_forecasting_ui("simple"))
 stopifnot(grepl("<details", ui_simple, fixed = TRUE),
-          !grepl('id="simple-custom_settings"[^>]*checked', ui_simple),
+          !grepl('id="simple-custom_settings"', ui_simple, fixed = TRUE),
           grepl('id="simple-payroll_mode"', ui_simple, fixed = TRUE),
           grepl('id="simple-payroll_in_expenses"', ui_simple, fixed = TRUE),
           !grepl('id="simple-casual_hours_pct"', ui_simple, fixed = TRUE),
@@ -182,5 +182,5 @@ stopifnot(grepl("<details", ui_simple, fixed = TRUE),
           regexpr("Income needed to cover costs", ui_simple, fixed = TRUE)[1] <
             regexpr("Price sensitivity", ui_simple, fixed = TRUE)[1],
           regexpr("Price sensitivity", ui_simple, fixed = TRUE)[1] <
-            regexpr("Explore the details", ui_simple, fixed = TRUE)[1])
+            regexpr("Monthly plan", ui_simple, fixed = TRUE)[1])
 cat("PASS quick-only inputs, inactive legacy settings, cached models and upload removal\n")
