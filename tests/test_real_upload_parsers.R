@@ -6,28 +6,38 @@ if (!nzchar(real_data_root)) {
   monthly_files <- discover_monthly_site_report_files(
     file.path(real_data_root, "Monthly Site Report")
   )
-  venue_files <- discover_venues_tracking_report_files(
-    file.path(real_data_root, "Business Unit Tracking Reports", "Venues")
-  )
+  # Accept both the documented Venues subfolder and a flat tracking folder.
+  # Discovery still filters filenames; no workbooks are moved or modified.
+  venue_dir <- file.path(real_data_root, "Business Unit Tracking Reports", "Venues")
+  if (!dir.exists(venue_dir)) {
+    venue_dir <- file.path(real_data_root, "Business Unit Tracking Reports")
+  }
+  venue_files <- discover_venues_tracking_report_files(venue_dir)
   site_files <- discover_business_unit_template_files(
     file.path(real_data_root, "Business Unit Templates that feed master reports")
   )
+  stopifnot(length(monthly_files) > 0L, length(venue_files) > 0L, length(site_files) > 0L)
+  cat(sprintf("REAL DATA: %d Monthly, %d Venues, %d Detailed Site workbooks\n",
+              length(monthly_files), length(venue_files), length(site_files)))
 
   monthly <- load_monthly_site_reports(
     paths = monthly_files,
     source_names = basename(monthly_files),
     strict = FALSE
   )
+  cat("PASS real Monthly Site Reports parsing\n")
   venues <- load_venues_tracking_reports(
     paths = venue_files,
     source_names = basename(venue_files),
     strict = FALSE
   )
+  cat("PASS real Venues Tracking Reports parsing\n")
   sites <- load_business_unit_template_reports(
     paths = site_files,
     source_names = basename(site_files),
     strict = FALSE
   )
+  cat("PASS real Detailed Site Reports parsing\n")
 
   monthly_preview <- basic_preview_monthly_site_data(monthly)
   monthly_preview_sheets <- basic_preview_source_sheets(

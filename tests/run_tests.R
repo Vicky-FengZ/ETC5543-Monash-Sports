@@ -33,6 +33,8 @@ source(file.path("tests", "test_basic_upload.R"))
 source(file.path("tests", "test_overview_charts.R"))
 source(file.path("tests", "test_site_comparison.R"))
 source(file.path("tests", "test_forecasting.R"))
+source(file.path("tests", "test_forecasting_simple.R"))
+source(file.path("tests", "test_forecasting_tiered.R"))
 source(file.path("tests", "test_real_upload_parsers.R"))
 
 cat("ALL TESTS PASSED\n")

@@ -3,6 +3,89 @@ body {
 }
 
 /* Forecasting: a planning workflow with clearly separated assumptions. */
+.forecast-controls { margin-bottom: 20px; }
+.forecast-controls .bslib-grid { margin-bottom: 0 !important; }
+.forecast-controls .form-group { margin-bottom: 8px; }
+.forecast-controls .forecast-help { margin-bottom: 0; }
+.forecast-control-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+}
+.forecast-control-footer .btn { white-space: nowrap; }
+.forecast-advanced {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+.forecast-advanced > summary {
+  color: #243B53;
+  cursor: pointer;
+  font-weight: 600;
+}
+.forecast-advanced > summary span {
+  margin-left: 12px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #64748B;
+}
+.forecast-advanced[open] > summary { margin-bottom: 20px; }
+.forecast-advanced h5 { font-size: 1rem; margin: 16px 0; }
+.forecast-data-notes { margin-top: 8px; }
+.forecast-data-notes > summary { cursor: pointer; font-size: 0.85rem; color: #475569; }
+.forecast-data-notes[open] > summary { margin-bottom: 10px; }
+.forecast-manual-mode {
+  color: #334155;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.forecast-manual-mode p { margin: 6px 0 0; font-size: 0.85rem; line-height: 1.6; }
+.forecast-payroll-controls { min-width: 0; }
+.forecast-mode-selector { margin-bottom: 20px; }
+.forecast-mode-selector .shiny-input-container { width: 100%; }
+.forecast-mode-selector .shiny-options-group { display: flex; flex-wrap: wrap; gap: 12px; }
+.forecast-mode-selector .radio-inline {
+  margin: 0 !important;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  color: #334155;
+  background: #F8FAFC;
+}
+.forecast-mode-selector .radio-inline:has(input:checked) {
+  border-color: #2563EB;
+  background: #EFF6FF;
+  color: #1E40AF;
+}
+.forecast-mode-selector input { margin-right: 8px; }
+.forecast-payroll-editor { margin: 12px 0 20px; padding-top: 20px; border-top: 1px solid #E2E8F0; }
+.forecast-payroll-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.forecast-payroll-heading h5 { margin: 0 0 6px; font-size: 1.05rem; }
+.forecast-payroll-heading .btn { white-space: nowrap; }
+.forecast-payroll-scroll { overflow-x: auto; margin: 16px 0 12px; }
+.forecast-payroll-table { width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 0; }
+.forecast-payroll-table th { font-size: 0.8rem; color: #475569; font-weight: 600; padding: 10px 8px; border-bottom: 1px solid #CBD5E1; }
+.forecast-payroll-table td { padding: 10px 8px; vertical-align: middle; border-bottom: 1px solid #E2E8F0; }
+.forecast-payroll-table th:first-child { width: 20%; }
+.forecast-payroll-table th:last-child { width: 50px; }
+.forecast-payroll-table .shiny-input-container { width: 100%; margin: 0; }
+.forecast-payroll-table .form-control { min-width: 100px; }
+.forecast-group-remove { color: #64748B; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 9px; }
+.forecast-group-remove:hover { color: #B91C1C; border-color: #FECACA; background: #FEF2F2; }
+.forecast-payroll-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.forecast-payroll-summary > div { padding: 14px 16px; background: #F1F5F9; border-radius: 10px; }
+.forecast-payroll-summary span { display: block; color: #64748B; font-size: 0.82rem; margin-bottom: 6px; }
+.forecast-payroll-summary strong { font-size: 1.2rem; color: #243B53; }
+.forecast-price-panel { min-width: 0; padding: 16px; border-radius: 12px; background: #F8FAFC; }
+.forecast-price-panel h5 { margin-bottom: 8px; }
+.forecast-status .bslib-grid { margin-bottom: 0 !important; }
 .forecasting-page .filter-section-title {
   font-size: 1.05rem;
   margin-bottom: 16px;
@@ -71,6 +154,10 @@ body {
 .forecast-details-card .nav-link { font-weight: 500; }
 
 @media (max-width: 767px) {
+  .forecast-payroll-heading { flex-direction: column; }
+  .forecast-payroll-summary { grid-template-columns: 1fr; }
+  .forecast-control-footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .forecast-advanced > summary span { display: block; margin: 8px 0 0 18px; }
   .forecast-secondary-settings { gap: 8px; }
   .forecast-secondary-settings > .form-group:first-child { width: 100%; min-width: 0; flex-basis: 100%; }
   .forecast-status { padding: 14px 16px; }

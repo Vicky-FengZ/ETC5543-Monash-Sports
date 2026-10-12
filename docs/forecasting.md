@@ -1,29 +1,110 @@
 # Forecasting and practical planning
 
 The Forecasting page uses uploaded **Monthly Site Reports** for monthly Actual
-Income and Expenses. It forecasts those two measures only. It does not forecast
-Net Result and does not treat historic Budget as a future budget.
+Income and Expenses, and **Venues Tracking Reports** for the recorded Casual
+Salaries component. It does not forecast Net Result or treat historical Budget
+as a future budget. Original Excel files and extracted data remain unchanged.
 
 ## What the user can do
 
-1. Upload Monthly Site Reports in **Data**, then open **Forecasting**.
-2. Choose Overall or a site, the earliest training year, the last actual month,
-   and a 3, 6 or 12 month horizon. Forecasting starts after the last complete
-   actual month, not after the computer's current date.
-3. Choose automatic model comparison or a specific baseline model.
-4. Set the annual payroll increase, a per-employee/FTE annual increase, or a
-   percentage payroll increase. Enter employer cost, including on-costs if
-   relevant. Enter a payroll share when changing payroll by percentage or
-   changing non-payroll costs; that share is a user assumption, not an extracted
-   payroll measurement.
-5. Enter the price increase, the share of income that can be repriced, the demand
-   change, and the effective month. The initial 100% repriceable share is an
-   editable assumption. Demand is not estimated from historical prices.
-6. Compare monthly actuals, the statistical baseline and the scenario. Inspect
-   the minimum income growth and price change needed to cover the **whole
-   selected period's** expenses. Inspect individual months in the monthly table.
-   **Use this minimum price** applies the rounded-up minimum to the scenario.
-7. Download the monthly plan and assumptions as separate CSV files.
+1. Upload **Monthly Site Reports** in Data and open Forecasting. Add Venues
+   Tracking Reports if you want a history-based casual pay estimate.
+2. Choose the forecast horizon (3/6/12 months) and price rise (%). The default
+   **Quick estimate** mode needs only the casual pay rise (%); its reference is
+   the predicted Venues-reported payroll for the selected future period.
+3. For a roster you know better than the historical reports, select **Advanced
+   pay & hours**. Add or remove casual staff categories, then enter each
+   category's current hourly wage, total monthly paid hours, pay rise and
+   hours change. Optional future monthly hours override the percentage; use
+   them when a new category has zero current hours.
+4. Review current monthly payroll, planned monthly payroll and the difference.
+   Confirm that these current costs belong to the selected Expenses scope and
+   that the proposed changes are not already included in its forecast.
+   Advanced mode uses only these inputs, never the quick pay rise or the
+   Venues wage model.
+5. Review Income, Expenses and **Income needed to cover costs**. **Price
+   sensitivity** is visible beside the break-even explanation, not inside a
+   collapsed details tab. **Use this minimum price** applies the rounded-up
+   requirement; it does not infer a demand response to the price.
+6. Expand **More options** and enable custom settings only if needed: scope,
+   history, demand, repriceable income share or effective month. Disabling
+   custom settings restores these defaults without changing the chosen
+   payroll mode. Changing scope or the finance history resets the advanced
+   cost-inclusion confirmation.
+7. Expand **Explore the details** for monthly values, CSV downloads, model
+   checks and methodology. The assumptions CSV records the active mode and,
+   in advanced mode, category inputs and the confirmation. **Reset plan**
+   restores Quick estimate, a 12-month horizon, zero price/pay changes,
+   automatic settings and one blank staff category.
+
+Automatic defaults are Overall, all available history (the latest usable
+continuous run), the latest complete actual month, automatic model comparison,
+unchanged demand, 100% repriceable income and first-forecast-month effectiveness.
+The pricing assumption is stated beside the control; it is not inferred from
+the workbooks. No employee count, FTE, payroll-share estimate or statistical
+model choice is needed.
+
+Without usable Venues wages, a zero quick pay rise still permits price-only
+planning. A positive rise exposes the missing-data reason rather than silently
+using zero payroll. Advanced mode works without Venues wages, including for
+individual sites, but still requires a valid Monthly Site Reports finance
+history. Empty or invalid categories are not treated as zero costs.
+
+## Recorded casual wage baseline and scope
+
+- Use only `casual_wages` rows with `period_type == "Month"`, `metric ==
+  "Actual"`, matching date/report/salary years and a reported finite value.
+  Monthly Budget, Variance, old-year comparison blocks and Reported Total are
+  not added to monthly Actuals. Overlapping wage months stop wage modelling.
+- Respect the finance cutoff to avoid using later wage actuals in backtests.
+  Missing months remain missing. Use the latest continuous run of at least 12
+  months; exclude unreported final months and unconfirmed final zeros. Do not
+  divide a partial annual sum by 12 or use it as a complete year's salary.
+- Select the wage model using the same benchmark/backtest framework, then
+  align its predicted dates to the finance plan. Wage observations may end
+  earlier; intervening predictions are clearly identified as estimates, never
+  written into the Actual table. Refuse plans more than 24 wage forecast steps
+  after the last wage actual, or inconsistent payroll greater than total
+  Expenses when applying any pay or paid-hours change, including a reduction.
+- The cleaned wages have no site allocation. Treat them as the **Venues-reported
+  payroll component**, not all staff costs. A nonzero casual adjustment
+  is available only for Overall and assumes that this reported component is
+  included in the organisation's Expenses. It is never extrapolated to other
+  staff or apportioned to sites. Use Advanced pay & hours with site-specific categories for site planning.
+  Confirm reporting scope and payroll on-cost treatment with the report owner
+  before relying on this component for operational decisions.
+- **Predicted casual payroll (before your changes)** is the sum of model
+  predictions for the selected future months, not a chosen historical annual
+  total, an individual's wage or a fixed-headcount budget. **Historical wage
+  actuals through** identifies the last observed month, not the future period.
+- Historical payroll mixes hours, headcounts and pay rates, and its forecast
+  may continue those trends. Quick mode applies **only** an additional pay rise
+  to the predicted payroll. It does not assume a future headcount, derive a
+  wage rate from Casual Hours or accept an extra hours-change input.
+- Advanced mode uses a **user-entered current monthly roster**, not Venues
+  data. Hours are total paid hours for the whole category per month; do not
+  multiply by headcount again or overlap categories. One monthly roster is
+  repeated across the plan, so seasonal monthly staffing is not modelled.
+- Both modes apply only a payroll **difference** to the finance baseline.
+  Advanced inputs do not subtract and replace the wages already embedded in
+  that baseline. They are incremental planning assumptions, not a reconstruction
+  of a full expense budget. Confirm that the planned changes are additional
+  to the financial forecast and that scopes and cost definitions match.
+- The first version covers casual hourly-paid staff. Fixed annual salaries
+  and separate employer on-costs (such as superannuation or payroll tax) are
+  not automatically computed. Do not mix those costs into only one side of
+  the current/future comparison.
+- Advanced checks require unique non-empty categories, finite non-negative
+  wages and hours, a positive rate whenever paid hours exist, pay rises of
+  0–100%, hours changes of -100–200%, and at most 20 categories. Explicit future
+  hours must be non-negative. A percentage cannot create hours from zero.
+  Current monthly casual payroll cannot exceed total monthly forecast Expenses.
+  These are safeguards, not proof that the input/reference scopes match.
+
+The supplied 2022–2024 Casual Salaries blocks have full monthly Actuals; the
+2025 block ends at September (October–December are blank). Its Total is not
+treated as full-year payroll. With a December 2025 finance cutoff, three wage
+months are modelled for alignment before the January 2026 planning period.
 
 ## Data checks and model selection
 
@@ -47,8 +128,10 @@ Net Result and does not treat historic Budget as a future budget.
   least 6 forecast origins; at most the most recent 12 origins are scored.
 - RMSE selects the automatic model separately for Income and Expenses. MAE,
   fold count and held-out horizon are displayed. Candidates that fail on a
-  fold are excluded rather than scored on an easier subset. A manually chosen
-  model is allowed without claiming that it won validation.
+  fold are excluded rather than scored on an easier subset. Selection is always
+  automatic in the page; model names, scores and selected methods remain
+  available under **Explore the details -> Forecast checks** and in exports.
+  The main chart headers do not ask users to interpret model names.
 - Prediction intervals use benchmark residual variance or the Holt-Winters
   prediction method. Monthly 80% and 95% baseline intervals are shown when
   estimable. Their assumptions include stable historical dynamics and
@@ -66,25 +149,42 @@ as cutoff; it may include pandemic effects and needs business review.
 ## Scenario calculations
 
 All percentages below are fractions. Let `I_t` and `E_t` be baseline Income and
-Expenses, `a_t` indicate months on/after the effective date, `s` be payroll share,
-`q` repriceable income share, `v` demand change, `p` price increase, `w` wage
-increase and `c` non-payroll cost change.
+Expenses, `W_t` predicted Venues payroll, `a_t` indicate active months, `q`
+repriceable income share, `v` demand change, `p` price rise and `w` quick pay rise.
+For manual category `j`, let `u_j` be current hourly wage, `h_j` current total
+monthly paid hours, `w_j` pay rise and `r_j` hours change.
 
 ```text
 Scenario Income_t = I_t x (1 + a_t v) x (1 + a_t q p)
 
-Percentage wage addition_t = a_t E_t s w
-Fixed wage addition_t      = a_t annual payroll increase / 12
-Per-employee addition_t    = a_t annual increase per employee x affected FTE / 12
+Quick payroll change_t = a_t W_t x w
 
-Scenario Expenses_t = E_t + wage addition_t + a_t E_t (1 - s) c
+Advanced current monthly payroll = sum(u_j x h_j)
+Advanced future monthly payroll  = sum(u_j x (1 + w_j) x h_j x (1 + r_j))
+# An entered future-hours target replaces h_j x (1 + r_j).
+Advanced payroll change_t = a_t x (future monthly payroll - current monthly payroll)
+
+Scenario Expenses_t = E_t + payroll change_t from ONE selected mode
 ```
 
-These are additional changes relative to the statistical baseline, applied once,
-not a monthly compounding schedule. Volume changes affect Income; staffing or
-other volume-related costs must be entered separately. Percentage scenarios use
-a constant assumed payroll share. Fixed wage amounts use an even monthly
-allocation; they do not model individual payroll dates or pay bands.
+Changes are additional to the statistical baseline, applied once rather than
+compounding monthly. The whole current/future payroll budget is never added
+again. For example, a category at $20/hour and 20 hours/month costs $400 now.
+A 5% pay rise plus 20% more hours gives $504/month: add only $104/month to
+Expenses. Over six active months this is $624. Quick inputs are ignored in
+advanced mode, and advanced rows are ignored in quick mode, even if previously
+entered values remain in the browser.
+
+Volume changes affect Income only; they do not automatically change staff hours.
+A manual monthly roster is assumed constant across the planning period; the
+result is conditional on that assumption, not an estimate of future hiring.
+Negative total monthly Expenses are rejected; interval lower bounds are clamped
+to zero after a reduction.
+
+The calculation helper retains its prior annual, per-employee, payroll-share,
+monthly-extra-cost and aggregate paid-hours modes for existing R callers and
+regression tests. These are not dashboard controls and cannot be activated by
+sending unused legacy inputs to the Shiny module.
 
 ```text
 Minimum total income growth = max(0, total Scenario Expenses / total Baseline Income - 1)
@@ -104,7 +204,8 @@ can still have insufficient income even when the whole period breaks even.
 Displayed minimum rates round upward to 0.1 percentage points so a displayed
 price requirement is not lower than the calculated threshold.
 Scenario interval columns in the downloaded plan transform the baseline 80%
-intervals conditional on fixed assumptions; they do not model input uncertainty.
+intervals conditional on fixed assumptions; they do not model input uncertainty
+or add the uncertainty of the separately predicted casual wage component.
 
 ## Implementation and verification
 
@@ -115,6 +216,12 @@ intervals conditional on fixed assumptions; they do not model input uncertainty.
 - `tests/test_forecasting.R`: aggregation, gaps, duplicates, interval availability,
   known payroll examples, delayed timing, demand, break-even boundaries and
   reactive upload/removal states.
+- `tests/test_forecasting_simple.R`: automatic selection, ignored removed/inactive
+  settings, partial wage years, date alignment, site-scope protection, pay/hours
+  interactions and reductions, retained R-call compatibility and no payroll double counting.
+- `tests/test_forecasting_tiered.R`: category validation, optional future-hours
+  targets, exact payroll differences and break-even thresholds, mode exclusivity,
+  dynamic add/remove, missing wages, confirmation reset and cleared-input reset.
 
 From the project root in RStudio:
 
@@ -130,7 +237,7 @@ changing business assumptions does not re-read Excel or re-fit baseline models.
 ## Reference
 
 Hyndman, R.J., and Athanasopoulos, G. (2021). *Forecasting: Principles and
-Practice*, 3rd edition. OTexts. Accessed 8 October 2026.
+Practice*, 3rd edition. OTexts. Accessed 12 October 2026.
 
 - [Benchmark methods](https://otexts.com/fpp3/simple-methods.html)
 - [Rolling-origin cross-validation](https://otexts.com/fpp3/tscv.html)
