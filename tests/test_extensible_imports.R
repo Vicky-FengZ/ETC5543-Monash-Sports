@@ -55,7 +55,8 @@ local({
   exports <- basic_cleaned_export_sheets(preview)
   stopifnot(all(c("Memberships", "Direct Visits") %in% names(exports)),
     any(exports$Memberships$raw_value == "Awaiting confirmation", na.rm = TRUE),
-    any(exports$Memberships$unit == "Currency", na.rm = TRUE))
+    !any(c("unit", "aggregation") %in% names(exports$Memberships)),
+    any(exports$Memberships$value == 42, na.rm = TRUE))
 
   # Venues also retain unfamiliar metric columns.
   venue_raw <- make_raw(3L, 13L)
@@ -115,8 +116,8 @@ local({
       any(roundtrip$value_type == "VIP", na.rm = TRUE))
   }, finally = unlink(paths))
 
-  # Definitions are isolated to the session/family/metric and reach the
-  # preview and exported workbook without changing reported numbers.
+  # Default definitions remain in imported data. Users can preview/download
+  # unfamiliar metrics directly without any per-session configuration.
   fake_parser <- function(path, source_name) report
   shiny::testServer(mod_data_upload_server,
     args = list(parsers = list(site_detail = fake_parser)), {
@@ -125,30 +126,24 @@ local({
       writeLines("test fixture", upload_path)
       process_upload_batch("site_detail", data.frame(name = "New Sport Site Report 2028.xlsx",
         size = file.info(upload_path)$size, datapath = upload_path))
-      session$setInputs(preview_report_type = "site_detail", open_metric_settings = 1)
-      session$flushReact()
-      index <- which(editing_metrics()$metric == "Average Membership Fee")
-      session$setInputs(definition_metric = as.character(index))
-      session$flushReact()
-      session$setInputs(definition_unit = "Currency", definition_aggregation = "Mean",
-        save_metric_definition = 1)
+      session$setInputs(preview_report_type = "site_detail")
       session$flushReact()
       data <- session$returned()$site_reports$memberships
-      stopifnot(data$unit[data$metric == "Average Membership Fee"] == "Currency",
-        data$aggregation[data$metric == "Average Membership Fee"] == "Mean",
+      stopifnot(data$unit[data$metric == "Average Membership Fee"] == "Unknown",
+        data$aggregation[data$metric == "Average Membership Fee"] == "None",
         data$value[data$metric == "Average Membership Fee"] == 42,
+        data$aggregation[data$metric == "New Members"] == "Sum",
         data$unit[data$metric == "Paused Memberships"] == "Unknown")
       downloaded <- preview_export_sheets()
-      stopifnot(any(downloaded$Memberships$unit == "Currency", na.rm = TRUE))
-      session$setInputs(definition_unit = "Rate", definition_aggregation = "Sum",
-        save_metric_definition = 2)
-      session$flushReact()
-      stopifnot(metric_overrides()$unit[[1L]] == "Currency")
+      stopifnot(!any(c("unit", "aggregation") %in% names(downloaded$Memberships)),
+        any(downloaded$Memberships$metric == "Average Membership Fee" &
+          downloaded$Memberships$value == 42, na.rm = TRUE),
+        any(downloaded$Memberships$raw_value == "Awaiting confirmation", na.rm = TRUE))
       remove_session_files(registry()$file_id)
       session$flushReact()
-      stopifnot(nrow(metric_catalog()) == 0L)
+      stopifnot(is.null(preview_report()))
       unlink(upload_path)
     })
   stopifnot(import_metric_definition("site_detail", "memberships", "Average Membership Fee")$unit == "Unknown")
 })
-cat("PASS extensible columns, new metrics, reconciliation, source retention and metric settings\n")
+cat("PASS extensible columns, default definitions, reconciliation and simplified preview/export\n")

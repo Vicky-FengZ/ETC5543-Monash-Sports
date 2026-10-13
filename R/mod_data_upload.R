@@ -682,6 +682,7 @@ basic_preview_combined_report_data <- function(report, report_type) {
     }
   )
   result <- bind_basic_preview_tables(tables)
+  result <- result[, setdiff(names(result), c("unit", "aggregation")), drop = FALSE]
 
   if (nrow(result) == 0L) {
     result$.preview_table_order <- NULL
@@ -1365,7 +1366,8 @@ basic_upload_card <- function(
   input_id,
   heading,
   description,
-  icon
+  icon,
+  template_filename = NULL
 ) {
   card(
     class = "basic-upload-source-card",
@@ -1387,6 +1389,13 @@ basic_upload_card <- function(
         tags$small(
           class = "text-secondary",
           "Files are parsed immediately and kept for this session only."
+        ),
+        if (!is.null(template_filename)) tags$a(
+          class = "basic-template-download",
+          href = paste0("templates/", utils::URLencode(template_filename)),
+          download = template_filename,
+          bs_icon("file-earmark-arrow-down"),
+          "Download Excel template"
         )
       )
     )
@@ -1451,7 +1460,8 @@ mod_data_upload_ui <- function(id) {
                   "Upload one or more annual Monthly Site Report",
                   "workbooks."
                 ),
-                icon = "cloud-arrow-up"
+                icon = "cloud-arrow-up",
+                template_filename = "Monthly Site Report 2026.xlsx"
               ),
               basic_upload_card(
                 ns = ns,
@@ -1462,7 +1472,8 @@ mod_data_upload_ui <- function(id) {
                   "Upload Business Unit Template site or program",
                   "reports."
                 ),
-                icon = "building"
+                icon = "building",
+                template_filename = "New Sport Site Report 2026.xlsx"
               ),
               basic_upload_card(
                 ns = ns,
@@ -1472,7 +1483,8 @@ mod_data_upload_ui <- function(id) {
                 description = paste(
                   "Upload annual Venues Tracking Report workbooks."
                 ),
-                icon = "activity"
+                icon = "activity",
+                template_filename = "2026 Venues Tracking Report.xlsx"
               ),
               col_widths = c(4, 4, 4)
             ),
@@ -1543,7 +1555,6 @@ mod_data_upload_ui <- function(id) {
                     ),
                     width = "100%"
                   ),
-                  uiOutput(ns("metric_settings_control")),
                   conditionalPanel(
                     condition = "input.preview_report_type === 'monthly_site'",
                     selectizeInput(
@@ -1697,8 +1708,6 @@ mod_data_upload_server <- function(
       registry <- reactiveVal(empty_basic_upload_registry())
       parsed_results <- reactiveVal(list())
       warning_details <- reactiveVal(list())
-      metric_overrides <- reactiveVal(IMPORT_METRIC_RULES[FALSE, ])
-      editing_metrics <- reactiveVal(NULL)
 
       session$onSessionEnded(function() {
         if (dir.exists(session_directory)) {
@@ -2078,15 +2087,8 @@ mod_data_upload_server <- function(
       })
 
       dashboard_data <- reactive({
-        data <- analysis_data()
-        for (family in names(BASIC_PREVIEW_REPORT_FIELDS)) {
-          field <- unname(BASIC_PREVIEW_REPORT_FIELDS[[family]])
-          data[[field]] <- define_import_report_metrics(
-            data[[field]], family, metric_overrides()
-          )
-        }
         c(
-          data,
+          analysis_data(),
           list(
             uploads = registry()
           )
@@ -2112,104 +2114,6 @@ mod_data_upload_server <- function(
         )
       })
 
-      metric_catalog <- reactive({
-        import_metric_catalog(preview_report(), selected_preview_report_type())
-      })
-
-      output$metric_settings_control <- renderUI({
-        catalog <- metric_catalog()
-        if (nrow(catalog) == 0L) return(NULL)
-        pending <- sum(catalog$unit == "Unknown")
-        div(
-          class = "metric-settings-control",
-          actionButton(session$ns("open_metric_settings"), "Metric settings",
-            icon = bs_icon("sliders"), class = "btn-sm btn-outline-secondary"),
-          if (pending > 0L) tags$small(paste(pending, "metric(s) need a unit"))
-        )
-      })
-
-      observeEvent(input$open_metric_settings, {
-        catalog <- metric_catalog()
-        if (nrow(catalog) == 0L) return()
-        catalog <- catalog[order(catalog$unit != "Unknown", catalog$dataset, catalog$metric), ]
-        editing_metrics(catalog)
-        showModal(modalDialog(
-          title = "Metric settings",
-          p("Choose how an indicator is described in the cleaned table and Excel download."),
-          selectInput(session$ns("definition_metric"), "Metric",
-            choices = stats::setNames(as.character(seq_len(nrow(catalog))),
-              paste(basic_preview_table_label(catalog$dataset), catalog$metric, sep = " · "))),
-          selectInput(session$ns("definition_unit"), "Unit",
-            choices = c("Not defined" = "Unknown", "People / items" = "Count",
-              "Currency" = "Currency", "Proportion / percentage" = "Rate",
-              "Hours" = "Hours", "Text" = "Text"), selected = catalog$unit[[1L]]),
-          selectInput(session$ns("definition_aggregation"), "Across months",
-            choices = stats::setNames(import_allowed_aggregations(catalog$unit[[1L]]),
-              c(None = "Do not aggregate", Sum = "Add together", Last = "Use latest month",
-                Mean = "Average months")[import_allowed_aggregations(catalog$unit[[1L]])]),
-            selected = catalog$aggregation[[1L]]),
-          tags$small("Settings last for this upload session. They do not change reported values or existing chart calculations."),
-          footer = tagList(modalButton("Close"),
-            actionButton(session$ns("save_metric_definition"), "Save setting", class = "btn-primary"))
-        ))
-      }, ignoreInit = TRUE)
-
-      observeEvent(input$definition_metric, {
-        catalog <- editing_metrics()
-        index <- suppressWarnings(as.integer(input$definition_metric))
-        if (!is.data.frame(catalog) || length(index) != 1L || is.na(index) ||
-            index < 1L || index > nrow(catalog)) return()
-        updateSelectInput(session, "definition_unit", selected = catalog$unit[[index]])
-        choices <- import_allowed_aggregations(catalog$unit[[index]])
-        updateSelectInput(session, "definition_aggregation",
-          choices = stats::setNames(choices, c(None = "Do not aggregate", Sum = "Add together",
-            Last = "Use latest month", Mean = "Average months")[choices]),
-          selected = catalog$aggregation[[index]])
-      }, ignoreInit = TRUE)
-
-      observeEvent(input$definition_unit, {
-        unit <- input$definition_unit
-        if (length(unit) != 1L || !unit %in% IMPORT_METRIC_UNITS) return()
-        choices <- import_allowed_aggregations(unit)
-        current <- isolate(input$definition_aggregation)
-        selected <- if (length(current) == 1L && current %in% choices) current else "None"
-        catalog <- editing_metrics()
-        index <- suppressWarnings(as.integer(input$definition_metric))
-        if (is.data.frame(catalog) && length(index) == 1L && !is.na(index) &&
-            index >= 1L && index <= nrow(catalog) && unit == catalog$unit[[index]]) {
-          # A metric change updates Unit on the client too. Restore its own
-          # saved aggregation rather than borrowing the previous metric's.
-          selected <- catalog$aggregation[[index]]
-        }
-        updateSelectInput(session, "definition_aggregation",
-          choices = stats::setNames(choices, c(None = "Do not aggregate", Sum = "Add together",
-            Last = "Use latest month", Mean = "Average months")[choices]), selected = selected)
-      }, ignoreInit = TRUE)
-
-      observeEvent(input$save_metric_definition, {
-        catalog <- editing_metrics()
-        index <- suppressWarnings(as.integer(input$definition_metric))
-        unit <- input$definition_unit
-        aggregation <- input$definition_aggregation
-        if (!is.data.frame(catalog) || length(index) != 1L || is.na(index) ||
-            index < 1L || index > nrow(catalog) || length(unit) != 1L ||
-            !unit %in% IMPORT_METRIC_UNITS || length(aggregation) != 1L ||
-            !aggregation %in% import_allowed_aggregations(unit)) {
-          showNotification("Choose a valid unit and monthly aggregation.", type = "message")
-          return()
-        }
-        definition <- catalog[index, names(IMPORT_METRIC_RULES), drop = FALSE]
-        definition$unit <- unit
-        definition$aggregation <- aggregation
-        rules <- metric_overrides()
-        same <- rules$family == definition$family & rules$dataset == definition$dataset &
-          normalise_excel_label(rules$metric) == normalise_excel_label(definition$metric)
-        metric_overrides(rbind(rules[!same, ], definition))
-        catalog$unit[[index]] <- unit
-        catalog$aggregation[[index]] <- aggregation
-        editing_metrics(catalog)
-        showNotification("Metric setting saved for this session.", type = "message")
-      }, ignoreInit = TRUE)
 
       preview_table_data <- reactive({
         report <- preview_report()

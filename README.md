@@ -368,25 +368,47 @@ Uploads can grow within the supported report layouts:
   exclusions. The field audit is not a cell-by-cell audit of the entire workbook;
   the chosen Casual Hours summary and reporting-year wage scope still apply.
 
-In **View Cleaned Data**, select Detailed Site Reports or Venues Tracking
-Reports, then **Metric settings** to define a membership/enrollment/merchandise
-indicator's unit and treatment across months. For example, an average fee can
-be Currency/Mean and active memberships Count/Last. Unfamiliar indicators start
-as Unknown/None, so a fee is not automatically labelled as a headcount.
+Metric definitions are automatic. Existing defaults identify known counts,
+currencies and rates. Unfamiliar indicators retain their name and reported
+value with internal Unknown/None definitions. Users do not configure them when
+uploading. Internal `unit` and `aggregation` columns are omitted from the ordinary
+preview and cleaned Excel download; the imported R objects retain them.
+New indicators do not automatically become chart/forecast targets.
 
-These settings add `unit` and `aggregation` metadata to the preview and downloaded
-tables; they do not recalculate reported values or automatically add indicators
-to existing charts. Settings apply within the current session, including later
-uploads with the same report family, table and metric. They are isolated from
-other users. Rate indicators cannot be configured to sum across months.
-
-For definitions that should apply on future app launches, maintain
+Default definitions are delivered in
 [`config/metric_definitions.csv`](config/metric_definitions.csv). Its columns are
 `family,dataset,metric,unit,aggregation`; names are matched without case/spacing
 differences. Supported units are Unknown, Count, Currency, Rate, Hours and Text;
 aggregations are None, Sum, Last and Mean. Restart the app after changing the
 CSV. The file is loaded once, and must be included when distributing the app.
 The default definitions live outside the parsing code in this file.
+
+### Standard Excel templates
+
+Each upload card includes **Download Excel template**. Three blank workbooks
+are shipped in `www/templates/`, outside `data/raw/` so they are not discovered
+as real reports. They contain input areas, formula totals and a built-in guide
+showing required headings, supported additions and filename/year rules.
+The example year is 2026; change the guide's Reporting year and Save As with
+the matching year before uploading completed data.
+
+- Monthly Site: organisation Finance Summary plus one example site, with
+  Income, Expenses, Discounts and Total Revenue. Update the organisation links
+  to include every site when adding more site worksheets.
+- Detailed Site: Finance, Direct Visits, Indirect Visits, Memberships and
+  Enrollments. Rename activity rows and insert new activities before Total;
+  repeated audience/indicator additions must be consistent across months.
+- Venues Tracking: all nine supported worksheets, including the selected
+  Casual Hours summary and the reporting-year Casual Salaries block.
+
+Amber cells are editable inputs. Grey labels and dark headings identify the
+required structure. Calculated cells should retain their formulas. Blank is
+unreported; enter zero only for a confirmed zero. Blank templates are starting
+files rather than reported data. Unknown fields can be viewed/downloaded, but
+new business relationships and arbitrary layouts require extraction rules.
+
+See [Excel template guide](docs/excel_templates.md) for instructions and
+the specific extension boundaries for each worksheet.
 
 ### Session scope
 
