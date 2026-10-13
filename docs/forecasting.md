@@ -311,14 +311,3 @@ shiny::runApp()
 
 No additional forecasting package is required. The models use `stats`, which
 ships with R, plus the project's existing Shiny packages.
-
-## Reference
-
-Hyndman, R.J., and Athanasopoulos, G. (2021). *Forecasting: Principles and
-Practice*, 3rd edition. OTexts. Accessed 12 October 2026.
-
-- [Benchmark methods](https://otexts.com/fpp3/simple-methods.html)
-- [Rolling-origin cross-validation](https://otexts.com/fpp3/tscv.html)
-- [Prediction intervals](https://otexts.com/fpp3/prediction-intervals.html)
-- [Scenario forecasting](https://otexts.com/fpp3/scenarios.html)
-- [Missing values and outliers](https://otexts.com/fpp3/missing-outliers.html)
