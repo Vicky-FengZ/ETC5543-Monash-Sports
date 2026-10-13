@@ -99,6 +99,129 @@ basic_upload_result_issues <- function(result) {
 }
 
 
+basic_upload_warning_impact <- function(message) {
+  text <- tolower(message)
+
+  if (startsWith(text, "sheet ") && grepl("was skipped", text, fixed = TRUE)) {
+    return("This worksheet was skipped. Other readable worksheets may still be available.")
+  }
+  if (grepl("extraction was skipped", text, fixed = TRUE)) {
+    return("This part of the worksheet was not extracted. Review the source layout before using these figures.")
+  }
+  if (grepl("discounts section was not found", text, fixed = TRUE)) {
+    return("Discount opportunity data are unavailable for this worksheet; Finance can still be viewed.")
+  }
+  if (grepl("total revenue (actual + opp) row was not found", text, fixed = TRUE)) {
+    return("The reported revenue cannot be checked against income and discounts for this worksheet.")
+  }
+  if (grepl("finance summary sheet was not found", text, fixed = TRUE)) {
+    return("The organisation summary is missing. Check site coverage before using organisation-wide totals.")
+  }
+  if (grepl("validation failed", text, fixed = TRUE)) {
+    return("Calculated and reported figures differ. Review the source totals before using these figures.")
+  }
+  if (grepl("validation was incomplete|validation incomplete", text)) {
+    return("Some checks could not be completed. Review missing inputs before using totals.")
+  }
+  if (grepl("duplicate", text, fixed = TRUE)) {
+    return("Some period labels or records repeat. Check the source before adding up these figures.")
+  }
+  if (grepl("missing month", text, fixed = TRUE)) {
+    return("Some expected months were not identified. Coverage may be incomplete.")
+  }
+  if (grepl("no reported total|no total .*block|no ytd", text)) {
+    return("A reported total was not identified, so the corresponding total check may be unavailable.")
+  }
+  if (grepl("sheet was not found|sheet is empty", text)) {
+    return("This part of the report has no extracted data. Other available parts can still be viewed.")
+  }
+  if (grepl("no recognised|no recognizable|no recognisable|could not be identified", text)) {
+    return("The expected layout was not identified; some data or checks may be unavailable.")
+  }
+
+  "Review this note against the source workbook before using the affected figures."
+}
+
+
+basic_upload_warning_rows <- function(result) {
+  empty <- data.frame(
+    sheet = character(), message = character(), impact = character(),
+    stringsAsFactors = FALSE
+  )
+  validation <- result$validation
+
+  if (!is.data.frame(validation) || nrow(validation) == 0L ||
+      !"level" %in% names(validation)) {
+    return(empty)
+  }
+
+  levels <- tolower(as.character(validation$level))
+  rows <- validation[!is.na(levels) & levels == "warning", , drop = FALSE]
+  if (nrow(rows) == 0L) {
+    return(empty)
+  }
+
+  sheets <- if ("sheet" %in% names(rows)) {
+    trimws(as.character(rows$sheet))
+  } else {
+    rep(NA_character_, nrow(rows))
+  }
+  messages <- if ("message" %in% names(rows)) {
+    as.character(rows$message)
+  } else {
+    rep(NA_character_, nrow(rows))
+  }
+  sheets[is.na(sheets) | !nzchar(sheets)] <- "File-level notes"
+  messages[is.na(messages) | !nzchar(trimws(messages))] <-
+    "No warning description was supplied by the importer."
+
+  data.frame(
+    sheet = sheets,
+    message = messages,
+    impact = vapply(messages, basic_upload_warning_impact, character(1L)),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+basic_upload_warning_details_ui <- function(warnings, file_name) {
+  if (is.null(warnings) || nrow(warnings) == 0L) {
+    return(NULL)
+  }
+
+  count <- nrow(warnings)
+  label <- paste(count, if (count == 1L) "warning" else "warnings")
+  tags$details(
+    class = "basic-upload-warning-details",
+    tags$summary(
+      `aria-label` = paste("View", label, "for", file_name),
+      bs_icon("chevron-right", class = "basic-upload-warning-chevron", size = "12px"),
+      span(class = "basic-upload-warning-count", label),
+      span(class = "basic-upload-warning-toggle", "View details")
+    ),
+    div(
+      class = "basic-upload-warning-body",
+      lapply(unique(warnings$sheet), function(sheet) {
+        rows <- warnings[warnings$sheet == sheet, , drop = FALSE]
+        div(
+          class = "basic-upload-warning-group",
+          div(class = "basic-upload-warning-group-heading", sheet),
+          tags$ul(lapply(seq_len(nrow(rows)), function(index) {
+            tags$li(
+              p(class = "basic-upload-warning-message", rows$message[[index]]),
+              p(
+                class = "basic-upload-warning-impact",
+                span("What this means: "), rows$impact[[index]]
+              )
+            )
+          }))
+        )
+      })
+    )
+  )
+}
+
+
 combine_basic_upload_results <- function(objects, result_class) {
   objects <- Filter(Negate(is.null), objects)
 
@@ -1550,6 +1673,7 @@ mod_data_upload_server <- function(
 
       registry <- reactiveVal(empty_basic_upload_registry())
       parsed_results <- reactiveVal(list())
+      warning_details <- reactiveVal(list())
 
       session$onSessionEnded(function() {
         if (dir.exists(session_directory)) {
@@ -1595,6 +1719,9 @@ mod_data_upload_server <- function(
         parsed <- parsed_results()
         parsed[file_ids] <- NULL
         parsed_results(parsed)
+        notes <- warning_details()
+        notes[file_ids] <- NULL
+        warning_details(notes)
         registry(rows[!rows$file_id %in% file_ids, , drop = FALSE])
         invisible(TRUE)
       }
@@ -1715,6 +1842,12 @@ mod_data_upload_server <- function(
             )
           } else {
             issues <- basic_upload_result_issues(parsed)
+            # Keep notes separate so failed validation can also be inspected
+            # without making that file's data available to the dashboard.
+            file_warnings <- basic_upload_warning_rows(parsed)
+            notes <- warning_details()
+            notes[[file_id]] <- if (nrow(file_warnings) > 0L) file_warnings else NULL
+            warning_details(notes)
 
             if (issues$errors > 0L) {
               update_registry_row(
@@ -1813,6 +1946,7 @@ mod_data_upload_server <- function(
 
       output$file_status <- renderUI({
         rows <- registry()
+        notes <- warning_details()
 
         if (nrow(rows) == 0L) {
           return(div(
@@ -1876,7 +2010,10 @@ mod_data_upload_server <- function(
               ),
               if (!is.na(error_text) && nzchar(error_text)) {
                 div(class = "basic-upload-error", error_text)
-              }
+              },
+              basic_upload_warning_details_ui(
+                notes[[row$file_id[[1L]]]], row$original_name[[1L]]
+              )
             )
           }
         ))

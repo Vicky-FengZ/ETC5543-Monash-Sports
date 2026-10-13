@@ -300,12 +300,19 @@ an individual status row for every uploaded file:
 |---|---|
 | `queued` or `parsing` | The workbook is waiting or is currently being read, cleaned and validated |
 | `ready` | Parsing completed without validation errors; the cleaned data are available to the dashboard |
-| `ready` with warnings | Data are available, but the warning count should be reviewed before analysis |
 | `failed` | The file type, workbook structure, parser or validation produced a blocking error; its data are excluded from the dashboard |
 
-The status row displays the relevant warning count or error message. A warning
-does not block a file. A validation error or parser exception does block it,
-because continuing could silently mislabel data.
+The status row displays the relevant warning count or error message. For files
+with warnings, select **View details** beneath the progress line to inspect the
+original messages and a short explanation of their impact. Notes are grouped
+by worksheet; notes without a worksheet appear under **File-level notes**.
+Details are collapsed by default and do not open a popup. The successful status
+remains `ready`, including when warnings are present.
+
+A warning does not block a file or alter its extracted values. A validation
+error or parser exception does block it, because continuing could silently
+mislabel data. If failed validation also supplies warnings, those notes can be
+inspected without including that file's data in the dashboard.
 
 If a successfully parsed file has the same report family and filename as an
 existing upload, it replaces the older session copy only after the new file has
