@@ -342,6 +342,52 @@ Excel viewer. To investigate a value in its original context, use
 `source_file`, `source_sheet`, `source_row` and `source_column` to locate the
 corresponding cell in the source workbook.
 
+### New projects, audiences and indicators
+
+Uploads can grow within the supported report layouts:
+
+- Direct/Indirect Visits locate each month's columns from the next month or
+  YTD heading. New activity rows and audience columns are retained, and the
+  audience total check includes the new categories.
+- Memberships, Enrollments and Venues Membership Tracking retain new labelled
+  indicator columns. Merchandise Tracking also retains unfamiliar indicators.
+- Monthly and Detailed Site Finance accept new discount categories. Reported
+  Total Revenue is located at the beginning of each business-unit group and
+  reconciled against actual income plus the extracted discount categories.
+- The field audit checks recognised Monthly/Detailed finance data areas,
+  Detailed visits/member areas, and Venues membership/merchandise areas. Values
+  without a recognised column, and non-numeric contents in numeric fields,
+  are retained in `additional_data` with their original text and source positions.
+  They appear in the same source-sheet preview/export and are excluded from
+  existing chart totals. The corresponding warning explains where to look.
+  Existing discount subtotal columns are retained there for reference without
+  triggering an unfamiliar-field warning or double-counting discounts.
+- New worksheets without a supported layout are reported in **View details**.
+  They require an extraction rule; they are not silently treated as finance or
+  membership data. Dashboard/chart/helper/budget worksheets remain intentional
+  exclusions. The field audit is not a cell-by-cell audit of the entire workbook;
+  the chosen Casual Hours summary and reporting-year wage scope still apply.
+
+In **View Cleaned Data**, select Detailed Site Reports or Venues Tracking
+Reports, then **Metric settings** to define a membership/enrollment/merchandise
+indicator's unit and treatment across months. For example, an average fee can
+be Currency/Mean and active memberships Count/Last. Unfamiliar indicators start
+as Unknown/None, so a fee is not automatically labelled as a headcount.
+
+These settings add `unit` and `aggregation` metadata to the preview and downloaded
+tables; they do not recalculate reported values or automatically add indicators
+to existing charts. Settings apply within the current session, including later
+uploads with the same report family, table and metric. They are isolated from
+other users. Rate indicators cannot be configured to sum across months.
+
+For definitions that should apply on future app launches, maintain
+[`config/metric_definitions.csv`](config/metric_definitions.csv). Its columns are
+`family,dataset,metric,unit,aggregation`; names are matched without case/spacing
+differences. Supported units are Unknown, Count, Currency, Rate, Hours and Text;
+aggregations are None, Sum, Last and Mean. Restart the app after changing the
+CSV. The file is loaded once, and must be included when distributing the app.
+The default definitions live outside the parsing code in this file.
+
 ### Session scope
 
 Uploads are deliberately session-only in the current version. Refreshing or

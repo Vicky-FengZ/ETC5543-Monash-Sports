@@ -611,6 +611,19 @@ body {
   font-weight: 500;
 }
 
+.metric-settings-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.metric-settings-control small {
+  color: #64748B;
+  font-size: 0.8rem;
+}
+
 .basic-status-badge {
   flex: 0 0 auto;
   padding: 2px 8px;

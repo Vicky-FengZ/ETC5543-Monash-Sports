@@ -64,6 +64,13 @@ if (!nzchar(real_data_root)) {
     ))
   }
 
+  expected_preview_tables <- function(report, family) {
+    c(BASIC_PREVIEW_TABLES[[family]],
+      if (nrow(report$additional_data) > 0L) "additional_data")
+  }
+  monthly_sections <- c("Finance", "Discounts", "Total Revenue",
+    if (nrow(monthly$additional_data) > 0L) "Additional data")
+
   stopifnot(
     inherits(monthly, "monthly_site_report_data"),
     length(attr(monthly, "source_sheet_order")) > 0L,
@@ -77,18 +84,18 @@ if (!nzchar(real_data_root)) {
     nrow(monthly_preview) ==
       nrow(monthly$finance) +
       nrow(monthly$discounts) +
-      4L * nrow(monthly$total_revenue),
+      4L * nrow(monthly$total_revenue) + nrow(monthly$additional_data),
     setequal(
       unique(monthly_preview$data_section),
-      c("Finance", "Discounts", "Total Revenue")
+      monthly_sections
     ),
     length(monthly_preview_sheets) > 0L,
     all(monthly_preview$data_section %in%
-      c("Finance", "Discounts", "Total Revenue")),
+      monthly_sections),
     inherits(monthly_preview$period_date, "Date"),
     identical(
       basic_preview_table_names(monthly, "monthly_site"),
-      BASIC_PREVIEW_TABLES$monthly_site
+      expected_preview_tables(monthly, "monthly_site")
     ),
     preview_tables_have_source_sheet(monthly, "monthly_site"),
     inherits(venues, "venues_tracking_report_data"),
@@ -136,11 +143,11 @@ if (!nzchar(real_data_root)) {
     ),
     identical(
       basic_preview_table_names(venues, "venues_tracking"),
-      BASIC_PREVIEW_TABLES$venues_tracking
+      expected_preview_tables(venues, "venues_tracking")
     ),
     preview_tables_have_source_sheet(venues, "venues_tracking"),
     nrow(venues_preview) == sum(vapply(
-      venues[BASIC_PREVIEW_TABLES$venues_tracking],
+      venues[expected_preview_tables(venues, "venues_tracking")],
       nrow,
       integer(1L)
     )),
@@ -171,11 +178,11 @@ if (!nzchar(real_data_root)) {
     nrow(sites$finance) > 0L,
     identical(
       basic_preview_table_names(sites, "site_detail"),
-      BASIC_PREVIEW_TABLES$site_detail
+      expected_preview_tables(sites, "site_detail")
     ),
     preview_tables_have_source_sheet(sites, "site_detail"),
     nrow(sites_preview) == sum(vapply(
-      sites[BASIC_PREVIEW_TABLES$site_detail],
+      sites[expected_preview_tables(sites, "site_detail")],
       nrow,
       integer(1L)
     )),

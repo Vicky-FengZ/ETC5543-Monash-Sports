@@ -431,7 +431,7 @@ load_monthly_site_reports <- function(
     )
   }
 
-  structure(
+  result <- structure(
     list(
       finance = finance,
       discounts = discounts,
@@ -442,6 +442,7 @@ load_monthly_site_reports <- function(
     class = "monthly_site_report_data",
     source_sheet_order = workbook_source_sheet_order(workbooks)
   )
+  finalise_extensible_report(result, valid_workbooks, "monthly_site")
 }
 
 

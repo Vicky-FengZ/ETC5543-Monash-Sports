@@ -441,12 +441,7 @@ extract_business_unit_discount_reported_totals <- function(workbook) {
     ),
     character(1)
   )
-  discount_type_map <- c(
-    students = "Student",
-    staff = "Staff",
-    other = "Other"
-  )
-  value_columns <- which(header_labels %in% names(discount_type_map))
+  value_columns <- discount_value_columns(header_labels)
   group_headers <- fill_group_headers(raw_sheet, header_row)
   records <- list()
 
@@ -468,8 +463,8 @@ extract_business_unit_discount_reported_totals <- function(workbook) {
       raw_business_unit = raw_business_unit,
       fund_code = business_unit_template_fund_code(raw_business_unit),
       is_summary = normalise_excel_label(raw_business_unit) == "ytd summary",
-      discount_type = unname(
-        discount_type_map[[header_labels[[source_column]]]]
+      discount_type = canonical_discount_type(
+        cell_as_text(raw_sheet, header_row, source_column)
       ),
       value = cell_as_number(raw_sheet, total_row, source_column),
       source_file = workbook$source_file,
@@ -748,10 +743,12 @@ clean_business_unit_template_visits <- function(
     for (period_index in seq_len(nrow(periods))) {
       period <- periods[period_index, , drop = FALSE]
       start_column <- period$start_column[[1]]
-      candidate_columns <- seq.int(
-        start_column,
-        min(start_column + 3L, ncol(raw_sheet))
-      )
+      end_column <- if (period_index < nrow(periods)) {
+        periods$start_column[[period_index + 1L]] - 1L
+      } else {
+        ncol(raw_sheet)
+      }
+      candidate_columns <- seq.int(start_column, end_column)
 
       for (source_column in candidate_columns) {
         raw_audience <- cell_as_text(
@@ -760,7 +757,7 @@ clean_business_unit_template_visits <- function(
           source_column
         )
         audience_key <- normalise_excel_label(raw_audience)
-        if (!audience_key %in% names(audience_map)) {
+        if (!nzchar(audience_key)) {
           next
         }
         period_type <- period$period_type[[1]]
@@ -785,7 +782,11 @@ clean_business_unit_template_visits <- function(
           visit_type = visit_type,
           activity = activity,
           row_type = row_type,
-          audience = unname(audience_map[[audience_key]]),
+          audience = if (audience_key %in% names(audience_map)) {
+            unname(audience_map[[audience_key]])
+          } else {
+            trimws(raw_audience)
+          },
           value = cell_as_number(raw_sheet, source_row, source_column),
           source_file = workbook$source_file,
           source_sheet = sheet_name,
@@ -918,11 +919,9 @@ clean_business_unit_template_member_sheet <- function(
             metric
           )
         }
-        metric_type <- if (grepl("share|%", normalise_excel_label(metric))) {
-          "Rate"
-        } else {
-          "Count"
-        }
+        metric_type <- import_metric_definition(
+          "site_detail", sheet_field, metric
+        )$unit[[1L]]
         records[[length(records) + 1L]] <- data.frame(
           report_year = as.integer(workbook$report_year),
           date = as.Date(sprintf("%04d-%02d-01", workbook$report_year, month)),

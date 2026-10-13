@@ -109,22 +109,18 @@ validate_business_unit_visit_structure <- function(
       character(1)
     )
   )
-  missing_audiences <- setdiff(
-    c("student", "staff", "community", "total"),
-    audiences
-  )
-  if (length(missing_audiences) > 0L) {
+  if (!any(nzchar(audiences[-1L]) & audiences[-1L] != "total")) {
     issues[[length(issues) + 1L]] <- make_import_issue(
       level = "error",
       source_file = workbook$source_file,
       sheet = sheet_name,
-      message = paste0(
-        label,
-        " is missing audience header(s): ",
-        paste(missing_audiences, collapse = ", "),
-        "."
-      )
+      message = paste0(label, " has no labelled audience columns.")
     )
+  }
+  if (!"total" %in% audiences) {
+    issues[[length(issues) + 1L]] <- make_import_issue("warning",
+      workbook$source_file, paste0(label, " has no Total audience column; audience rollups cannot be checked."),
+      sheet_name)
   }
   bind_import_tables(issues, empty_import_issue_table())
 }
@@ -715,7 +711,7 @@ build_business_unit_visit_checks <- function(
       drop = FALSE
     ]
     component_values <- group_data$value[
-      group_data$audience %in% c("Student", "Staff", "Community")
+      group_data$audience != "Total"
     ]
     reported <- business_unit_visit_record(group_data, "Total")
     expected <- if (all(is.na(component_values))) {
