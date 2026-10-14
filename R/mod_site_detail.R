@@ -862,6 +862,101 @@ site_detail_membership_movement <- function(memberships) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Active membership mix
+# -------------------------------------------------------------------------
+
+site_detail_membership_active_mix <- function(memberships) {
+
+  empty_result <- data.frame(
+    audience = character(),
+    value = double(),
+    share = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(memberships) ||
+      !is.data.frame(memberships) ||
+      nrow(memberships) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(memberships))) {
+    return(empty_result)
+  }
+
+  valid_dates <- memberships$date[
+    !is.na(memberships$date)
+  ]
+
+  if (length(valid_dates) == 0L) {
+    return(empty_result)
+  }
+
+  latest_date <- max(valid_dates)
+
+  metric_map <- c(
+    Student = "Active Student Members",
+    Staff = "Active Staff Members",
+    Community = "Active Community Members"
+  )
+
+  values <- vapply(
+    metric_map,
+    function(metric_name) {
+
+      rows <- memberships[
+        memberships$date == latest_date &
+          memberships$metric == metric_name,
+        ,
+        drop = FALSE
+      ]
+
+      if (nrow(rows) == 0L) {
+        return(NA_real_)
+      }
+
+      site_detail_sum_available(
+        rows$value
+      )
+    },
+    double(1)
+  )
+
+  total <- if (all(is.finite(values))) {
+    sum(values)
+  } else {
+    NA_real_
+  }
+
+  shares <- if (
+    is.finite(total) &&
+      total > 0
+  ) {
+    values / total
+  } else {
+    rep(
+      NA_real_,
+      length(values)
+    )
+  }
+
+  data.frame(
+    audience = names(values),
+    value = as.numeric(values),
+    share = as.numeric(shares),
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1009,7 +1104,10 @@ mod_site_detail_ui <- function(id) {
             div(
               div(
                 class = "chart-header-title",
-                "Audience Mix"
+                uiOutput(
+                  ns("audience_title"),
+                  inline = TRUE
+                )
               ),
 
               uiOutput(
@@ -1256,6 +1354,13 @@ mod_site_detail_server <- function(
       membership_movement <- reactive({
 
         site_detail_membership_movement(
+          selected_memberships()
+        )
+      })
+
+      membership_active_mix <- reactive({
+
+        site_detail_membership_active_mix(
           selected_memberships()
         )
       })
@@ -1860,12 +1965,45 @@ mod_site_detail_server <- function(
         bg = "white"
       )
 
+      output$audience_title <- renderUI({
+
+        if (identical(input$area, "Memberships")) {
+          return("Active Member Mix")
+        }
+
+        "Audience Mix"
+      })
+
       output$audience_subtitle <- renderUI({
 
         req(
           input$year,
           input$site
         )
+
+        if (identical(input$area, "Memberships")) {
+
+          values <- membership_kpis()
+
+          latest_month <- if (
+            is.character(values$latest_month) &&
+              length(values$latest_month) > 0L &&
+              !is.na(values$latest_month)
+          ) {
+            values$latest_month
+          } else {
+            input$year
+          }
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Student, staff and community · ",
+                latest_month
+              )
+            )
+          )
+        }
 
         chart_subtitle(
           paste0(
@@ -1875,10 +2013,16 @@ mod_site_detail_server <- function(
         )
       })
 
-
       output$audience_content <- renderUI({
 
-        if (identical(input$area, "Visits")) {
+        req(input$area)
+
+        if (
+          input$area %in% c(
+            "Visits",
+            "Memberships"
+          )
+        ) {
           return(
             plotOutput(
               ns("audience_mix"),
@@ -1888,35 +2032,45 @@ mod_site_detail_server <- function(
         }
 
         placeholder_chart(
-          "Audience mix is available for Visits"
+          "Composition analysis is not yet available for this dataset"
         )
       })
-
 
       output$audience_mix <- renderPlot(
         {
 
+          req(input$area)
+
           req(
-            identical(
-              input$area,
-              "Visits"
+            input$area %in% c(
+              "Visits",
+              "Memberships"
             )
           )
 
-          audience <- audience_breakdown()
+          mix <- if (
+            identical(
+              input$area,
+              "Memberships"
+            )
+          ) {
+            membership_active_mix()
+          } else {
+            audience_breakdown()
+          }
 
           validate(
             need(
-              is.data.frame(audience) &&
-                nrow(audience) == 3L &&
-                all(is.finite(audience$value)) &&
-                all(is.finite(audience$share)),
-              "Complete audience values are not available for this selection."
+              is.data.frame(mix) &&
+                nrow(mix) == 3L &&
+                all(is.finite(mix$value)) &&
+                all(is.finite(mix$share)),
+              "Complete Student, Staff and Community values are not available for this selection."
             )
           )
 
           plot_site_detail_audience_mix(
-            audience
+            mix
           )
         },
         res = 96,
@@ -2006,6 +2160,7 @@ mod_site_detail_server <- function(
           membership_kpis = membership_kpis,
           membership_trend = membership_trend,
           membership_movement = membership_movement,
+          membership_active_mix = membership_active_mix,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
