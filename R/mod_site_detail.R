@@ -363,6 +363,120 @@ site_detail_format_visit_count <- function(value) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Monthly visit trend data
+# -------------------------------------------------------------------------
+
+site_detail_monthly_visit_totals <- function(visits) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    direct = double(),
+    indirect = double(),
+    total = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(visits) ||
+      !is.data.frame(visits) ||
+      nrow(visits) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "period_type",
+    "row_type",
+    "visit_type",
+    "audience",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(visits))) {
+    return(empty_result)
+  }
+
+  keep <-
+    visits$period_type == "Month" &
+    visits$row_type == "Total" &
+    visits$audience == "Total" &
+    visits$visit_type %in% c(
+      "Direct",
+      "Indirect"
+    ) &
+    !is.na(visits$date)
+
+  monthly <- visits[
+    !is.na(keep) & keep,
+    c(
+      "date",
+      "visit_type",
+      "value"
+    ),
+    drop = FALSE
+  ]
+
+  if (nrow(monthly) == 0L) {
+    return(empty_result)
+  }
+
+  monthly$value <- suppressWarnings(
+    as.numeric(monthly$value)
+  )
+
+  totals <- aggregate(
+    value ~ date + visit_type,
+    data = monthly,
+    FUN = site_detail_sum_available
+  )
+
+  totals <- reshape(
+    totals,
+    idvar = "date",
+    timevar = "visit_type",
+    direction = "wide"
+  )
+
+  if (!"value.Direct" %in% names(totals)) {
+    totals$value.Direct <- NA_real_
+  }
+
+  if (!"value.Indirect" %in% names(totals)) {
+    totals$value.Indirect <- NA_real_
+  }
+
+  dates <- as.Date(totals$date)
+  order_index <- order(dates)
+
+  direct <- totals$value.Direct[order_index]
+  indirect <- totals$value.Indirect[order_index]
+  dates <- dates[order_index]
+
+  data.frame(
+    date = dates,
+    month = as.integer(
+      format(dates, "%m")
+    ),
+    month_label = format(
+      dates,
+      "%b"
+    ),
+    direct = direct,
+    indirect = indirect,
+    total = ifelse(
+      is.finite(direct) &
+        is.finite(indirect),
+      direct + indirect,
+      NA_real_
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -637,6 +751,13 @@ mod_site_detail_server <- function(
       visit_kpis <- reactive({
 
         site_detail_visit_kpis(
+          selected_visits()
+        )
+      })
+
+            monthly_visits <- reactive({
+
+        site_detail_monthly_visit_totals(
           selected_visits()
         )
       })
@@ -1026,10 +1147,49 @@ mod_site_detail_server <- function(
       })
 
       output$main_content <- renderUI({
+
+        if (identical(input$area, "Visits")) {
+          return(
+            plotOutput(
+              ns("visits_over_time"),
+              height = "440px"
+            )
+          )
+        }
+
         placeholder_chart(
           titles()$main_placeholder
         )
       })
+
+
+      output$visits_over_time <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Visits"
+            )
+          )
+
+          monthly <- monthly_visits()
+
+          validate(
+            need(
+              is.data.frame(monthly) &&
+                nrow(monthly) > 0L,
+              "No monthly visit values are available for this selection."
+            )
+          )
+
+          plot_site_detail_visits_over_time(
+            monthly
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$breakdown_title <- renderUI({
         titles()$breakdown
@@ -1059,7 +1219,8 @@ mod_site_detail_server <- function(
           site = reactive(input$site),
           area = reactive(input$area),
           selected_visits = selected_visits,
-          visit_kpis = visit_kpis
+          visit_kpis = visit_kpis,
+          monthly_visits = monthly_visits
         )
       )
     }
