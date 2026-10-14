@@ -211,6 +211,158 @@ site_detail_available_areas <- function(
   names(datasets)[available]
 }
 
+# -------------------------------------------------------------------------
+# Site Detail visit calculations
+# -------------------------------------------------------------------------
+
+site_detail_sum_available <- function(values) {
+
+  values <- suppressWarnings(
+    as.numeric(values)
+  )
+
+  values <- values[
+    is.finite(values)
+  ]
+
+  if (length(values) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(values)
+}
+
+
+site_detail_visit_value <- function(
+    visits,
+    visit_type,
+    audience
+) {
+
+  if (
+    is.null(visits) ||
+      !is.data.frame(visits) ||
+      nrow(visits) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "row_type",
+    "visit_type",
+    "audience",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(visits))) {
+    return(NA_real_)
+  }
+
+  base_keep <-
+    visits$row_type == "Total" &
+    visits$visit_type == visit_type &
+    visits$audience == audience
+
+  ytd_values <- visits$value[
+    base_keep &
+      visits$period_type == "YTD"
+  ]
+
+  ytd_total <- site_detail_sum_available(
+    ytd_values
+  )
+
+  if (is.finite(ytd_total)) {
+    return(ytd_total)
+  }
+
+  monthly_values <- visits$value[
+    base_keep &
+      visits$period_type == "Month"
+  ]
+
+  site_detail_sum_available(
+    monthly_values
+  )
+}
+
+
+site_detail_visit_kpis <- function(visits) {
+
+  direct_total <- site_detail_visit_value(
+    visits,
+    visit_type = "Direct",
+    audience = "Total"
+  )
+
+  indirect_total <- site_detail_visit_value(
+    visits,
+    visit_type = "Indirect",
+    audience = "Total"
+  )
+
+  combined_value <- function(audience) {
+
+    direct <- site_detail_visit_value(
+      visits,
+      visit_type = "Direct",
+      audience = audience
+    )
+
+    indirect <- site_detail_visit_value(
+      visits,
+      visit_type = "Indirect",
+      audience = audience
+    )
+
+    if (
+      !is.finite(direct) ||
+        !is.finite(indirect)
+    ) {
+      return(NA_real_)
+    }
+
+    direct + indirect
+  }
+
+  total_visits <- if (
+    is.finite(direct_total) &&
+      is.finite(indirect_total)
+  ) {
+    direct_total + indirect_total
+  } else {
+    NA_real_
+  }
+
+  c(
+    total = total_visits,
+    direct = direct_total,
+    indirect = indirect_total,
+    student = combined_value("Student"),
+    staff = combined_value("Staff"),
+    community = combined_value("Community")
+  )
+}
+
+
+site_detail_format_visit_count <- function(value) {
+
+  if (
+    length(value) == 0L ||
+      !is.finite(value[[1L]])
+  ) {
+    return("—")
+  }
+
+  format(
+    round(value[[1L]]),
+    big.mark = ",",
+    scientific = FALSE,
+    trim = TRUE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -463,6 +615,32 @@ mod_site_detail_server <- function(
         NULL
       })
 
+      selected_visits <- reactive({
+
+        reports <- site_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        site_detail_filter_rows(
+          reports$visits,
+          year = input$year,
+          site = input$site
+        )
+      })
+
+
+      visit_kpis <- reactive({
+
+        site_detail_visit_kpis(
+          selected_visits()
+        )
+      })
+
 
       # -------------------------------------------------------------------
       # Available years
@@ -673,26 +851,61 @@ mod_site_detail_server <- function(
         switch(
           input$area,
 
-          "Visits" = list(
+          "Visits" = {
+
+            values <- visit_kpis()
+
             list(
-              title = "Total Visits",
-              value = "—",
-              subtitle = "Selected year",
-              icon = "people"
-            ),
-            list(
-              title = "Direct Visits",
-              value = "—",
-              subtitle = "Selected year",
-              icon = "arrow-right-circle"
-            ),
-            list(
-              title = "Indirect Visits",
-              value = "—",
-              subtitle = "Selected year",
-              icon = "diagram-3"
+              list(
+                title = "Total Visits",
+                value = site_detail_format_visit_count(
+                  values[["total"]]
+                ),
+                subtitle = "Direct + indirect",
+                icon = "people"
+              ),
+              list(
+                title = "Direct Visits",
+                value = site_detail_format_visit_count(
+                  values[["direct"]]
+                ),
+                subtitle = "Selected year",
+                icon = "arrow-right-circle"
+              ),
+              list(
+                title = "Indirect Visits",
+                value = site_detail_format_visit_count(
+                  values[["indirect"]]
+                ),
+                subtitle = "Selected year",
+                icon = "diagram-3"
+              ),
+              list(
+                title = "Student Visits",
+                value = site_detail_format_visit_count(
+                  values[["student"]]
+                ),
+                subtitle = "Direct + indirect",
+                icon = "mortarboard"
+              ),
+              list(
+                title = "Staff Visits",
+                value = site_detail_format_visit_count(
+                  values[["staff"]]
+                ),
+                subtitle = "Direct + indirect",
+                icon = "person-badge"
+              ),
+              list(
+                title = "Community Visits",
+                value = site_detail_format_visit_count(
+                  values[["community"]]
+                ),
+                subtitle = "Direct + indirect",
+                icon = "people-fill"
+              )
             )
-          ),
+          },
 
           "Memberships" = list(
             list(
@@ -844,7 +1057,9 @@ mod_site_detail_server <- function(
         list(
           year = reactive(input$year),
           site = reactive(input$site),
-          area = reactive(input$area)
+          area = reactive(input$area),
+          selected_visits = selected_visits,
+          visit_kpis = visit_kpis
         )
       )
     }
