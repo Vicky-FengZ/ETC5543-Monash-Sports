@@ -477,6 +477,92 @@ site_detail_monthly_visit_totals <- function(visits) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Visit activity breakdown
+# -------------------------------------------------------------------------
+
+site_detail_activity_totals <- function(visits) {
+
+  empty_result <- data.frame(
+    activity = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(visits) ||
+      !is.data.frame(visits) ||
+      nrow(visits) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "row_type",
+    "audience",
+    "activity",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(visits))) {
+    return(empty_result)
+  }
+
+  keep <-
+    visits$period_type == "Month" &
+    visits$row_type == "Activity" &
+    visits$audience == "Total" &
+    !is.na(visits$activity) &
+    nzchar(trimws(visits$activity))
+
+  activity_rows <- visits[
+    !is.na(keep) & keep,
+    c(
+      "activity",
+      "value"
+    ),
+    drop = FALSE
+  ]
+
+  if (nrow(activity_rows) == 0L) {
+    return(empty_result)
+  }
+
+  activity_rows$value <- suppressWarnings(
+    as.numeric(activity_rows$value)
+  )
+
+  activity_rows <- activity_rows[
+    is.finite(activity_rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(activity_rows) == 0L) {
+    return(empty_result)
+  }
+
+  totals <- aggregate(
+    value ~ activity,
+    data = activity_rows,
+    FUN = sum
+  )
+
+  totals <- totals[
+    order(
+      totals$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(totals) <- NULL
+
+  totals
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -638,34 +724,17 @@ mod_site_detail_ui <- function(id) {
           )
         ),
 
-          div(
-            class = "p-3",
+        col_widths = c(
+          8,
+          4
+        )
+      ),
 
-            p(
-              class = "text-secondary",
-              paste(
-                "This area can provide context for unusual monthly",
-                "movements, events, operational changes and reporting notes."
-              )
-            ),
-
-            tags$ul(
-              tags$li(
-                "Monthly highlights from the Site Report"
-              ),
-              tags$li(
-                "Operational or program changes"
-              ),
-              tags$li(
-                "Potential explanations for unusual peaks or drops"
-              )
-            )
-          )
-        ),
-
-        col_widths = c(8, 4)
+      uiOutput(
+        ns("activity_section")
       )
     )
+  )
 }
 
 
@@ -852,6 +921,12 @@ mod_site_detail_server <- function(
         )
       })
 
+      activity_breakdown <- reactive({
+
+        site_detail_activity_totals(
+          selected_visits()
+        )
+      })      
 
       # -------------------------------------------------------------------
       # Available years
@@ -1406,6 +1481,79 @@ mod_site_detail_server <- function(
         bg = "white"
       )
 
+      output$activity_section <- renderUI({
+
+        if (!identical(input$area, "Visits")) {
+          return(NULL)
+        }
+
+        activities <- activity_breakdown()
+
+        chart_height <- max(
+          380,
+          nrow(activities) * 42
+        )
+
+        card(
+          full_screen = TRUE,
+
+          card_header(
+            div(
+              div(
+                class = "chart-header-title",
+                "Visits by Activity"
+              ),
+
+              chart_subtitle(
+                paste0(
+                  "Direct + indirect · ",
+                  input$site,
+                  " · ",
+                  input$year
+                )
+              )
+            )
+          ),
+
+          plotOutput(
+            ns("activity_breakdown"),
+            height = paste0(
+              chart_height,
+              "px"
+            )
+          )
+        )
+      })
+
+
+      output$activity_breakdown <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Visits"
+            )
+          )
+
+          activities <- activity_breakdown()
+
+          validate(
+            need(
+              is.data.frame(activities) &&
+                nrow(activities) > 0L,
+              "No activity-level visit values are available for this selection."
+            )
+          )
+
+          plot_site_detail_activity_breakdown(
+            activities
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
+
       invisible(
         list(
           year = reactive(input$year),
@@ -1415,7 +1563,8 @@ mod_site_detail_server <- function(
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
-          audience_breakdown = audience_breakdown
+          audience_breakdown = audience_breakdown,
+          activity_breakdown = activity_breakdown
         )
       )
     }

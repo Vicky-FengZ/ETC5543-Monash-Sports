@@ -4569,3 +4569,168 @@ plot_site_detail_audience_mix <- function(audience_mix) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Site Detail Visits by Activity
+# -------------------------------------------------------------------------
+
+plot_site_detail_activity_breakdown <- function(activity_data) {
+
+  if (
+    is.null(activity_data) ||
+      !is.data.frame(activity_data) ||
+      nrow(activity_data) == 0L
+  ) {
+    stop(
+      "No activity visit values are available.",
+      call. = FALSE
+    )
+  }
+
+  labels <- trimws(
+    as.character(
+      activity_data$activity
+    )
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      activity_data$value
+    )
+  )
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(values)
+
+  labels <- labels[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No complete activity visit values are available.",
+      call. = FALSE
+    )
+  }
+
+  # Horizontal barplots place the last row at the top.
+  order_index <- order(
+    values,
+    decreasing = FALSE
+  )
+
+  labels <- labels[order_index]
+  values <- values[order_index]
+
+  wrapped_labels <- vapply(
+    labels,
+    function(label) {
+      paste(
+        strwrap(
+          label,
+          width = 24
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  x_limit <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.18
+  }
+
+  old_par <- par(
+    mar = c(
+      4.5,
+      9,
+      2,
+      1.5
+    ),
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    names.arg = wrapped_labels,
+    horiz = TRUE,
+    las = 1,
+    cex.names = 0.76,
+    border = NA,
+    col = "#2563EB",
+    axes = FALSE,
+    xlim = c(0, x_limit)
+  )
+
+  x_ticks <- pretty(
+    c(0, max_value),
+    n = 5
+  )
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    names.arg = wrapped_labels,
+    horiz = TRUE,
+    las = 1,
+    cex.names = 0.76,
+    border = NA,
+    col = "#2563EB",
+    axes = FALSE,
+    xlim = c(0, x_limit),
+    add = TRUE
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format(
+      round(x_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    tick = FALSE,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  label_offset <- x_limit * 0.015
+
+  text(
+    values + label_offset,
+    positions,
+    labels = format(
+      round(values),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    pos = 4,
+    cex = 0.72,
+    col = "#475569",
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
