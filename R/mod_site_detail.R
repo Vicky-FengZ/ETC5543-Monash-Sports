@@ -2,6 +2,215 @@
 # Site Detail module
 # -------------------------------------------------------------------------
 
+# -------------------------------------------------------------------------
+# Site Detail data helpers
+# -------------------------------------------------------------------------
+
+site_detail_filter_rows <- function(
+    data,
+    year = NULL,
+    site = NULL
+) {
+
+  if (
+    is.null(data) ||
+      !is.data.frame(data) ||
+      nrow(data) == 0L
+  ) {
+    return(data)
+  }
+
+  keep <- rep(TRUE, nrow(data))
+
+  if (
+    !is.null(year) &&
+      length(year) > 0L
+  ) {
+
+    selected_year <- suppressWarnings(
+      as.integer(year[[1L]])
+    )
+
+    if (
+      !is.na(selected_year) &&
+        "report_year" %in% names(data)
+    ) {
+      keep <- keep &
+        data$report_year == selected_year
+    }
+  }
+
+  if (
+    !is.null(site) &&
+      length(site) > 0L &&
+      nzchar(as.character(site[[1L]]))
+  ) {
+
+    key <- facility_site_key(
+      as.character(site[[1L]])
+    )
+
+    if (
+      is.null(key) ||
+        !all(
+          c(
+            "report_unit",
+            "campus"
+          ) %in% names(data)
+        )
+    ) {
+      return(
+        data[0, , drop = FALSE]
+      )
+    }
+
+    keep <- keep &
+      data$report_unit == key$report_unit &
+      data$campus == key$campus
+  }
+
+  data[
+    !is.na(keep) & keep,
+    ,
+    drop = FALSE
+  ]
+}
+
+
+site_detail_available_years <- function(
+    site_reports
+) {
+
+  if (
+    is.null(site_reports) ||
+      !is.list(site_reports)
+  ) {
+    return(integer())
+  }
+
+  tables <- lapply(
+    c(
+      "visits",
+      "memberships",
+      "enrollments"
+    ),
+    function(name) {
+      site_reports[[name]]
+    }
+  )
+
+  years <- unlist(
+    lapply(
+      tables,
+      function(data) {
+
+        if (
+          is.null(data) ||
+            !is.data.frame(data) ||
+            !"report_year" %in% names(data)
+        ) {
+          return(integer())
+        }
+
+        as.integer(data$report_year)
+      }
+    ),
+    use.names = FALSE
+  )
+
+  sort(
+    unique(
+      years[
+        !is.na(years)
+      ]
+    )
+  )
+}
+
+
+site_detail_available_sites <- function(
+    site_reports,
+    year = NULL
+) {
+
+  if (
+    is.null(site_reports) ||
+      !is.list(site_reports)
+  ) {
+    return(character())
+  }
+
+  SITE_NAMES[
+    vapply(
+      SITE_NAMES,
+      function(site) {
+
+        any(
+          vapply(
+            c(
+              "visits",
+              "memberships",
+              "enrollments"
+            ),
+            function(name) {
+
+              data <- site_detail_filter_rows(
+                site_reports[[name]],
+                year = year,
+                site = site
+              )
+
+              is.data.frame(data) &&
+                nrow(data) > 0L
+            },
+            logical(1)
+          )
+        )
+      },
+      logical(1)
+    )
+  ]
+}
+
+
+site_detail_available_areas <- function(
+    site_reports,
+    year = NULL,
+    site = NULL
+) {
+
+  if (
+    is.null(site_reports) ||
+      !is.list(site_reports)
+  ) {
+    return(character())
+  }
+
+  datasets <- c(
+    Visits = "visits",
+    Memberships = "memberships",
+    Enrolments = "enrollments"
+  )
+
+  available <- vapply(
+    datasets,
+    function(name) {
+
+      data <- site_detail_filter_rows(
+        site_reports[[name]],
+        year = year,
+        site = site
+      )
+
+      is.data.frame(data) &&
+        nrow(data) > 0L
+    },
+    logical(1)
+  )
+
+  names(datasets)[available]
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -24,51 +233,56 @@ mod_site_detail_ui <- function(id) {
         )
       ),
 
-      # Primary controls: choose the report year, site and analysis area.
-      # Analysis-area choices will eventually come from detected workbook sheets.
+      # Site Detail controls are populated from uploaded Detailed Site Reports.
       div(
         class = "filter-bar",
 
         div(
           class = "filter-section-title",
-          "Site report detail"
+          "Participation detail"
         ),
 
         layout_columns(
-
+          
           selectInput(
             ns("year"),
             "Year",
-            choices = SITE_DETAIL_YEARS,
-            selected = max(SITE_DETAIL_YEARS)
+            choices = character()
           ),
 
           selectInput(
             ns("site"),
             "Site",
-            choices = SITE_NAMES,
-            selected = SITE_NAMES[[1]]
+            choices = character()
           ),
 
-          selectInput(
-            ns("area"),
-            "Analysis area",
-            choices = prototype_site_detail_areas(
-              SITE_NAMES[[1]]
-            ),
-            selected = "Finance"
-          ),
-
-          col_widths = c(3, 4, 4)
+          col_widths = c(
+            4,
+            8
+          )
         ),
 
-        tags$small(
-          class = "text-secondary",
-          paste(
-            "Available analysis areas will eventually be detected",
-            "from the uploaded Site Report."
-          )
+        uiOutput(
+          ns("availability_note")
         )
+      ),
+
+      div(
+        class = "section-heading-custom",
+
+        h4(
+          class = "mb-1",
+          "Participation Analysis"
+        ),
+
+        p(
+          class = "text-secondary mb-2",
+          "Choose the participation dataset to explore."
+        )
+      ),
+
+      uiOutput(
+        ns("area_tabs")
       ),
 
       # Dynamic focus heading confirms the current Year / Site / Area.
@@ -187,26 +401,237 @@ mod_site_detail_server <- function(
     id,
     function(input, output, session) {
 
-      # Prototype availability rule: different sites expose different areas.
-      # Later this should be driven by the sheets found in the uploaded file.
-      observeEvent(
-        input$site,
-        {
-          req(input$site)
+      ns <- session$ns
 
-          choices <- prototype_site_detail_areas(
-            input$site
+      # -------------------------------------------------------------------
+      # Detailed Site Report data
+      # -------------------------------------------------------------------
+
+      site_reports <- reactive({
+
+        if (is.null(data)) {
+          return(NULL)
+        }
+
+        dashboard_data <- if (
+          shiny::is.reactive(data)
+        ) {
+          data()
+        } else {
+          data
+        }
+
+        if (is.null(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data,
+            "business_unit_template_report_data"
           )
+        ) {
+          return(dashboard_data)
+        }
+
+        if (!is.list(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data$site_reports,
+            "business_unit_template_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$site_reports
+          )
+        }
+
+        if (
+          inherits(
+            dashboard_data$sites,
+            "business_unit_template_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$sites
+          )
+        }
+
+        NULL
+      })
+
+
+      # -------------------------------------------------------------------
+      # Available years
+      # -------------------------------------------------------------------
+
+      observeEvent(
+        site_reports(),
+        {
+
+          years <- site_detail_available_years(
+            site_reports()
+          )
+
+          selected_year <- if (
+            length(years) > 0L
+          ) {
+            as.character(max(years))
+          } else {
+            character()
+          }
 
           updateSelectInput(
             session,
-            "area",
-            choices = choices,
-            selected = choices[[1]]
+            "year",
+            choices = years,
+            selected = selected_year
           )
         },
-        ignoreInit = TRUE
+        ignoreInit = FALSE
       )
+
+
+      # -------------------------------------------------------------------
+      # Available sites for selected year
+      # -------------------------------------------------------------------
+
+      observeEvent(
+        list(
+          site_reports(),
+          input$year
+        ),
+        {
+
+          sites <- site_detail_available_sites(
+            site_reports(),
+            year = input$year
+          )
+
+          selected_site <- if (
+            !is.null(input$site) &&
+              input$site %in% sites
+          ) {
+            input$site
+          } else if (length(sites) > 0L) {
+            sites[[1L]]
+          } else {
+            character()
+          }
+
+          updateSelectInput(
+            session,
+            "site",
+            choices = sites,
+            selected = selected_site
+          )
+        },
+        ignoreInit = FALSE
+      )
+
+      # -------------------------------------------------------------------
+      # Available participation views
+      # -------------------------------------------------------------------
+
+      output$area_tabs <- renderUI({
+
+        reports <- site_reports()
+
+        if (is.null(reports)) {
+          return(NULL)
+        }
+
+        areas <- site_detail_available_areas(
+          reports,
+          year = input$year,
+          site = input$site
+        )
+
+        if (length(areas) == 0L) {
+          return(NULL)
+        }
+
+        current_area <- isolate(
+          input$area
+        )
+
+        selected_area <- if (
+          !is.null(current_area) &&
+            current_area %in% areas
+        ) {
+          current_area
+        } else if ("Visits" %in% areas) {
+          "Visits"
+        } else {
+          areas[[1L]]
+        }
+
+        tabs <- lapply(
+          areas,
+          function(area) {
+
+            nav_panel(
+              area,
+              value = area,
+              div()
+            )
+          }
+        )
+
+        do.call(
+          navset_pill,
+          c(
+            list(
+              id = ns("area"),
+              selected = selected_area
+            ),
+            tabs
+          )
+        )
+      })
+
+      output$availability_note <- renderUI({
+
+        reports <- site_reports()
+
+        if (is.null(reports)) {
+          return(
+            tags$small(
+              class = "text-secondary",
+              "Upload Detailed Site Reports on the Data page to activate this analysis."
+            )
+          )
+        }
+
+        areas <- site_detail_available_areas(
+          reports,
+          year = input$year,
+          site = input$site
+        )
+
+        if (length(areas) == 0L) {
+          return(
+            tags$small(
+              class = "text-secondary",
+              "No participation data is available for this selection."
+            )
+          )
+        }
+
+        tags$small(
+          class = "text-secondary",
+          paste0(
+            "Available from uploaded reports: ",
+            paste(
+              areas,
+              collapse = ", "
+            )
+          )
+        )
+      })
 
       output$focus_heading <- renderUI({
 
@@ -217,12 +642,11 @@ mod_site_detail_server <- function(
         )
 
         div(
-          class = "snapshot-heading",
+          class = "section-heading-custom",
 
           h4(
+            class = "mb-1",
             paste0(
-              input$year,
-              " · ",
               input$site,
               " · ",
               input$area
@@ -230,15 +654,18 @@ mod_site_detail_server <- function(
           ),
 
           p(
-            "Month-by-month detail from the selected Site Report."
-          ),
-
-          prototype_note()
+            class = "mb-0 text-secondary",
+            paste(
+              input$year,
+              "· Participation detail from the selected Detailed Site Report."
+            )
+          )
         )
       })
 
       # Defines the KPI layout for each analysis area.
       # Values are placeholders; only the structure changes at this stage.
+
       kpi_specs <- reactive({
 
         req(input$area)
@@ -246,112 +673,70 @@ mod_site_detail_server <- function(
         switch(
           input$area,
 
-          "Finance" = list(
+          "Visits" = list(
             list(
-              title = "YTD Actual",
-              value = "$1.24M",
-              subtitle = "Current year actual",
-              icon = "graph-up-arrow"
+              title = "Total Visits",
+              value = "—",
+              subtitle = "Selected year",
+              icon = "people"
             ),
             list(
-              title = "YTD Budget",
-              value = "$1.18M",
-              subtitle = "Current year budget",
-              icon = "clipboard-data"
+              title = "Direct Visits",
+              value = "—",
+              subtitle = "Selected year",
+              icon = "arrow-right-circle"
             ),
-            list(
-              title = "Variance",
-              value = "+5.1%",
-              subtitle = "Actual vs budget",
-              icon = "arrow-up-right"
-            )
-          ),
-
-          "Direct Visits" = list(
-            list(
-              title = "Total Direct Visits",
-              value = "128K",
-              subtitle = "Year-to-date",
-              icon = "graph-up-arrow"
-            ),
-            list(
-              title = "Student Share",
-              value = "54%",
-              subtitle = "Placeholder audience mix",
-              icon = "bar-chart-line"
-            ),
-            list(
-              title = "Community Share",
-              value = "31%",
-              subtitle = "Placeholder audience mix",
-              icon = "bar-chart-line"
-            )
-          ),
-
-          "Indirect Visits" = list(
             list(
               title = "Indirect Visits",
-              value = "42K",
-              subtitle = "Year-to-date",
-              icon = "graph-up-arrow"
-            ),
-            list(
-              title = "Largest Activity",
               value = "—",
-              subtitle = "Placeholder",
-              icon = "bar-chart-line"
-            ),
-            list(
-              title = "Change",
-              value = "+4.8%",
-              subtitle = "Placeholder",
-              icon = "arrow-up-right"
+              subtitle = "Selected year",
+              icon = "diagram-3"
             )
           ),
 
           "Memberships" = list(
             list(
-              title = "Active Members",
-              value = "4,820",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
+              title = "Memberships",
+              value = "—",
+              subtitle = "Latest available period",
+              icon = "people"
             ),
             list(
-              title = "New Members",
-              value = "640",
-              subtitle = "Placeholder",
-              icon = "clipboard-data"
+              title = "Count Measures",
+              value = "—",
+              subtitle = "Available membership measures",
+              icon = "bar-chart"
             ),
             list(
-              title = "Expiring",
-              value = "520",
-              subtitle = "Placeholder",
+              title = "Reporting Months",
+              value = "—",
+              subtitle = "Available periods",
               icon = "calendar3"
             )
           ),
 
           "Enrolments" = list(
             list(
-              title = "Total Enrolments",
-              value = "6,340",
-              subtitle = "Placeholder",
+              title = "Enrolments",
+              value = "—",
+              subtitle = "Selected year",
               icon = "clipboard-data"
             ),
             list(
-              title = "Student",
-              value = "3,920",
-              subtitle = "Placeholder",
-              icon = "bar-chart-line"
+              title = "Available Measures",
+              value = "—",
+              subtitle = "Enrolment measures",
+              icon = "bar-chart"
             ),
             list(
-              title = "Community",
-              value = "1,860",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
+              title = "Reporting Months",
+              value = "—",
+              subtitle = "Available periods",
+              icon = "calendar3"
             )
           ),
 
-          "Monthly Highlights" = NULL
+          NULL
         )
       })
 
@@ -378,46 +763,31 @@ mod_site_detail_server <- function(
         switch(
           input$area,
 
-          "Finance" = list(
-            main = "Monthly Financial Performance",
-            breakdown = "Budget vs Actual Breakdown",
-            main_placeholder = "January–December financial trend",
-            breakdown_placeholder = "Break down actual and budget performance"
-          ),
-
-          "Direct Visits" = list(
-            main = "Monthly Direct Visits",
-            breakdown = "Visit Type Breakdown",
-            main_placeholder = "January–December direct visit trend",
-            breakdown_placeholder = "Compare visit categories and audience groups"
-          ),
-
-          "Indirect Visits" = list(
-            main = "Monthly Indirect Visits",
-            breakdown = "Activity Breakdown",
-            main_placeholder = "January–December indirect visit trend",
-            breakdown_placeholder = "Compare indirect visit activities"
+          "Visits" = list(
+            main = "Visits Over Time",
+            breakdown = "Visits Breakdown",
+            main_placeholder =
+              "Monthly Direct and Indirect Visits",
+            breakdown_placeholder =
+              "Audience and activity breakdown"
           ),
 
           "Memberships" = list(
-            main = "Monthly Membership Movement",
-            breakdown = "Membership Mix",
-            main_placeholder = "Active, new and expiring membership trends",
-            breakdown_placeholder = "Compare membership categories"
+            main = "Memberships Over Time",
+            breakdown = "Membership Breakdown",
+            main_placeholder =
+              "Monthly membership measures",
+            breakdown_placeholder =
+              "Membership counts and shares"
           ),
 
           "Enrolments" = list(
-            main = "Monthly Enrolments",
-            breakdown = "Enrolment Mix",
-            main_placeholder = "January–December enrolment trend",
-            breakdown_placeholder = "Compare enrolment categories"
-          ),
-
-          "Monthly Highlights" = list(
-            main = "Monthly Highlights Timeline",
-            breakdown = "Highlight Categories",
-            main_placeholder = "Operational highlights across January–December",
-            breakdown_placeholder = "Summarise the types of events and operational notes"
+            main = "Enrolments Over Time",
+            breakdown = "Enrolment Breakdown",
+            main_placeholder =
+              "Monthly enrolment measures",
+            breakdown_placeholder =
+              "Enrolment measure breakdown"
           )
         )
       })
