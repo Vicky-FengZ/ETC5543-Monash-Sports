@@ -4360,3 +4360,212 @@ plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Site Detail Audience Mix
+# -------------------------------------------------------------------------
+
+plot_site_detail_audience_mix <- function(audience_mix) {
+
+  if (
+    is.null(audience_mix) ||
+      !is.data.frame(audience_mix) ||
+      nrow(audience_mix) == 0L
+  ) {
+    stop(
+      "No audience values are available.",
+      call. = FALSE
+    )
+  }
+
+  labels <- as.character(
+    audience_mix$audience
+  )
+
+  values <- suppressWarnings(
+    as.numeric(audience_mix$value)
+  )
+
+  shares <- suppressWarnings(
+    as.numeric(audience_mix$share)
+  )
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(values) &
+    is.finite(shares)
+
+  labels <- labels[keep]
+  values <- values[keep]
+  shares <- shares[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No complete audience values are available.",
+      call. = FALSE
+    )
+  }
+
+  # Keep a consistent audience order.
+  audience_order <- c(
+    "Student",
+    "Staff",
+    "Community"
+  )
+
+  order_index <- match(
+    audience_order,
+    labels
+  )
+
+  order_index <- order_index[
+    !is.na(order_index)
+  ]
+
+  labels <- labels[order_index]
+  values <- values[order_index]
+  shares <- shares[order_index]
+
+  colours <- c(
+    Student = "#2563EB",
+    Staff = "#0F766E",
+    Community = "#F59E0B"
+  )
+
+  bar_colours <- colours[labels]
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  y_limit <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.28
+  }
+
+  old_par <- par(
+    mar = c(
+      4.8,
+      5.2,
+      2.5,
+      1.2
+    ),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    plot = FALSE,
+    space = 0.55
+  )
+
+  x_limits <- range(positions) +
+    c(-0.75, 0.75)
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_limit),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, max_value),
+    n = 4
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_limit
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    col = bar_colours,
+    border = NA,
+    axes = FALSE,
+    axisnames = FALSE,
+    space = 0.55,
+    add = TRUE
+  )
+
+  axis(
+    1,
+    at = positions,
+    labels = labels,
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#475569",
+    cex.axis = 0.82
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.78
+  )
+
+  value_labels <- paste0(
+    format(
+      round(values),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    "\n",
+    sprintf(
+      "%.1f%%",
+      100 * shares
+    )
+  )
+
+  label_y <- ifelse(
+    values > 0,
+    values + y_limit * 0.025,
+    y_limit * 0.025
+  )
+
+  text(
+    positions,
+    label_y,
+    labels = value_labels,
+    pos = 3,
+    offset = 0.15,
+    cex = 0.72,
+    col = "#475569",
+    xpd = NA
+  )
+
+  invisible(NULL)
+}

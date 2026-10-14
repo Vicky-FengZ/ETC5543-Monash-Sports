@@ -618,9 +618,25 @@ mod_site_detail_ui <- function(id) {
         ),
 
         card(
+          full_screen = TRUE,
+
           card_header(
-            "Context & Notes"
+            div(
+              div(
+                class = "chart-header-title",
+                "Audience Mix"
+              ),
+
+              uiOutput(
+                ns("audience_subtitle")
+              )
+            )
           ),
+
+          uiOutput(
+            ns("audience_content")
+          )
+        ),
 
           div(
             class = "p-3",
@@ -650,7 +666,6 @@ mod_site_detail_ui <- function(id) {
         col_widths = c(8, 4)
       )
     )
-  )
 }
 
 
@@ -792,6 +807,46 @@ mod_site_detail_server <- function(
         data.frame(
           visit_type = names(visit_values),
           value = as.numeric(visit_values),
+          share = as.numeric(shares),
+          stringsAsFactors = FALSE
+        )
+      })
+
+      audience_breakdown <- reactive({
+
+        values <- visit_kpis()
+
+        audience_values <- c(
+          Student = values[["student"]],
+          Staff = values[["staff"]],
+          Community = values[["community"]]
+        )
+
+        complete <- all(
+          is.finite(audience_values)
+        )
+
+        total <- if (complete) {
+          sum(audience_values)
+        } else {
+          NA_real_
+        }
+
+        shares <- if (
+          is.finite(total) &&
+            total > 0
+        ) {
+          audience_values / total
+        } else {
+          rep(
+            NA_real_,
+            length(audience_values)
+          )
+        }
+
+        data.frame(
+          audience = names(audience_values),
+          value = as.numeric(audience_values),
           share = as.numeric(shares),
           stringsAsFactors = FALSE
         )
@@ -1288,6 +1343,69 @@ mod_site_detail_server <- function(
         bg = "white"
       )
 
+      output$audience_subtitle <- renderUI({
+
+        req(
+          input$year,
+          input$site
+        )
+
+        chart_subtitle(
+          paste0(
+            "Student, staff and community · ",
+            input$year
+          )
+        )
+      })
+
+
+      output$audience_content <- renderUI({
+
+        if (identical(input$area, "Visits")) {
+          return(
+            plotOutput(
+              ns("audience_mix"),
+              height = "360px"
+            )
+          )
+        }
+
+        placeholder_chart(
+          "Audience mix is available for Visits"
+        )
+      })
+
+
+      output$audience_mix <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Visits"
+            )
+          )
+
+          audience <- audience_breakdown()
+
+          validate(
+            need(
+              is.data.frame(audience) &&
+                nrow(audience) == 3L &&
+                all(is.finite(audience$value)) &&
+                all(is.finite(audience$share)),
+              "Complete audience values are not available for this selection."
+            )
+          )
+
+          plot_site_detail_audience_mix(
+            audience
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
+
       invisible(
         list(
           year = reactive(input$year),
@@ -1296,7 +1414,8 @@ mod_site_detail_server <- function(
           selected_visits = selected_visits,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
-          visit_type_breakdown = visit_type_breakdown
+          visit_type_breakdown = visit_type_breakdown,
+          audience_breakdown = audience_breakdown
         )
       )
     }
