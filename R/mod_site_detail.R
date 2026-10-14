@@ -563,6 +563,130 @@ site_detail_activity_totals <- function(visits) {
   totals
 }
 
+# -------------------------------------------------------------------------
+# Membership calculations
+# -------------------------------------------------------------------------
+
+site_detail_latest_membership_value <- function(
+    memberships,
+    metric
+) {
+
+  if (
+    is.null(memberships) ||
+      !is.data.frame(memberships) ||
+      nrow(memberships) == 0L ||
+      !"date" %in% names(memberships) ||
+      !"metric" %in% names(memberships) ||
+      !"value" %in% names(memberships)
+  ) {
+    return(NA_real_)
+  }
+
+  rows <- memberships[
+    memberships$metric == metric &
+      !is.na(memberships$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  latest_date <- max(
+    rows$date,
+    na.rm = TRUE
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      rows$value[
+        rows$date == latest_date
+      ]
+    )
+  )
+
+  values <- values[
+    is.finite(values)
+  ]
+
+  if (length(values) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(values)
+}
+
+
+site_detail_membership_kpis <- function(memberships) {
+
+  if (
+    is.null(memberships) ||
+      !is.data.frame(memberships) ||
+      nrow(memberships) == 0L
+  ) {
+    return(
+      list(
+        total_active = NA_real_,
+        new_members = NA_real_,
+        expired_cancelled = NA_real_,
+        reporting_months = 0L,
+        latest_month = NA_character_
+      )
+    )
+  }
+
+  valid_dates <- memberships$date[
+    !is.na(memberships$date)
+  ]
+
+  latest_date <- if (length(valid_dates) > 0L) {
+    max(valid_dates)
+  } else {
+    as.Date(NA)
+  }
+
+  list(
+    total_active =
+      site_detail_latest_membership_value(
+        memberships,
+        "Total Active"
+      ),
+
+    new_members =
+      site_detail_latest_membership_value(
+        memberships,
+        "New Members"
+      ),
+
+    expired_cancelled =
+      site_detail_latest_membership_value(
+        memberships,
+        "Expired/Cancelled"
+      ),
+
+    reporting_months =
+      length(
+        unique(
+          memberships$month[
+            !is.na(memberships$month)
+          ]
+        )
+      ),
+
+    latest_month =
+      if (!is.na(latest_date)) {
+        format(
+          latest_date,
+          "%b %Y"
+        )
+      } else {
+        NA_character_
+      }
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -921,6 +1045,32 @@ mod_site_detail_server <- function(
         )
       })
 
+      selected_memberships <- reactive({
+
+        reports <- site_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        site_detail_filter_rows(
+          reports$memberships,
+          year = input$year,
+          site = input$site
+        )
+      })
+
+
+      membership_kpis <- reactive({
+
+        site_detail_membership_kpis(
+          selected_memberships()
+        )
+      })
+
       activity_breakdown <- reactive({
 
         site_detail_activity_totals(
@@ -1193,26 +1343,55 @@ mod_site_detail_server <- function(
             )
           },
 
-          "Memberships" = list(
+          "Memberships" = {
+
+            values <- membership_kpis()
+
+            latest_month <- if (
+              is.character(values$latest_month) &&
+                length(values$latest_month) > 0L &&
+                !is.na(values$latest_month)
+            ) {
+              values$latest_month
+            } else {
+              "Latest available month"
+            }
+
             list(
-              title = "Memberships",
-              value = "—",
-              subtitle = "Latest available period",
-              icon = "people"
-            ),
-            list(
-              title = "Count Measures",
-              value = "—",
-              subtitle = "Available membership measures",
-              icon = "bar-chart"
-            ),
-            list(
-              title = "Reporting Months",
-              value = "—",
-              subtitle = "Available periods",
-              icon = "calendar3"
+              list(
+                title = "Total Active",
+                value = site_detail_format_visit_count(
+                  values$total_active
+                ),
+                subtitle = latest_month,
+                icon = "people"
+              ),
+              list(
+                title = "New Members",
+                value = site_detail_format_visit_count(
+                  values$new_members
+                ),
+                subtitle = latest_month,
+                icon = "person-plus"
+              ),
+              list(
+                title = "Expired / Cancelled",
+                value = site_detail_format_visit_count(
+                  values$expired_cancelled
+                ),
+                subtitle = latest_month,
+                icon = "person-dash"
+              ),
+              list(
+                title = "Reporting Months",
+                value = as.character(
+                  values$reporting_months
+                ),
+                subtitle = "Available periods",
+                icon = "calendar3"
+              )
             )
-          ),
+          },
 
           "Enrolments" = list(
             list(
@@ -1560,6 +1739,8 @@ mod_site_detail_server <- function(
           site = reactive(input$site),
           area = reactive(input$area),
           selected_visits = selected_visits,
+          selected_memberships = selected_memberships,
+          membership_kpis = membership_kpis,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,

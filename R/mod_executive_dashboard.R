@@ -490,6 +490,7 @@ executive_visual_card_ui <- function(
 executive_visual_grid_ui <- function(
     visual_ids,
     context_label = NULL,
+    context_label_overrides = NULL,
     ns
 ) {
 
@@ -505,7 +506,7 @@ executive_visual_grid_ui <- function(
   ]
 
   # Nothing at all has been selected.
-  if (length(all_visual_ids) == 0L) {
+  if (length(all_visual_ids) == 0L) { 
 
     return(
       div(
@@ -535,7 +536,7 @@ executive_visual_grid_ui <- function(
   # Keep only graph-type components for the graph grid.
   graph_ids <- all_visual_ids[
     vapply(
-      all_visual_ids,
+      all_visual_ids, 
       function(visual_id) {
 
         identical(
@@ -562,9 +563,22 @@ executive_visual_grid_ui <- function(
         graph_ids,
         function(visual_id) {
 
+          visual_context_label <-
+            context_label
+
+          if (
+            !is.null(context_label_overrides) &&
+              visual_id %in%
+                names(context_label_overrides)
+          ) {
+
+            visual_context_label <-
+              context_label_overrides[[visual_id]]
+          }
+
           executive_visual_card_ui(
             visual_id = visual_id,
-            context_label = context_label,
+            context_label = visual_context_label,
             ns = ns
           )
         }
@@ -857,7 +871,8 @@ mod_executive_dashboard_ui <- function(id) {
                     2,
                     4
                   )
-                ),
+                )
+              ),
                 
               # KPI strip -------------------------------------------------
               
@@ -998,7 +1013,6 @@ mod_executive_dashboard_ui <- function(id) {
         )
       )
     )
-  )
   }
 
 mod_executive_dashboard_server <- function(
@@ -1253,6 +1267,100 @@ mod_executive_dashboard_server <- function(
         ]
       })
 
+      # -------------------------------------------------------------------
+      # Executive all-site snapshot data
+      # -------------------------------------------------------------------
+
+      executive_snapshot_year <- reactive({
+
+        context <- executive_context()
+
+        year <-
+          suppressWarnings(
+            as.integer(
+              context$year
+            )
+          )
+
+        if (
+          length(year) == 0L ||
+            is.na(year[[1L]])
+        ) {
+          return(NA_integer_)
+        }
+
+        year[[1L]]
+      })
+
+
+      executive_site_snapshot_finance <- reactive({
+
+        x <-
+          calculate_site_annual_finance(
+            executive_monthly_reports()
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[0, , drop = FALSE]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
+
+      executive_site_snapshot_revenue <- reactive({
+
+        x <-
+          calculate_site_annual_revenue(
+            executive_monthly_reports()
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[0, , drop = FALSE]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
+
+      executive_site_snapshot_discounts <- reactive({
+
+        x <-
+          calculate_site_annual_discounts(
+            executive_monthly_reports()
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[0, , drop = FALSE]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
       validate_executive_monthly_data <- function(
           x
       ) {
@@ -1294,6 +1402,49 @@ mod_executive_dashboard_server <- function(
               "No finance data is available",
               "for the selected Executive Dashboard context."
             )
+          )
+        )
+      }
+
+      validate_executive_site_snapshot_data <- function(
+          x,
+          empty_message
+      ) {
+
+        reports <-
+          executive_monthly_reports()
+
+        duplicate_years <-
+          overview_duplicate_report_years(
+            reports
+          )
+
+        validate(
+          need(
+            !is.null(reports),
+            paste(
+              "Upload at least one Monthly Site Report",
+              "on the Data page."
+            )
+          ),
+
+          need(
+            length(
+              duplicate_years
+            ) == 0L,
+            paste0(
+              "More than one Monthly Site Report is active for: ",
+              paste(
+                duplicate_years,
+                collapse = ", "
+              ),
+              ". Delete the superseded file on the Data page."
+            )
+          ),
+
+          need(
+            nrow(x) > 0L,
+            empty_message
           )
         )
       }
@@ -1518,6 +1669,156 @@ mod_executive_dashboard_server <- function(
           res = 96,
           bg = "white"
         )
+      
+      # -------------------------------------------------------------------
+      # Executive Site Comparison plots
+      # -------------------------------------------------------------------
+
+      output$executive_plot_site_ranking <-
+        renderPlot(
+          {
+
+            x <-
+              executive_site_snapshot_finance()
+
+            validate_executive_site_snapshot_data(
+              x,
+              paste(
+                "No site finance data is available",
+                "for the selected year."
+              )
+            )
+
+            metric <-
+              input$metric_site_ranking
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            values <-
+              site_finance_values(
+                x,
+                metric,
+                "Actual"
+              )
+
+            validate(
+              need(
+                any(
+                  is.finite(values)
+                ),
+                paste(
+                  "No Actual",
+                  metric,
+                  "values are available for the selected year."
+                )
+              )
+            )
+
+            plot_site_ranking(
+              x,
+              metric
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_site_revenue_opportunity <-
+        renderPlot(
+          {
+
+            x <-
+              executive_site_snapshot_revenue()
+
+            validate_executive_site_snapshot_data(
+              x,
+              paste(
+                "No site revenue opportunity data is available",
+                "for the selected year."
+              )
+            )
+
+            complete <-
+              is.finite(
+                x$actual_income
+              ) &
+              is.finite(
+                x$discount_opportunity
+              ) &
+              is.finite(
+                x$potential_revenue
+              )
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "No complete revenue opportunity values",
+                  "are available for the selected year."
+                )
+              )
+            )
+
+            plot_site_revenue_opportunity(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_site_discount_mix <-
+        renderPlot(
+          {
+
+            x <-
+              executive_site_snapshot_discounts()
+
+            validate_executive_site_snapshot_data(
+              x,
+              paste(
+                "No site discount data is available",
+                "for the selected year."
+              )
+            )
+
+            complete <-
+              is.finite(
+                x$student_discount
+              ) &
+              is.finite(
+                x$staff_discount
+              ) &
+              is.finite(
+                x$other_discount
+              ) &
+              is.finite(
+                x$total_discount
+              ) &
+              x$total_discount > 0
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "No complete discount mix values",
+                  "are available for the selected year."
+                )
+              )
+            )
+
+            plot_site_discount_mix(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
 
       # -------------------------------------------------------------------
       # Dynamic Finance visual grid
@@ -1542,11 +1843,52 @@ mod_executive_dashboard_server <- function(
               context$comparison_year
           )
 
+
+        # Cross-site comparison visuals intentionally use all sites.
+        site_snapshot_mode <- if (
+          identical(
+            context$view_mode,
+            "Comparison"
+          )
+        ) {
+          "Comparison snapshot"
+        } else {
+          "Year Review"
+        }
+
+
+        site_snapshot_label <-
+          paste(
+            site_snapshot_mode,
+            context$year,
+            "All Sites",
+            sep = " · "
+          )
+
+
+        context_label_overrides <-
+          c(
+            site_ranking =
+              site_snapshot_label,
+
+            site_revenue_opportunity =
+              site_snapshot_label,
+
+            site_discount_mix =
+              site_snapshot_label
+          )
+
+
         executive_visual_grid_ui(
           visual_ids =
             selected_visuals$Finance,
+
           context_label =
             context_label,
+
+          context_label_overrides =
+            context_label_overrides,
+
           ns = ns
         )
       })
