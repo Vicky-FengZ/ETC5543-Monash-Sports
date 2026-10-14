@@ -687,6 +687,82 @@ site_detail_membership_kpis <- function(memberships) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Membership trend data
+# -------------------------------------------------------------------------
+
+site_detail_membership_trend <- function(memberships) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    total_active = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(memberships) ||
+      !is.data.frame(memberships) ||
+      nrow(memberships) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(memberships))) {
+    return(empty_result)
+  }
+
+  rows <- memberships[
+    memberships$metric == "Total Active" &
+      !is.na(memberships$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows <- rows[
+    order(rows$date),
+    ,
+    drop = FALSE
+  ]
+
+  data.frame(
+    date = as.Date(rows$date),
+    month = as.integer(rows$month),
+    month_label = format(
+      as.Date(rows$date),
+      "%b"
+    ),
+    total_active = rows$value,
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1067,6 +1143,13 @@ mod_site_detail_server <- function(
       membership_kpis <- reactive({
 
         site_detail_membership_kpis(
+          selected_memberships()
+        )
+      })
+
+            membership_trend <- reactive({
+
+        site_detail_membership_trend(
           selected_memberships()
         )
       })
@@ -1501,6 +1584,15 @@ mod_site_detail_server <- function(
           )
         }
 
+        if (identical(input$area, "Memberships")) {
+          return(
+            plotOutput(
+              ns("memberships_over_time"),
+              height = "440px"
+            )
+          )
+        }
+
         placeholder_chart(
           titles()$main_placeholder
         )
@@ -1529,6 +1621,34 @@ mod_site_detail_server <- function(
 
           plot_site_detail_visits_over_time(
             monthly
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
+
+      output$memberships_over_time <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Memberships"
+            )
+          )
+
+          trend <- membership_trend()
+
+          validate(
+            need(
+              is.data.frame(trend) &&
+                nrow(trend) > 0L,
+              "No monthly Total Active membership values are available for this selection."
+            )
+          )
+
+          plot_site_detail_memberships_over_time(
+            trend
           )
         },
         res = 96,
@@ -1741,6 +1861,7 @@ mod_site_detail_server <- function(
           selected_visits = selected_visits,
           selected_memberships = selected_memberships,
           membership_kpis = membership_kpis,
+          membership_trend = membership_trend,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
