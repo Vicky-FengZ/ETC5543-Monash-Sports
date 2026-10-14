@@ -4885,3 +4885,212 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Site Detail Membership Movement
+# -------------------------------------------------------------------------
+
+plot_site_detail_membership_movement <- function(movement_data) {
+
+  if (
+    is.null(movement_data) ||
+      !is.data.frame(movement_data) ||
+      nrow(movement_data) == 0L
+  ) {
+    stop(
+      "No membership movement values are available.",
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    movement_data$date
+  )
+
+  new_members <- suppressWarnings(
+    as.numeric(
+      movement_data$new_members
+    )
+  )
+
+  expired <- suppressWarnings(
+    as.numeric(
+      movement_data$expired_cancelled
+    )
+  )
+
+  keep <- !is.na(dates) &
+    (
+      is.finite(new_members) |
+        is.finite(expired)
+    )
+
+  dates <- dates[keep]
+  new_members <- new_members[keep]
+  expired <- expired[keep]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No finite membership movement values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  new_members <- new_members[order_index]
+  expired <- expired[order_index]
+
+  max_value <- max(
+    c(
+      new_members,
+      expired
+    ),
+    na.rm = TRUE
+  )
+
+  y_limit <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.15
+  }
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits + c(-15, 15)
+  } else {
+    x_limits <- x_limits + c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(
+      4.8,
+      5.8,
+      4.2,
+      1.2
+    ),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_limit),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, y_limit),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_limit
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  lines(
+    dates,
+    new_members,
+    col = "#2563EB",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    new_members,
+    pch = 21,
+    cex = 0.95,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  lines(
+    dates,
+    expired,
+    col = "#F59E0B",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    expired,
+    pch = 21,
+    cex = 0.95,
+    lwd = 1.7,
+    col = "#F59E0B",
+    bg = "white"
+  )
+
+  axis.Date(
+    1,
+    at = dates,
+    format = "%b",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "New Members",
+      "Expired / Cancelled"
+    ),
+    col = c(
+      "#2563EB",
+      "#F59E0B"
+    ),
+    lty = 1,
+    lwd = 2.6,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.8,
+    text.col = "#475569",
+    inset = c(0, -0.04),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}

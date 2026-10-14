@@ -763,6 +763,105 @@ site_detail_membership_trend <- function(memberships) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Membership movement
+# -------------------------------------------------------------------------
+
+site_detail_membership_movement <- function(memberships) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month_label = character(),
+    new_members = double(),
+    expired_cancelled = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(memberships) ||
+      !is.data.frame(memberships) ||
+      nrow(memberships) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(memberships))) {
+    return(empty_result)
+  }
+
+  rows <- memberships[
+    memberships$metric %in% c(
+      "New Members",
+      "Expired/Cancelled"
+    ) &
+      !is.na(memberships$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  totals <- aggregate(
+    value ~ date + metric,
+    data = rows,
+    FUN = sum
+  )
+
+  totals <- reshape(
+    totals,
+    idvar = "date",
+    timevar = "metric",
+    direction = "wide"
+  )
+
+  if (!"value.New Members" %in% names(totals)) {
+    totals[["value.New Members"]] <- NA_real_
+  }
+
+  if (!"value.Expired/Cancelled" %in% names(totals)) {
+    totals[["value.Expired/Cancelled"]] <- NA_real_
+  }
+
+  dates <- as.Date(totals$date)
+
+  order_index <- order(dates)
+
+  data.frame(
+    date = dates[order_index],
+    month_label = format(
+      dates[order_index],
+      "%b"
+    ),
+    new_members =
+      totals[["value.New Members"]][order_index],
+    expired_cancelled =
+      totals[["value.Expired/Cancelled"]][order_index],
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1154,6 +1253,13 @@ mod_site_detail_server <- function(
         )
       })
 
+      membership_movement <- reactive({
+
+        site_detail_membership_movement(
+          selected_memberships()
+        )
+      })
+
       activity_breakdown <- reactive({
 
         site_detail_activity_totals(
@@ -1535,7 +1641,7 @@ mod_site_detail_server <- function(
 
           "Memberships" = list(
             main = "Memberships Over Time",
-            breakdown = "Membership Breakdown",
+            breakdown = "Membership Movement",
             main_placeholder =
               "Monthly membership measures",
             breakdown_placeholder =
@@ -1682,6 +1788,15 @@ mod_site_detail_server <- function(
           )
         }
 
+        if (identical(input$area, "Memberships")) {
+          return(
+            plotOutput(
+              ns("membership_movement"),
+              height = "360px"
+            )
+          )
+        }
+
         placeholder_chart(
           titles()$breakdown_placeholder
         )
@@ -1711,6 +1826,34 @@ mod_site_detail_server <- function(
 
           plot_site_detail_visit_type_breakdown(
             breakdown
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
+
+      output$membership_movement <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Memberships"
+            )
+          )
+
+          movement <- membership_movement()
+
+          validate(
+            need(
+              is.data.frame(movement) &&
+                nrow(movement) > 0L,
+              "No monthly membership movement values are available for this selection."
+            )
+          )
+
+          plot_site_detail_membership_movement(
+            movement
           )
         },
         res = 96,
@@ -1862,6 +2005,7 @@ mod_site_detail_server <- function(
           selected_memberships = selected_memberships,
           membership_kpis = membership_kpis,
           membership_trend = membership_trend,
+          membership_movement = membership_movement,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
