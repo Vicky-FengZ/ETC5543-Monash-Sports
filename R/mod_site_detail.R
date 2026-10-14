@@ -762,6 +762,41 @@ mod_site_detail_server <- function(
         )
       })
 
+        visit_type_breakdown <- reactive({
+
+        values <- visit_kpis()
+
+        visit_values <- c(
+          Direct = values[["direct"]],
+          Indirect = values[["indirect"]]
+        )
+
+        total <- sum(
+          visit_values[
+            is.finite(visit_values)
+          ]
+        )
+
+        shares <- if (
+          is.finite(total) &&
+            total > 0
+        ) {
+          visit_values / total
+        } else {
+          rep(
+            NA_real_,
+            length(visit_values)
+          )
+        }
+
+        data.frame(
+          visit_type = names(visit_values),
+          value = as.numeric(visit_values),
+          share = as.numeric(shares),
+          stringsAsFactors = FALSE
+        )
+      })
+
 
       # -------------------------------------------------------------------
       # Available years
@@ -1099,11 +1134,11 @@ mod_site_detail_server <- function(
 
           "Visits" = list(
             main = "Visits Over Time",
-            breakdown = "Visits Breakdown",
+            breakdown = "Direct vs Indirect Visits",
             main_placeholder =
               "Monthly Direct and Indirect Visits",
             breakdown_placeholder =
-              "Audience and activity breakdown"
+              "Annual visit-type breakdown"
           ),
 
           "Memberships" = list(
@@ -1208,10 +1243,50 @@ mod_site_detail_server <- function(
       })
 
       output$breakdown_content <- renderUI({
+
+        if (identical(input$area, "Visits")) {
+          return(
+            plotOutput(
+              ns("visit_type_breakdown"),
+              height = "360px"
+            )
+          )
+        }
+
         placeholder_chart(
           titles()$breakdown_placeholder
         )
       })
+
+
+      output$visit_type_breakdown <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Visits"
+            )
+          )
+
+          breakdown <- visit_type_breakdown()
+
+          validate(
+            need(
+              is.data.frame(breakdown) &&
+                nrow(breakdown) > 0L &&
+                any(is.finite(breakdown$value)),
+              "No visit breakdown values are available for this selection."
+            )
+          )
+
+          plot_site_detail_visit_type_breakdown(
+            breakdown
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       invisible(
         list(
@@ -1220,7 +1295,8 @@ mod_site_detail_server <- function(
           area = reactive(input$area),
           selected_visits = selected_visits,
           visit_kpis = visit_kpis,
-          monthly_visits = monthly_visits
+          monthly_visits = monthly_visits,
+          visit_type_breakdown = visit_type_breakdown
         )
       )
     }

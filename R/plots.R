@@ -4228,3 +4228,135 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Site Detail Direct vs Indirect Visits
+# -------------------------------------------------------------------------
+
+plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
+
+  if (
+    is.null(visit_breakdown) ||
+      !is.data.frame(visit_breakdown) ||
+      nrow(visit_breakdown) == 0L
+  ) {
+    stop("No visit breakdown values are available.", call. = FALSE)
+  }
+
+  labels <- as.character(visit_breakdown$visit_type)
+  values <- suppressWarnings(as.numeric(visit_breakdown$value))
+  shares <- suppressWarnings(as.numeric(visit_breakdown$share))
+
+  keep <- !is.na(labels) &
+    nzchar(labels) &
+    is.finite(values)
+
+  labels <- labels[keep]
+  values <- values[keep]
+  shares <- shares[keep]
+
+  if (length(values) == 0L) {
+    stop("No finite visit breakdown values are available.", call. = FALSE)
+  }
+
+  colours <- ifelse(
+    labels == "Direct",
+    "#2563EB",
+    "#0F766E"
+  )
+
+  y_max <- max(values, na.rm = TRUE)
+
+  if (!is.finite(y_max) || y_max <= 0) {
+    y_max <- 1
+  }
+
+  y_limit <- y_max * 1.18
+
+  positions <- barplot(
+    values,
+    plot = FALSE,
+    space = 0.7
+  )
+
+  old_par <- par(
+    mar = c(4.8, 5.8, 2.5, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(par(old_par), add = TRUE)
+
+  plot(
+    NA,
+    xlim = range(positions) + c(-0.7, 0.7),
+    ylim = c(0, y_limit),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(c(0, y_limit), n = 5)
+  y_ticks <- y_ticks[y_ticks >= 0 & y_ticks <= y_limit]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    names.arg = paste0(labels, " Visits"),
+    col = colours,
+    border = NA,
+    axes = FALSE,
+    space = 0.7,
+    add = TRUE
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  labels_above <- paste0(
+    format(
+      round(values),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    ifelse(
+      is.finite(shares),
+      paste0(" · ", sprintf("%.1f%%", 100 * shares)),
+      ""
+    )
+  )
+
+  text(
+    positions,
+    values,
+    labels = labels_above,
+    pos = 3,
+    offset = 0.4,
+    cex = 0.78,
+    col = "#475569",
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
