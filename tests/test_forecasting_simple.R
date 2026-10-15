@@ -114,7 +114,7 @@ stopifnot(known_monthly$extra_wage_cost == 600,
           all(known_monthly$table$extra_wage_cost[1:6] == 0),
           all(is.na(known_monthly$table$baseline_casual_wages)),
           !any(c("employee_fte_count", "payroll_share_pct", "casual_paid_hours_change_pct") %in% known_monthly$assumptions$assumption),
-          known_monthly$assumptions$value[known_monthly$assumptions$assumption == "monthly_extra_payroll_cost"] == "100")
+          known_monthly$assumptions$value[known_monthly$assumptions$assumption == "monthly_payroll_adjustment"] == "100")
 lower_bound <- known_casual
 lower_bound$forecast$baseline <- 1100
 reduced <- calculate_finance_scenario(baseline, wage_mode = "casual_baseline",
@@ -147,8 +147,10 @@ shiny::testServer(mod_forecasting_server, args = list(data = simple_data), {
             grepl("Predicted casual payroll", output$data_health$html, fixed = TRUE))
   session$setInputs(site = "Site A", from_year = "2022",
                     cutoff = "2025-12-01", effective_month = "7")
-  stopifnot(grepl("individual site", scenario()$error))
-  session$setInputs(site = "Overall", effective_month = "1")
+  stopifnot(is.null(scenario()$error), selected_scope() == "Overall",
+            identical(financial_base, baseline()), identical(payroll_base, casual_baseline()),
+            all(scenario()$table$extra_wage_cost[1:6] == 0))
+  session$setInputs(site = "Site B", effective_month = "1")
   stopifnot(is.null(scenario()$error), selected_scope() == "Overall",
             scenario()$table$extra_wage_cost[1] > 0,
             scenario()$assumptions$value[scenario()$assumptions$assumption == "repriceable_income_share_pct"] == "100")
@@ -169,8 +171,10 @@ shiny::testServer(mod_forecasting_server, args = list(data = simple_data), {
 ui_simple <- as.character(mod_forecasting_ui("simple"))
 stopifnot(grepl("<details", ui_simple, fixed = TRUE),
           !grepl('id="simple-custom_settings"', ui_simple, fixed = TRUE),
+          !grepl('id="simple-site"', ui_simple, fixed = TRUE),
           grepl('id="simple-payroll_mode"', ui_simple, fixed = TRUE),
-          grepl('id="simple-payroll_in_expenses"', ui_simple, fixed = TRUE),
+          !grepl('id="simple-payroll_in_expenses"', ui_simple, fixed = TRUE),
+          grepl('id="simple-monthly_payroll_adjustment"', ui_simple, fixed = TRUE),
           !grepl('id="simple-casual_hours_pct"', ui_simple, fixed = TRUE),
           !grepl('id="simple-manual_payroll"', ui_simple, fixed = TRUE),
           !grepl('id="simple-monthly_payroll_amount"', ui_simple, fixed = TRUE),

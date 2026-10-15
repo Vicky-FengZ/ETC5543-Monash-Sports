@@ -1,24 +1,23 @@
 # Monash Sport Performance Dashboard
 
-This repository contains a modular R Shiny dashboard and its Excel data
-pipeline. The pipeline discovers recurring reports, validates their structure
-and calculations, and converts them into long tables that can later feed the
-dashboard and forecasting modules.
+This repository contains a modular R Shiny dashboard and an Excel data
+pipeline. The pipeline finds recurring reports, checks their structure and
+calculations, and converts them into long tables for use in the dashboard
+and forecasting modules.
 
 ## Quick start
 
-Restore the project packages and start the app from the project root:
+From the project root, restore the packages and start the app:
 
 ```r
 renv::restore()
 shiny::runApp()
 ```
 
-The dashboard includes working Excel import pipelines, session-only file
-uploads, cleaned-data inspection and Excel export. Successfully parsed uploads
-are shared with the dashboard modules during the current Shiny session. The
-Overview page uses Monthly Site Report data; the remaining analytical pages can
-be connected progressively as their charts are completed.
+You can import Excel reports, inspect the cleaned data and export the results
+to Excel. Uploaded files last for the current Shiny session, and the dashboard
+modules share data from successful imports. Overview uses Monthly Site Report
+data. Other analytical pages can be connected as their charts are completed.
 
 ## Project structure
 
@@ -62,7 +61,7 @@ www/
   styles.css
 ```
 
-The main responsibilities are:
+Each file has a specific role:
 
 - `app.R`: assemble the navigation and connect Shiny modules.
 - `R/data/load.R`: source the complete data layer in dependency order.
@@ -75,7 +74,7 @@ The main responsibilities are:
 
 ## Data architecture
 
-All report types follow the same workflow:
+Each report type follows this workflow:
 
 ```text
 data/raw Excel files
@@ -89,9 +88,9 @@ standardised long tables
 dashboard calculations, charts and forecasts
 ```
 
-Extracted tables retain source metadata such as `source_file`, `source_sheet`,
-`source_row` and `source_column`. This makes a dashboard value traceable back
-to its original Excel cell.
+Extracted tables keep source metadata such as `source_file`, `source_sheet`,
+`source_row` and `source_column`, so you can trace a dashboard value back to
+its original Excel cell.
 
 ### Data-source summary
 
@@ -109,8 +108,8 @@ Source the data layer once before using any loader:
 source("R/data/load.R")
 ```
 
-The three loaders are independent. You only need to run the loader for the
-report type you are currently developing or testing.
+The three loaders run independently. Run the one for the report type you are
+developing or testing.
 
 ### 1. Monthly Site Reports
 
@@ -124,7 +123,7 @@ monthly_reports$files
 monthly_reports$validation
 ```
 
-Key outputs:
+Outputs:
 
 | Object | Description |
 |---|---|
@@ -134,8 +133,8 @@ Key outputs:
 | `files` | Discovered files and report years |
 | `validation` | Import, structure and calculation issues |
 
-Use `is_summary == TRUE` for site-level totals. The Monash Sport summary row is
-the organisation-level total.
+Use `is_summary == TRUE` for site totals. The Monash Sport summary row gives
+the total for the organisation.
 
 ### 2. Venues Tracking Reports
 
@@ -164,7 +163,7 @@ venues_reports$files
 venues_reports$validation
 ```
 
-Key outputs:
+Outputs:
 
 | Object | Description |
 |---|---|
@@ -179,8 +178,8 @@ Key outputs:
 | `casual_wages` | Budget, actual and variance for the salary-year block matching each workbook's report year |
 | `*_checks` | Independent monthly-to-YTD and finance reconciliation checks |
 
-The source workbook's `MTD Total` and `YTD Total` rows are retained separately
-from fund-level rows to prevent accidental double counting.
+The source workbook's `MTD Total` and `YTD Total` rows stay separate from
+fund-level rows to avoid double counting.
 
 ### 3. Business Unit Site and Program Reports
 
@@ -201,7 +200,7 @@ site_reports$files
 site_reports$validation
 ```
 
-Key outputs:
+Outputs:
 
 | Object | Description |
 |---|---|
@@ -216,9 +215,9 @@ Key outputs:
 Student, Staff, Community and Total, while `period_type` distinguishes Month
 and YTD values.
 
-Visits can be formula-derived counts that display as whole people while storing
-fractions. Visit checks therefore use a default tolerance of one visit; the
-financial tolerance remains one cent:
+Visit formulas can store fractional values even when Excel displays whole
+people. Visit checks allow a difference of one visit by default. Financial
+checks use a tolerance of one cent:
 
 ```r
 site_reports <- load_business_unit_template_reports(
@@ -229,9 +228,9 @@ site_reports <- load_business_unit_template_reports(
 
 ## Validation
 
-Validation does not silently overwrite or discard a source discrepancy.
-Extracted data remain available, while the issue is recorded in a check table
-or the loader's `validation` table.
+Validation keeps extracted data available and records source discrepancies in
+a check table or the loader's `validation` table. It does not silently overwrite
+or discard a discrepancy.
 
 Common statuses are:
 
@@ -243,8 +242,8 @@ Common statuses are:
 | `missing_components` | A reported total exists but some required detail is absent |
 | `missing_monthly_values` | An annual/YTD value cannot be fully checked against monthly data |
 
-Warnings do not stop extraction. Structural errors stop a strict import because
-continuing could mislabel data. A compact review pattern is:
+Warnings allow extraction to continue. Structural errors stop a strict import
+to avoid mislabelling data. To review issues:
 
 ```r
 print(site_reports)
@@ -258,8 +257,8 @@ stopifnot(!any(site_reports$validation$level == "error"))
 
 ## Adding future report years
 
-Years and worksheet row positions are not hard-coded. Add a new file to the
-appropriate raw-data folder and run its loader again.
+Add a new file to the appropriate raw-data folder and run its loader again.
+The loaders do not hard-code years or worksheet row positions.
 
 | Report type | Example future filename | Required recognisable structure |
 |---|---|---|
@@ -267,16 +266,16 @@ appropriate raw-data folder and run its loader again.
 | Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire, Court Hire year comparison, Membership, Online Sales, Merchandise, Casual Hours and Casual Wages sheets; a year prefix such as `2026 Casual Hours` and a comparison name such as `Court Hire 2025 vs 2026` are accepted |
 | Business Unit report | `Aquatics Site Report 2026.xlsx` | Finance, Direct Visits and Indirect Visits; Memberships and Enrollments are optional |
 
-If a future workbook changes its structure, inspect the returned `validation`
-table before using the new year in the dashboard.
+If a workbook's structure changes, check the returned `validation` table
+before using that year's data in the dashboard.
 
 ## Data upload and review workflow
 
-The Data page provides two clearly separated tasks:
+The Data page has two tasks:
 
-- **Upload & Manage**: upload, parse and remove Excel workbooks.
-- **View Cleaned Data**: inspect and download the standardised tables produced
-  by successful imports.
+- **Upload & Manage** lets you upload, parse and remove Excel workbooks.
+- **View Cleaned Data** lets you inspect and download the standardised tables
+  from successful imports.
 
 ### Uploading files
 
@@ -288,13 +287,13 @@ Upload each workbook through the matching report family:
 | Detailed Site Reports | Business Unit Template site or program reports |
 | Venues Tracking Reports | Annual Venues Tracking Report workbooks |
 
-One or more `.xlsx` or `.xls` files can be selected at a time. The module copies
-each file into a temporary session directory, preserves its original filename
-for traceability, and then runs the appropriate import, cleaning and validation
-pipeline. The original workbook on the user's computer is never modified.
+Select one or more `.xlsx` or `.xls` files at a time. The module copies each
+file into a temporary session directory, keeps its original filename for
+traceability, and runs the matching import, cleaning and validation pipeline.
+Your original workbook stays unchanged.
 
-Files are processed one at a time. The page shows overall parsing progress and
-an individual status row for every uploaded file:
+The module processes one file at a time. The page shows overall parsing
+progress and a status row for each upload:
 
 | Upload status | Meaning and action |
 |---|---|
@@ -303,17 +302,16 @@ an individual status row for every uploaded file:
 | `ready` with warnings | Data are available, but the warning count should be reviewed before analysis |
 | `failed` | The file type, workbook structure, parser or validation produced a blocking error; its data are excluded from the dashboard |
 
-The status row displays the relevant warning count or error message. A warning
-does not block a file. A validation error or parser exception does block it,
-because continuing could silently mislabel data.
+Each status row shows a warning count or error message. Warnings do not block
+a file. Validation errors and parser exceptions block it to avoid silently
+mislabelling data.
 
-If a successfully parsed file has the same report family and filename as an
-existing upload, it replaces the older session copy only after the new file has
-parsed and validated successfully. If the replacement fails, the previous
-ready file and its dashboard data remain available.
+A file with the same report family and filename as an existing upload replaces
+the session copy after it passes parsing and validation. If the replacement
+fails, the previous ready file and its dashboard data stay available.
 
-Use the remove button beside a status row to delete that temporary upload and
-its parsed result. This does not delete or change the original Excel file.
+Use the remove button beside a status row to delete the temporary upload and
+its parsed result. Your original Excel file stays unchanged.
 
 ### Viewing cleaned data
 
@@ -327,23 +325,23 @@ Open **View Cleaned Data** and select the report family. The preview supports:
 - downloading the filtered result as an Excel workbook, with one worksheet per
   represented `source_sheet`.
 
-The preview is built from the already parsed R objects. Changing a filter,
-sorting a column or moving between pages does not read the Excel files again.
+The preview uses the parsed R objects. You can filter, sort and move between
+pages without reading the Excel files again.
 
-The current interface is a cleaned-data viewer rather than a cell-for-cell raw
-Excel viewer. To investigate a value in its original context, use
-`source_file`, `source_sheet`, `source_row` and `source_column` to locate the
-corresponding cell in the source workbook.
+The preview shows cleaned tables, so it does not reproduce the raw Excel cells
+and layout. To check a value in its original context, use `source_file`,
+`source_sheet`, `source_row` and `source_column` to find the cell in the source
+workbook.
 
 ### Session scope
 
-Uploads are deliberately session-only in the current version. Refreshing or
-closing the dashboard clears the temporary files and their parsed results.
-Persistent per-user storage, cached RDS files and background import workers are
-reserved for a later deployment stage.
+Uploads last only for the current session. Refreshing or closing the dashboard
+clears the temporary files and parsed results. Persistent per-user storage,
+cached RDS files and background import workers are planned for a later
+deployment stage.
 
-For custom Shiny upload code, remember that Shiny's temporary `datapath` does
-not retain the user's filename. Pass both values to a loader:
+In custom Shiny upload code, Shiny's temporary `datapath` does not retain the
+original filename. Pass both values to the loader:
 
 ```r
 monthly_reports <- load_monthly_site_reports(
@@ -353,49 +351,49 @@ monthly_reports <- load_monthly_site_reports(
 )
 ```
 
-Dashboard filters and charts should operate on the imported R object rather
-than calling a loader again.
+Reuse the imported R object for dashboard filters and charts to avoid calling
+a loader again.
 
 ## Forecasting and business planning
 
-The **Forecasting** page uses Monthly Site Reports for monthly Income and
-Expenses. History and models are selected automatically; users do not need to
-choose a statistical model. Net Result is not a forecast target.
+The **Forecasting** page uses monthly Income and Expenses from Monthly Site
+Reports. It selects history and models automatically, so you do not need to
+choose a statistical model. It does not forecast Net Result.
 
-Choose a 3/6/12-month horizon, price rise (%) and one casual-payroll mode:
+Choose a 3/6/12-month horizon, a price rise (%) and a casual-payroll mode:
 
-- **Quick estimate** (default): Venues Tracking Reports provide the historical
-  Casual Salaries reference; enter only the additional pay rise (%). Its
-  predicted payroll is not a headcount budget or all staff costs.
-- **Advanced pay & hours** (inside **More options**): add/remove staff categories and enter current hourly
-  wage, total monthly paid hours, pay rise and hours change. Optional future
-  hours support new categories. Review current cost, planned cost and the
-  difference, and confirm the selected Expenses scope before using the result.
-  This mode needs no Venues wage data and never stacks with the quick rise.
+- **Quick estimate** is the default. Enter the additional pay rise (%). Venues
+  Tracking Reports supply the historical Casual Salaries reference. The
+  predicted payroll is not a headcount budget or a measure of all staff costs.
+- **Manual adjustment** uses one signed **Monthly payroll adjustment (AUD)**
+  entered in **Your plan**. Positive amounts add costs, negative amounts reduce
+  costs, and 0 leaves costs unchanged. You do not need Venues wage data.
 
-Only the payroll difference is added to baseline Expenses, not the whole future
-payroll. Advanced inputs are incremental scenarios, not a replacement of payroll
-already inside the finance forecast. Separate employer on-costs and annual-salary
-staff are not automatically computed. Scope/history changes reset the advanced
-confirmation.
+Choose the payroll method in **More options**; only one method applies at a
+time. A manual amount adjusts the Overall financial forecast by an additional
+monthly amount. It is not a full replacement payroll budget, so do not deduct
+savings from departures already reflected in the forecast. The amount applies
+each month from the selected effective date, without compounding. The system
+rejects blank amounts and reductions that would make any month's total
+Expenses negative.
 
-The page calculates minimum income growth and price increase needed to cover
-the selected period's costs, including an existing shortfall. **Price sensitivity**
-is visible inside **Income needed to cover costs**. Advanced payroll, scope/history,
-pricing, demand and timing are grouped in **More options**; edited settings apply
-directly, without a separate enable switch. Closing that panel does not reset
-the plan. **Monthly plan** and both CSV downloads are always visible below the
-results. Validation runs internally and model names are recorded in the assumptions CSV.
-Missing years are not joined or filled with zero, and model accuracy is assessed
-only when continuous history supports rolling-origin validation.
+The page calculates the minimum income growth and price increase needed to
+cover costs over the selected period, including any existing shortfall.
+**Price sensitivity** appears in **Income needed to cover costs**. Use
+**More options** to set the payroll method, history, pricing, demand and timing.
+Settings apply directly and stay in effect when the panel is closed.
+**Monthly plan** and both CSV downloads are always visible below the results.
+
+Validation runs internally, and the assumptions CSV records the selected model
+names. Missing years remain gaps and are not filled with zero. Model accuracy
+is assessed only when continuous history supports rolling-origin validation.
 
 See [Forecasting and practical planning](docs/forecasting.md) for the formulas,
 data checks, limitations, model comparison and testing instructions.
 
 ## Performance and website deployment
 
-This project is a Shiny application rather than a self-contained static HTML
-file. The browser displays HTML, but data import, validation, uploads and
-predictions run in an R process on the server. A static HTML export could embed
-precalculated results, but it would not support the current server-side upload
-and forecasting workflow by itself.
+The dashboard runs as a Shiny application. The browser displays HTML, while
+an R process on the server handles data import, validation, uploads and
+predictions. A static HTML export could include precalculated results. On its
+own, it would not support the server-side upload and forecasting workflow.

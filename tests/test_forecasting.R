@@ -115,14 +115,12 @@ stopifnot(!grepl("Net Result|Forecast Prototype|Forecast vs Budget", ui_text),
 data_source <- reactiveVal(list(monthly = fixture))
 shiny::testServer(mod_forecasting_server, args = list(data = data_source), {
   session$setInputs(site = "Overall", horizon = "12",
-                    cutoff = "2025-12-01", from_year = "2022", payroll_mode = "advanced",
-                    group_1_category = "Casual staff", group_1_hourly_wage = 20,
-                    group_1_monthly_hours = 20, group_1_pay_increase_pct = 0,
-                    group_1_hours_change_pct = 0, payroll_in_expenses = TRUE,
+                    cutoff = "2025-12-01", from_year = "2022", payroll_mode = "manual",
+                    monthly_payroll_adjustment = 0,
                     effective_month = "1")
   stopifnot(is.null(baseline()$error), is.null(scenario()$error))
   previous_baseline <- baseline()
-  session$setInputs(group_1_pay_increase_pct = 25, price_pct = 10)
+  session$setInputs(monthly_payroll_adjustment = 100, price_pct = 10)
   stopifnot(identical(previous_baseline, baseline()), scenario()$extra_wage_cost == 1200)
   data_source(list(monthly = NULL))
   session$flushReact()

@@ -8,27 +8,31 @@ stopifnot(options_end > 0L)
 options_html <- substr(options_tail, 1L, options_end + nchar("</details>") - 1L)
 outside_options <- paste(substr(layout_html, 1L, options_start - 1L),
   substring(options_tail, options_end + nchar("</details>")))
-for (control in c("payroll_mode", "payroll_group_inputs", "add_payroll_group",
-                   "payroll_in_expenses", "site", "from_year", "cutoff",
-                   "price_share", "volume_pct", "effective_month", "include_trailing_zeros")) {
+for (control in c("payroll_mode", "from_year", "cutoff",
+                   "price_share", "volume_pct", "effective_month", "finance_zero_review", "wage_zero_review")) {
   control_id <- paste0('id="layout-', control, '"')
   stopifnot(grepl(control_id, options_html, fixed = TRUE),
             !grepl(control_id, outside_options, fixed = TRUE))
 }
-for (control in c("horizon", "casual_wage_pct", "price_pct", "monthly_table",
+for (control in c("horizon", "casual_wage_pct", "monthly_payroll_adjustment", "price_pct", "monthly_table",
                   "download_plan", "download_assumptions")) {
   stopifnot(grepl(paste0('id="layout-', control, '"'), outside_options, fixed = TRUE))
 }
 stopifnot(length(gregexpr("<details", layout_html, fixed = TRUE)[[1]]) == 1L,
+          !grepl("Treat final zero months as confirmed actuals", layout_html, fixed = TRUE),
+          !grepl("payroll_in_expenses|payroll_group_inputs|add_payroll_group", layout_html),
+          !grepl('id="layout-site"', layout_html, fixed = TRUE),
+          !grepl("Scope and history|site-specific", layout_html),
+          grepl("Payroll, history, pricing and timing", layout_html, fixed = TRUE),
+          grepl("Monash Sport overall", layout_html, fixed = TRUE),
           !grepl("Data notes and limitations|Explore the details|Forecast checks|How it works", layout_html),
           !grepl('id="layout-custom_settings"', layout_html, fixed = TRUE),
           !grepl('id="layout-model_table"', layout_html, fixed = TRUE),
           !grepl('id="layout-validation_note"', layout_html, fixed = TRUE),
-          grepl("panel.open = true", outside_options, fixed = TRUE),
           grepl("forecast-monthly-plan-header", layout_html, fixed = TRUE),
           regexpr('id="layout-monthly_table"', layout_html, fixed = TRUE)[1] >
             options_start + options_end)
-cat("PASS grouped advanced controls, direct monthly plan and removed technical UI\n")
+cat("PASS grouped optional controls, direct monthly plan and removed technical UI\n")
 
 layout_data <- reactiveVal(list(monthly = fixture, venues = partial))
 shiny::testServer(mod_forecasting_server, args = list(data = layout_data), {
@@ -54,26 +58,32 @@ shiny::testServer(mod_forecasting_server, args = list(data = layout_data), {
   stopifnot(nrow(quick_plan) == 12L,
             isTRUE(all.equal(quick_plan$scenario_income, expected$table$scenario_income)),
             quick_assumptions$value[quick_assumptions$assumption == "payroll_mode"] == "quick",
+            quick_assumptions$value[quick_assumptions$assumption == "scope"] == "Overall",
             quick_assumptions$value[quick_assumptions$assumption == "repriceable_income_share_pct"] == "50",
             "casual_wage_model" %in% quick_assumptions$assumption,
             !"custom_settings" %in% quick_assumptions$assumption,
             grepl("Income Needed", output$monthly_table, fixed = TRUE))
-  session$setInputs(payroll_mode = "advanced", casual_wage_pct = NA_real_,
-    group_1_category = "Attendants", group_1_hourly_wage = 20,
-    group_1_monthly_hours = 20, group_1_pay_increase_pct = 5,
-    group_1_hours_change_pct = 20)
-  stopifnot(grepl("Confirm", scenario()$error, fixed = TRUE))
-  session$setInputs(payroll_in_expenses = TRUE)
-  stopifnot(is.null(scenario()$error), abs(scenario()$extra_wage_cost - 624) < 1e-8,
+  session$setInputs(payroll_mode = "manual", casual_wage_pct = NA_real_,
+    monthly_payroll_adjustment = -100)
+  stopifnot(is.null(scenario()$error), scenario()$extra_wage_cost == -600,
             identical(saved_finance, baseline()),
-            grepl("Advanced payroll", output$options_state$html, fixed = TRUE))
-  advanced_plan <- utils::read.csv(output$download_plan, stringsAsFactors = FALSE)
-  advanced_assumptions <- utils::read.csv(output$download_assumptions, stringsAsFactors = FALSE)
-  stopifnot(nrow(advanced_plan) == 12L,
-            abs(sum(advanced_plan$extra_wage_cost) - 624) < 1e-8,
-            advanced_assumptions$value[advanced_assumptions$assumption == "payroll_mode"] == "advanced",
-            advanced_assumptions$value[advanced_assumptions$assumption == "wage_mode"] == "manual_categories",
-            any(grepl("payroll_group_", advanced_assumptions$assumption, fixed = TRUE)),
-            !"casual_wage_model" %in% advanced_assumptions$assumption)
+            grepl("Manual adjustment", output$options_state$html, fixed = TRUE))
+  manual_plan <- utils::read.csv(output$download_plan, stringsAsFactors = FALSE)
+  manual_assumptions <- utils::read.csv(output$download_assumptions, stringsAsFactors = FALSE)
+  stopifnot(nrow(manual_plan) == 12L,
+            sum(manual_plan$extra_wage_cost) == -600,
+            all(manual_plan$extra_wage_cost[1:6] == 0),
+            all(manual_plan$extra_wage_cost[7:12] == -100),
+            all(is.na(manual_plan$baseline_casual_wages)),
+            all(is.na(manual_plan$scenario_casual_wages)),
+            manual_assumptions$value[manual_assumptions$assumption == "payroll_mode"] == "manual",
+            manual_assumptions$value[manual_assumptions$assumption == "scope"] == "Overall",
+            manual_assumptions$value[manual_assumptions$assumption == "wage_mode"] == "monthly_amount",
+            manual_assumptions$value[manual_assumptions$assumption == "monthly_payroll_adjustment"] == "-100",
+            manual_assumptions$value[manual_assumptions$assumption == "effective_from"] == "2026-07",
+            !any(grepl("payroll_group_|payroll_in_expenses|wage_increase_pct", manual_assumptions$assumption)),
+            !"casual_wage_model" %in% manual_assumptions$assumption,
+            grepl("-$100", output$monthly_table, fixed = TRUE),
+            !grepl("Predicted Casual Payroll|Scenario Casual Payroll", output$monthly_table))
 })
-cat("PASS direct settings, unchanged models, mode badges and quick/advanced CSV downloads\n")
+cat("PASS direct settings, unchanged models, mode badges and quick/manual CSV downloads\n")
