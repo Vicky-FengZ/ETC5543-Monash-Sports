@@ -1288,6 +1288,88 @@ site_detail_enrolment_breakdown <- function(enrollments) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Enrolment student share trend
+# -------------------------------------------------------------------------
+
+site_detail_enrolment_student_share <- function(enrollments) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month_label = character(),
+    student_share = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(enrollments) ||
+      !is.data.frame(enrollments) ||
+      nrow(enrollments) == 0L ||
+      !all(
+        c(
+          "date",
+          "metric",
+          "value"
+        ) %in% names(enrollments)
+      )
+  ) {
+    return(empty_result)
+  }
+
+  rows <- enrollments[
+    enrollments$metric == "Student Share" &
+      !is.na(enrollments$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  # Zero-filled months in these templates represent
+  # months without a meaningful reported share.
+  rows <- rows[
+    rows$value > 0,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows <- rows[
+    order(rows$date),
+    ,
+    drop = FALSE
+  ]
+
+  data.frame(
+    date = as.Date(rows$date),
+    month_label = format(
+      as.Date(rows$date),
+      "%b"
+    ),
+    student_share = rows$value,
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1710,6 +1792,13 @@ mod_site_detail_server <- function(
       enrolment_breakdown <- reactive({
 
         site_detail_enrolment_breakdown(
+          selected_enrollments()
+        )
+      })
+
+      enrolment_student_share <- reactive({
+
+        site_detail_enrolment_student_share(
           selected_enrollments()
         )
       })
@@ -2476,18 +2565,25 @@ mod_site_detail_server <- function(
 
       output$audience_title <- renderUI({
 
+        req(input$area)
+
         if (identical(input$area, "Memberships")) {
           return("Active Member Mix")
+        }
+
+        if (identical(input$area, "Enrolments")) {
+          return("Student Share Over Time")
         }
 
         "Audience Mix"
       })
 
-      output$audience_subtitle <- renderUI({
+            output$audience_subtitle <- renderUI({
 
         req(
           input$year,
-          input$site
+          input$site,
+          input$area
         )
 
         if (identical(input$area, "Memberships")) {
@@ -2514,6 +2610,18 @@ mod_site_detail_server <- function(
           )
         }
 
+        if (identical(input$area, "Enrolments")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Share of active membership · ",
+                input$year
+              )
+            )
+          )
+        }
+
         chart_subtitle(
           paste0(
             "Student, staff and community · ",
@@ -2521,10 +2629,19 @@ mod_site_detail_server <- function(
           )
         )
       })
-
+      
       output$audience_content <- renderUI({
 
         req(input$area)
+
+        if (identical(input$area, "Enrolments")) {
+          return(
+            plotOutput(
+              ns("enrolment_student_share"),
+              height = "360px"
+            )
+          )
+        }
 
         if (
           input$area %in% c(
@@ -2544,6 +2661,39 @@ mod_site_detail_server <- function(
           "Composition analysis is not yet available for this dataset"
         )
       })
+
+      output$enrolment_student_share <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Enrolments"
+            )
+          )
+
+          share_data <- enrolment_student_share()
+
+          validate(
+            need(
+              is.data.frame(share_data) &&
+                nrow(share_data) > 0L &&
+                any(
+                  is.finite(
+                    share_data$student_share
+                  )
+                ),
+              "No monthly Student Share values are available for this selection."
+            )
+          )
+
+          plot_site_detail_enrolment_student_share(
+            share_data
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$audience_mix <- renderPlot(
         {
@@ -2672,6 +2822,7 @@ mod_site_detail_server <- function(
           membership_active_mix = membership_active_mix,
           enrolment_trend = enrolment_trend,
           enrolment_breakdown = enrolment_breakdown,
+          enrolment_student_share = enrolment_student_share,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,

@@ -5344,6 +5344,207 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
 }
 
 # -------------------------------------------------------------------------
+# Enrolment student share
+# -------------------------------------------------------------------------
+
+plot_site_detail_enrolment_student_share <- function(share_data) {
+
+  if (
+    is.null(share_data) ||
+      !is.data.frame(share_data) ||
+      nrow(share_data) == 0L
+  ) {
+    stop(
+      "No student share values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "student_share"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(share_data)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Student share data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    share_data$date
+  )
+
+  shares <- suppressWarnings(
+    as.numeric(
+      share_data$student_share
+    )
+  )
+
+  keep <- !is.na(dates) &
+    is.finite(shares)
+
+  dates <- dates[keep]
+  shares <- shares[keep]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No finite student share values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  shares <- shares[order_index]
+
+  # Convert stored fractions to percentage points for plotting.
+  percentages <- shares * 100
+
+  max_value <- max(
+    percentages,
+    na.rm = TRUE
+  )
+
+  y_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    100
+  } else {
+    min(
+      100,
+      max_value * 1.25
+    )
+  }
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits + c(-15, 15)
+  } else {
+    x_limits <- x_limits + c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(4.8, 5.2, 3.8, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_max),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, y_max),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_max
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  if (length(dates) > 1L) {
+    lines(
+      dates,
+      percentages,
+      col = "#2563EB",
+      lwd = 2.6
+    )
+  }
+
+  points(
+    dates,
+    percentages,
+    pch = 21,
+    cex = 1.1,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  text(
+    dates,
+    percentages,
+    labels = sprintf(
+      "%.1f%%",
+      percentages
+    ),
+    pos = 3,
+    offset = 0.5,
+    cex = 0.78,
+    col = "#475569",
+    xpd = NA
+  )
+
+  axis(
+    1,
+    at = dates,
+    labels = format(
+      dates,
+      "%b"
+    ),
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.88
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = paste0(
+      format(
+        y_ticks,
+        trim = TRUE,
+        scientific = FALSE
+      ),
+      "%"
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  invisible(NULL)
+}
+
+# -------------------------------------------------------------------------
 # Site Detail Membership Movement
 # -------------------------------------------------------------------------
 
