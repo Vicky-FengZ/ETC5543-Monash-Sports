@@ -562,9 +562,9 @@ venues_operations_attendance_area_totals <- function(attendance) {
 
 mod_venues_operations_ui <- function(id) {
 
-  ns <- NS(id)
+  ns <- shiny::NS(id)
 
-  nav_panel(
+  bslib::nav_panel(
     "Venues Operations",
 
     div(
@@ -736,7 +736,7 @@ mod_venues_operations_server <- function(
   data = NULL
 ) {
 
-  moduleServer(
+  shiny::moduleServer(
     id,
     function(input, output, session) {
 
