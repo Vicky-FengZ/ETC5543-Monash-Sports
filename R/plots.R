@@ -5113,6 +5113,237 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
 }
 
 # -------------------------------------------------------------------------
+# Enrolment breakdown
+# -------------------------------------------------------------------------
+
+plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
+
+  if (
+    is.null(enrolment_data) ||
+      !is.data.frame(enrolment_data) ||
+      nrow(enrolment_data) == 0L
+  ) {
+    stop(
+      "No enrolment breakdown values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "total_active",
+    "active_students"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(enrolment_data)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Enrolment breakdown data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    enrolment_data$date
+  )
+
+  total_active <- suppressWarnings(
+    as.numeric(
+      enrolment_data$total_active
+    )
+  )
+
+  active_students <- suppressWarnings(
+    as.numeric(
+      enrolment_data$active_students
+    )
+  )
+
+  keep <- !is.na(dates) &
+    (
+      is.finite(total_active) |
+        is.finite(active_students)
+    )
+
+  dates <- dates[keep]
+  total_active <- total_active[keep]
+  active_students <- active_students[keep]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No finite enrolment breakdown values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  total_active <- total_active[order_index]
+  active_students <- active_students[order_index]
+
+  max_value <- max(
+    c(
+      total_active,
+      active_students
+    ),
+    na.rm = TRUE
+  )
+
+  y_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.12
+  }
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits + c(-15, 15)
+  } else {
+    x_limits <- x_limits + c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(4.8, 5.8, 4.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_max),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, y_max),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_max
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  lines(
+    dates,
+    total_active,
+    col = "#2563EB",
+    lwd = 2.6
+  )
+
+  points(
+    dates[is.finite(total_active)],
+    total_active[is.finite(total_active)],
+    pch = 21,
+    cex = 1,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  lines(
+    dates,
+    active_students,
+    col = "#0F766E",
+    lwd = 2.6
+  )
+
+  points(
+    dates[is.finite(active_students)],
+    active_students[is.finite(active_students)],
+    pch = 21,
+    cex = 1,
+    lwd = 1.7,
+    col = "#0F766E",
+    bg = "white"
+  )
+
+  axis(
+    1,
+    at = dates,
+    labels = format(
+      dates,
+      "%b"
+    ),
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.88
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "top",
+    legend = c(
+      "Total Active",
+      "Active Students"
+    ),
+    col = c(
+      "#2563EB",
+      "#0F766E"
+    ),
+    lty = 1,
+    lwd = 2.6,
+    pch = 21,
+    pt.bg = "white",
+    bty = "n",
+    ncol = 2,
+    cex = 0.8,
+    text.col = "#475569",
+    inset = c(0, -0.04),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
+
+# -------------------------------------------------------------------------
 # Site Detail Membership Movement
 # -------------------------------------------------------------------------
 
