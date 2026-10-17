@@ -2,6 +2,258 @@
 # Venues Operations module
 # -------------------------------------------------------------------------
 
+# -------------------------------------------------------------------------
+# Venues Operations data helpers
+# -------------------------------------------------------------------------
+
+venues_operations_filter_year <- function(
+    data,
+    year = NULL
+) {
+
+  if (
+    is.null(data) ||
+      !is.data.frame(data) ||
+      nrow(data) == 0L
+  ) {
+    return(data)
+  }
+
+  if (
+    is.null(year) ||
+      length(year) == 0L ||
+      !"report_year" %in% names(data)
+  ) {
+    return(data)
+  }
+
+  selected_year <- suppressWarnings(
+    as.integer(year[[1L]])
+  )
+
+  if (is.na(selected_year)) {
+    return(data)
+  }
+
+  data[
+    !is.na(data$report_year) &
+      data$report_year == selected_year,
+    ,
+    drop = FALSE
+  ]
+}
+
+
+venues_operations_available_years <- function(
+    venues_reports
+) {
+
+  if (
+    is.null(venues_reports) ||
+      !is.list(venues_reports) ||
+      is.null(venues_reports$attendance) ||
+      !is.data.frame(venues_reports$attendance)
+  ) {
+    return(integer())
+  }
+
+  years <- suppressWarnings(
+    as.integer(
+      venues_reports$attendance$report_year
+    )
+  )
+
+  sort(
+    unique(
+      years[
+        !is.na(years)
+      ]
+    )
+  )
+}
+
+# -------------------------------------------------------------------------
+# Attendance calculations
+# -------------------------------------------------------------------------
+
+venues_operations_monthly_attendance <- function(attendance) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(attendance) ||
+      !is.data.frame(attendance) ||
+      nrow(attendance) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "month_label",
+    "period_type",
+    "row_type",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(attendance))) {
+    return(empty_result)
+  }
+
+  rows <- attendance[
+    attendance$period_type == "Month" &
+      attendance$row_type == "Overall Total" &
+      !is.na(attendance$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows <- rows[
+    order(rows$date),
+    ,
+    drop = FALSE
+  ]
+
+  data.frame(
+    date = as.Date(rows$date),
+    month = as.integer(rows$month),
+    month_label = as.character(rows$month_label),
+    value = rows$value,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+venues_operations_attendance_kpis <- function(attendance) {
+
+  monthly <- venues_operations_monthly_attendance(
+    attendance
+  )
+
+  ytd_value <- NA_real_
+
+  if (
+    is.data.frame(attendance) &&
+      nrow(attendance) > 0L &&
+      all(
+        c(
+          "period_type",
+          "row_type",
+          "value"
+        ) %in% names(attendance)
+      )
+  ) {
+
+    ytd_rows <- attendance[
+      attendance$period_type == "YTD" &
+        attendance$row_type == "Overall Total",
+      ,
+      drop = FALSE
+    ]
+
+    ytd_values <- suppressWarnings(
+      as.numeric(ytd_rows$value)
+    )
+
+    ytd_values <- ytd_values[
+      is.finite(ytd_values)
+    ]
+
+    if (length(ytd_values) == 1L) {
+      ytd_value <- ytd_values[[1L]]
+    }
+  }
+
+  total_attendance <- if (
+    is.finite(ytd_value)
+  ) {
+    ytd_value
+  } else if (nrow(monthly) > 0L) {
+    sum(monthly$value)
+  } else {
+    NA_real_
+  }
+
+  average_monthly <- if (
+    nrow(monthly) > 0L
+  ) {
+    mean(monthly$value)
+  } else {
+    NA_real_
+  }
+
+  if (nrow(monthly) > 0L) {
+
+    peak_index <- which.max(
+      monthly$value
+    )
+
+    peak_value <- monthly$value[
+      peak_index
+    ]
+
+    peak_month <- monthly$month_label[
+      peak_index
+    ]
+
+  } else {
+
+    peak_value <- NA_real_
+    peak_month <- NA_character_
+  }
+
+  list(
+    total_attendance = total_attendance,
+    average_monthly = average_monthly,
+    peak_value = peak_value,
+    peak_month = peak_month,
+    reporting_months = nrow(monthly)
+  )
+}
+
+
+venues_operations_format_count <- function(value) {
+
+  if (
+    length(value) == 0L ||
+      !is.finite(value[[1L]])
+  ) {
+    return("—")
+  }
+
+  format(
+    round(value[[1L]]),
+    big.mark = ",",
+    scientific = FALSE,
+    trim = TRUE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Venues Operations.
 # This page is separated from Site Detail because Tracking Reports contain
@@ -10,10 +262,6 @@
 mod_venues_operations_ui <- function(id) {
 
   ns <- NS(id)
-
-  initial_year <- max(
-    VENUES_TRACKING_YEARS
-  )
 
   nav_panel(
     "Venues Operations",
@@ -43,30 +291,20 @@ mod_venues_operations_ui <- function(id) {
           selectInput(
             ns("year"),
             "Year",
-            choices = VENUES_TRACKING_YEARS,
-            selected = initial_year
+            choices = character()
           ),
 
           selectInput(
             ns("area"),
             "Operational area",
-            choices = prototype_venues_areas(
-              initial_year
-            ),
-            selected = prototype_venues_areas(
-              initial_year
-            )[[1]]
+            choices = character()
           ),
 
           col_widths = c(3, 5)
         ),
 
-        tags$small(
-          class = "text-secondary",
-          paste(
-            "Operational areas will eventually update according to",
-            "the sheets available in the selected year's Tracking Report."
-          )
+        uiOutput(
+          ns("availability_note")
         )
       ),
 
@@ -168,26 +406,193 @@ mod_venues_operations_server <- function(
     id,
     function(input, output, session) {
 
-      # Prototype availability rule. Later replace this with actual sheet
-      # detection from the uploaded Tracking Report.
-      observeEvent(
-        input$year,
-        {
-          req(input$year)
+      # -------------------------------------------------------------------
+      # Venues Tracking Report data
+      # -------------------------------------------------------------------
 
-          choices <- prototype_venues_areas(
-            input$year
+      venues_reports <- reactive({
+
+        if (is.null(data)) {
+          return(NULL)
+        }
+
+        dashboard_data <- if (
+          shiny::is.reactive(data)
+        ) {
+          data()
+        } else {
+          data
+        }
+
+        if (is.null(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data,
+            "venues_tracking_report_data"
           )
+        ) {
+          return(dashboard_data)
+        }
+
+        if (!is.list(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data$venues_reports,
+            "venues_tracking_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$venues_reports
+          )
+        }
+
+        if (
+          inherits(
+            dashboard_data$venues,
+            "venues_tracking_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$venues
+          )
+        }
+
+        NULL
+      })
+
+
+      selected_attendance <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$attendance,
+          year = input$year
+        )
+      })
+
+      attendance_kpis <- reactive({
+
+        venues_operations_attendance_kpis(
+          selected_attendance()
+        )
+      })
+
+      # -------------------------------------------------------------------
+      # Available years
+      # -------------------------------------------------------------------
+
+      observeEvent(
+        venues_reports(),
+        {
+
+          years <- venues_operations_available_years(
+            venues_reports()
+          )
+
+          selected_year <- if (
+            length(years) > 0L
+          ) {
+            as.character(
+              max(years)
+            )
+          } else {
+            character()
+          }
+
+          updateSelectInput(
+            session,
+            "year",
+            choices = years,
+            selected = selected_year
+          )
+        },
+        ignoreInit = FALSE
+      )
+
+      # -------------------------------------------------------------------
+      # Available operational areas
+      # -------------------------------------------------------------------
+
+      observeEvent(
+        list(
+          venues_reports(),
+          input$year
+        ),
+        {
+
+          attendance <- selected_attendance()
+
+          areas <- if (
+            is.data.frame(attendance) &&
+              nrow(attendance) > 0L
+          ) {
+            "Attendance"
+          } else {
+            character()
+          }
 
           updateSelectInput(
             session,
             "area",
-            choices = choices,
-            selected = choices[[1]]
+            choices = areas,
+            selected = if (
+              length(areas) > 0L
+            ) {
+              areas[[1L]]
+            } else {
+              character()
+            }
           )
         },
-        ignoreInit = TRUE
+        ignoreInit = FALSE
       )
+
+      output$availability_note <- renderUI({
+
+        reports <- venues_reports()
+
+        if (is.null(reports)) {
+          return(
+            tags$small(
+              class = "text-secondary",
+              "Upload Venues Tracking Reports on the Data page to activate this analysis."
+            )
+          )
+        }
+
+        attendance <- selected_attendance()
+
+        if (
+          !is.data.frame(attendance) ||
+            nrow(attendance) == 0L
+        ) {
+          return(
+            tags$small(
+              class = "text-secondary",
+              "No Attendance data is available for this year."
+            )
+          )
+        }
+
+        tags$small(
+          class = "text-secondary",
+          "Available from uploaded reports: Attendance"
+        )
+      })
 
       output$focus_heading <- renderUI({
 
@@ -209,9 +614,8 @@ mod_venues_operations_server <- function(
 
           p(
             "Operational detail from the selected Venues Tracking Report."
-          ),
-
-          prototype_note()
+          )
+          
         )
       })
 
@@ -221,196 +625,49 @@ mod_venues_operations_server <- function(
 
         req(input$area)
 
-        switch(
-          input$area,
+        if (!identical(input$area, "Attendance")) {
+          return(NULL)
+        }
 
-          "Facility Usage & Attendance" = list(
-            list(
-              title = "Total Attendance",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
+        values <- attendance_kpis()
+
+        peak_month <- if (
+          is.character(values$peak_month) &&
+            length(values$peak_month) > 0L &&
+            !is.na(values$peak_month[[1L]])
+        ) {
+          values$peak_month[[1L]]
+        } else {
+          "No reported month"
+        }
+
+        list(
+          list(
+            title = "Total Attendance",
+            value = venues_operations_format_count(
+              values$total_attendance
             ),
-            list(
-              title = "Usage Hours",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "calendar3"
-            ),
-            list(
-              title = "Peak Activity",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "bar-chart-line"
-            )
+            subtitle = "Selected year",
+            icon = "people"
           ),
-
-          "Facility Hire" = list(
-            list(
-              title = "Hire Revenue",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "cash-stack"
+          list(
+            title = "Average / Month",
+            value = venues_operations_format_count(
+              values$average_monthly
             ),
-            list(
-              title = "Bookings",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "calendar3"
+            subtitle = paste0(
+              values$reporting_months,
+              " reporting months"
             ),
-            list(
-              title = "Avg Revenue / Booking",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "receipt"
-            )
+            icon = "calendar3"
           ),
-
-          "Membership" = list(
-            list(
-              title = "Active Members",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
+          list(
+            title = "Peak Month",
+            value = venues_operations_format_count(
+              values$peak_value
             ),
-            list(
-              title = "New Members",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "clipboard-data"
-            ),
-            list(
-              title = "Expiring",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "calendar3"
-            )
-          ),
-
-          "Online Sales" = list(
-            list(
-              title = "Online Sales",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "cash-stack"
-            ),
-            list(
-              title = "Transactions",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "receipt"
-            ),
-            list(
-              title = "Avg Transaction",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "cash-stack"
-            )
-          ),
-
-          "Workforce" = list(
-            list(
-              title = "Casual Hours",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "calendar3"
-            ),
-            list(
-              title = "Casual Wages",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "cash-stack"
-            ),
-            list(
-              title = "Avg Cost / Hour",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "receipt"
-            )
-          ),
-
-          "Finance" = list(
-            list(
-              title = "YTD Actual",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
-            ),
-            list(
-              title = "YTD Budget",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "clipboard-data"
-            ),
-            list(
-              title = "Variance",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "arrow-up-right"
-            )
-          ),
-
-          "Customer Operations" = list(
-            list(
-              title = "Service Desk Calls",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "receipt"
-            ),
-            list(
-              title = "Cancellations",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "arrow-up-right"
-            ),
-            list(
-              title = "Resolution Rate",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "bullseye"
-            )
-          ),
-
-          "Offers & Targets" = list(
-            list(
-              title = "Active Offers",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "bullseye"
-            ),
-            list(
-              title = "Target Achievement",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "graph-up-arrow"
-            ),
-            list(
-              title = "Variance",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "arrow-up-right"
-            )
-          ),
-
-          "Discounts" = list(
-            list(
-              title = "Discount Value",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "bullseye"
-            ),
-            list(
-              title = "Transactions",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "receipt"
-            ),
-            list(
-              title = "Avg Discount",
-              value = "—",
-              subtitle = "Placeholder",
-              icon = "cash-stack"
-            )
+            subtitle = peak_month,
+            icon = "bar-chart-line"
           )
         )
       })
