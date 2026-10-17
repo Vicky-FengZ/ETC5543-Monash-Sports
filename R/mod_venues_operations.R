@@ -236,6 +236,116 @@ venues_operations_attendance_kpis <- function(attendance) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Attendance by activity
+# -------------------------------------------------------------------------
+
+venues_operations_attendance_activity_totals <- function(attendance) {
+
+  empty_result <- data.frame(
+    activity = character(),
+    area = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(attendance) ||
+      !is.data.frame(attendance) ||
+      nrow(attendance) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "row_type",
+    "activity",
+    "area",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(attendance))) {
+    return(empty_result)
+  }
+
+  valid_activity <-
+    !is.na(attendance$activity) &
+    nzchar(trimws(attendance$activity)) &
+    tolower(trimws(attendance$activity)) != "overall"
+
+  select_rows <- function(period_type, row_type) {
+
+    rows <- attendance[
+      attendance$period_type == period_type &
+        attendance$row_type == row_type &
+        valid_activity,
+      ,
+      drop = FALSE
+    ]
+
+    rows$value <- suppressWarnings(
+      as.numeric(rows$value)
+    )
+
+    rows[
+      is.finite(rows$value),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  # Prefer the reported annual/YTD activity totals.
+  rows <- select_rows(
+    "YTD",
+    "Summary Total"
+  )
+
+  # Fallbacks for workbook layouts without Summary Total YTD rows.
+  if (nrow(rows) == 0L) {
+    rows <- select_rows(
+      "YTD",
+      "Section Total"
+    )
+  }
+
+  if (nrow(rows) == 0L) {
+    rows <- select_rows(
+      "Month",
+      "Summary Total"
+    )
+  }
+
+  if (nrow(rows) == 0L) {
+    rows <- select_rows(
+      "Month",
+      "Section Total"
+    )
+  }
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  totals <- aggregate(
+    value ~ activity + area,
+    data = rows,
+    FUN = sum
+  )
+
+  totals <- totals[
+    order(
+      totals$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(totals) <- NULL
+
+  totals
+}
 
 venues_operations_format_count <- function(value) {
 
@@ -355,7 +465,10 @@ mod_venues_operations_ui <- function(id) {
             div(
               div(
                 class = "chart-header-title",
-                "Operational Breakdown"
+                uiOutput(
+                  ns("breakdown_title"),
+                  inline = TRUE
+                )
               ),
 
               uiOutput(
@@ -364,8 +477,9 @@ mod_venues_operations_ui <- function(id) {
             )
           ),
 
-          placeholder_chart(
-            "Break down the selected operational area into its main categories"
+          plotOutput(
+            ns("attendance_by_activity"),
+            height = "360px"
           )
         ),
 
@@ -498,6 +612,13 @@ mod_venues_operations_server <- function(
       monthly_attendance <- reactive({
 
         venues_operations_monthly_attendance(
+          selected_attendance()
+        )
+      })
+
+      attendance_activity <- reactive({
+
+        venues_operations_attendance_activity_totals(
           selected_attendance()
         )
       })
@@ -746,9 +867,34 @@ mod_venues_operations_server <- function(
         bg = "white"
       )
 
-      output$breakdown_subtitle <- renderUI({
+            output$breakdown_title <- renderUI({
 
         req(input$area)
+
+        if (identical(input$area, "Attendance")) {
+          return("Attendance by Activity")
+        }
+
+        "Operational Breakdown"
+      })
+
+      output$breakdown_subtitle <- renderUI({
+
+        req(
+          input$year,
+          input$area
+        )
+
+        if (identical(input$area, "Attendance")) {
+          return(
+            chart_subtitle(
+              paste0(
+                "Annual attendance by activity · ",
+                input$year
+              )
+            )
+          )
+        }
 
         chart_subtitle(
           paste0(
@@ -757,6 +903,35 @@ mod_venues_operations_server <- function(
           )
         )
       })
+
+      output$attendance_by_activity <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Attendance"
+            )
+          )
+
+          activity_data <- attendance_activity()
+
+          validate(
+            need(
+              is.data.frame(activity_data) &&
+                nrow(activity_data) > 0L &&
+                any(is.finite(activity_data$value)),
+              "No activity attendance values are available for this selection."
+            )
+          )
+
+          plot_venues_attendance_by_activity(
+            activity_data
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       invisible(
         list(

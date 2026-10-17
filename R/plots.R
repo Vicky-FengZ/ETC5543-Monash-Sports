@@ -5926,3 +5926,177 @@ plot_venues_attendance_over_time <- function(attendance_data) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Venues Operations - Attendance by Activity
+# -------------------------------------------------------------------------
+
+plot_venues_attendance_by_activity <- function(activity_data) {
+
+  if (
+    is.null(activity_data) ||
+      !is.data.frame(activity_data) ||
+      nrow(activity_data) == 0L
+  ) {
+    stop(
+      "No activity attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "activity",
+    "value"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(activity_data)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Activity attendance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  activities <- as.character(
+    activity_data$activity
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      activity_data$value
+    )
+  )
+
+  keep <-
+    !is.na(activities) &
+    nzchar(trimws(activities)) &
+    is.finite(values)
+
+  activities <- activities[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No finite activity attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  # Highest attendance at the top.
+  order_index <- order(
+    values,
+    decreasing = FALSE
+  )
+
+  activities <- activities[order_index]
+  values <- values[order_index]
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  x_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.15
+  }
+
+  old_par <- par(
+    mar = c(4.5, 10, 2.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    names.arg = activities,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = c(0, x_max),
+    axes = FALSE,
+    cex.names = 0.82
+  )
+
+  x_ticks <- pretty(
+    c(0, x_max),
+    n = 5
+  )
+
+  x_ticks <- x_ticks[
+    x_ticks >= 0 &
+      x_ticks <= x_max
+  ]
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    names.arg = activities,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = c(0, x_max),
+    axes = FALSE,
+    cex.names = 0.82,
+    add = TRUE
+  )
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = format(
+      round(x_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  text(
+    x = values,
+    y = positions,
+    labels = format(
+      round(values),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    pos = 4,
+    offset = 0.4,
+    cex = 0.78,
+    col = "#475569"
+  )
+
+  invisible(NULL)
+}
