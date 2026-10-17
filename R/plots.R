@@ -6001,6 +6001,41 @@ plot_venues_attendance_by_activity <- function(activity_data) {
   activities <- activities[order_index]
   values <- values[order_index]
 
+  wrapped_activities <- vapply(
+  activities,
+  function(label) {
+    paste(
+      strwrap(
+        label,
+        width = 20
+      ),
+      collapse = "\n"
+    )
+  },
+  character(1)
+)
+
+activity_lines <- unlist(
+  strsplit(
+    wrapped_activities,
+    "\n",
+    fixed = TRUE
+  )
+)
+
+max_label_width <- max(
+  nchar(activity_lines),
+  na.rm = TRUE
+)
+
+left_margin <- max(
+  6.5,
+  min(
+    8.5,
+    max_label_width * 0.48
+  )
+)
+
   max_value <- max(
     values,
     na.rm = TRUE
@@ -6016,7 +6051,7 @@ plot_venues_attendance_by_activity <- function(activity_data) {
   }
 
   old_par <- par(
-    mar = c(4.5, 10, 2.2, 1.2),
+    mar = c(4.5, left_margin, 2.2, 1.2),
     xaxs = "i",
     yaxs = "i",
     family = "sans"
@@ -6029,14 +6064,14 @@ plot_venues_attendance_by_activity <- function(activity_data) {
 
   positions <- barplot(
     values,
-    names.arg = activities,
+    names.arg = wrapped_activities,
     horiz = TRUE,
     las = 1,
     border = NA,
     col = "#2563EB",
     xlim = c(0, x_max),
     axes = FALSE,
-    cex.names = 0.82
+    cex.names = 0.76
   )
 
   x_ticks <- pretty(
@@ -6057,14 +6092,14 @@ plot_venues_attendance_by_activity <- function(activity_data) {
 
   barplot(
     values,
-    names.arg = activities,
+    names.arg = wrapped_activities,
     horiz = TRUE,
     las = 1,
     border = NA,
     col = "#2563EB",
     xlim = c(0, x_max),
     axes = FALSE,
-    cex.names = 0.82,
+    cex.names = 0.76,
     add = TRUE
   )
 
@@ -6095,6 +6130,176 @@ plot_venues_attendance_by_activity <- function(activity_data) {
     pos = 4,
     offset = 0.4,
     cex = 0.78,
+    col = "#475569"
+  )
+
+  invisible(NULL)
+}
+
+# -------------------------------------------------------------------------
+# Venues Operations - Attendance by Area
+# -------------------------------------------------------------------------
+
+plot_venues_attendance_by_area <- function(area_data) {
+
+  if (
+    is.null(area_data) ||
+      !is.data.frame(area_data) ||
+      nrow(area_data) == 0L
+  ) {
+    stop(
+      "No area attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "area",
+    "value"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(area_data)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Area attendance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  areas <- as.character(
+    area_data$area
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      area_data$value
+    )
+  )
+
+  keep <-
+    !is.na(areas) &
+    nzchar(trimws(areas)) &
+    is.finite(values)
+
+  areas <- areas[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No finite area attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(
+    values,
+    decreasing = TRUE
+  )
+
+  areas <- areas[order_index]
+  values <- values[order_index]
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  y_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.15
+  }
+
+  old_par <- par(
+    mar = c(5, 4.8, 2.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    names.arg = areas,
+    border = NA,
+    col = "#2563EB",
+    ylim = c(0, y_max),
+    axes = FALSE,
+    cex.names = 0.86
+  )
+
+  y_ticks <- pretty(
+    c(0, y_max),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_max
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    names.arg = areas,
+    border = NA,
+    col = "#2563EB",
+    ylim = c(0, y_max),
+    axes = FALSE,
+    cex.names = 0.86,
+    add = TRUE
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  text(
+    x = positions,
+    y = values,
+    labels = format(
+      round(values),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    pos = 3,
+    offset = 0.4,
+    cex = 0.8,
     col = "#475569"
   )
 
