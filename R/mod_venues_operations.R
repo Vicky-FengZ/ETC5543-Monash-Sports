@@ -327,7 +327,10 @@ mod_venues_operations_ui <- function(id) {
           div(
             div(
               class = "chart-header-title",
-              "Monthly Operational Trend"
+              uiOutput(
+                ns("main_title"),
+                inline = TRUE
+              )
             ),
 
             uiOutput(
@@ -336,8 +339,9 @@ mod_venues_operations_ui <- function(id) {
           )
         ),
 
-        placeholder_chart(
-          "Month-by-month operational performance"
+        plotOutput(
+          ns("attendance_over_time"),
+          height = "440px"
         )
       ),
 
@@ -487,6 +491,13 @@ mod_venues_operations_server <- function(
       attendance_kpis <- reactive({
 
         venues_operations_attendance_kpis(
+          selected_attendance()
+        )
+      })
+
+      monthly_attendance <- reactive({
+
+        venues_operations_monthly_attendance(
           selected_attendance()
         )
       })
@@ -679,6 +690,17 @@ mod_venues_operations_server <- function(
         )
       })
 
+      output$main_title <- renderUI({
+
+        req(input$area)
+
+        if (identical(input$area, "Attendance")) {
+          return("Attendance Over Time")
+        }
+
+        "Operational Trend"
+      })
+
       output$main_subtitle <- renderUI({
 
         req(
@@ -694,6 +716,35 @@ mod_venues_operations_server <- function(
           )
         )
       })
+
+      output$attendance_over_time <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Attendance"
+            )
+          )
+
+          monthly <- monthly_attendance()
+
+          validate(
+            need(
+              is.data.frame(monthly) &&
+                nrow(monthly) > 0L &&
+                any(is.finite(monthly$value)),
+              "No monthly attendance values are available for this selection."
+            )
+          )
+
+          plot_venues_attendance_over_time(
+            monthly
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
 
       output$breakdown_subtitle <- renderUI({
 

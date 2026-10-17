@@ -5752,3 +5752,177 @@ plot_site_detail_membership_movement <- function(movement_data) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Venues Operations - Attendance Over Time
+# -------------------------------------------------------------------------
+
+plot_venues_attendance_over_time <- function(attendance_data) {
+
+  if (
+    is.null(attendance_data) ||
+      !is.data.frame(attendance_data) ||
+      nrow(attendance_data) == 0L
+  ) {
+    stop(
+      "No monthly attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "value"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(attendance_data)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Attendance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    attendance_data$date
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      attendance_data$value
+    )
+  )
+
+  keep <- !is.na(dates) &
+    is.finite(values)
+
+  dates <- dates[keep]
+  values <- values[keep]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No finite monthly attendance values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  values <- values[order_index]
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  y_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.15
+  }
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits + c(-15, 15)
+  } else {
+    x_limits <- x_limits + c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(4.8, 5.8, 3.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_max),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, y_max),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_max
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  lines(
+    dates,
+    values,
+    col = "#2563EB",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    values,
+    pch = 21,
+    cex = 1,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  axis.Date(
+    1,
+    at = dates,
+    format = "%b",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.86
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  invisible(NULL)
+}
