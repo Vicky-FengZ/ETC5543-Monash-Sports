@@ -957,6 +957,145 @@ site_detail_membership_active_mix <- function(memberships) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Enrolment calculations
+# -------------------------------------------------------------------------
+
+site_detail_latest_enrolment_metric <- function(
+    enrollments,
+    metric
+) {
+
+  empty_result <- list(
+    value = NA_real_,
+    latest_month = NA_character_
+  )
+
+  if (
+    is.null(enrollments) ||
+      !is.data.frame(enrollments) ||
+      nrow(enrollments) == 0L ||
+      !"date" %in% names(enrollments) ||
+      !"metric" %in% names(enrollments) ||
+      !"value" %in% names(enrollments)
+  ) {
+    return(empty_result)
+  }
+
+  rows <- enrollments[
+    enrollments$metric == metric &
+      !is.na(enrollments$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  # These enrolment templates contain zero-filled months where
+  # no meaningful snapshot value has been reported yet.
+  meaningful_rows <- rows[
+    rows$value > 0,
+    ,
+    drop = FALSE
+  ]
+
+  # If the metric genuinely contains only zeros, retain zero
+  # rather than treating the metric as unavailable.
+  if (nrow(meaningful_rows) > 0L) {
+    rows <- meaningful_rows
+  }
+
+  latest_date <- max(
+    rows$date,
+    na.rm = TRUE
+  )
+
+  values <- rows$value[
+    rows$date == latest_date
+  ]
+
+  list(
+    value = sum(values),
+    latest_month = format(
+      latest_date,
+      "%b %Y"
+    )
+  )
+}
+
+
+site_detail_enrolment_kpis <- function(enrollments) {
+
+  if (
+    is.null(enrollments) ||
+      !is.data.frame(enrollments) ||
+      nrow(enrollments) == 0L
+  ) {
+    return(
+      list(
+        total_active = NA_real_,
+        total_active_month = NA_character_,
+        target = NA_real_,
+        target_month = NA_character_,
+        active_students = NA_real_,
+        active_students_month = NA_character_,
+        student_share = NA_real_,
+        student_share_month = NA_character_
+      )
+    )
+  }
+
+  total_active <- site_detail_latest_enrolment_metric(
+    enrollments,
+    "Total Active"
+  )
+
+  target <- site_detail_latest_enrolment_metric(
+    enrollments,
+    "Target"
+  )
+
+  active_students <- site_detail_latest_enrolment_metric(
+    enrollments,
+    "Active Student Members"
+  )
+
+  student_share <- site_detail_latest_enrolment_metric(
+    enrollments,
+    "Student Share"
+  )
+
+  list(
+    total_active = total_active$value,
+    total_active_month = total_active$latest_month,
+
+    target = target$value,
+    target_month = target$latest_month,
+
+    active_students = active_students$value,
+    active_students_month = active_students$latest_month,
+
+    student_share = student_share$value,
+    student_share_month = student_share$latest_month
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1344,7 +1483,32 @@ mod_site_detail_server <- function(
         )
       })
 
-            membership_trend <- reactive({
+      selected_enrollments <- reactive({
+
+        reports <- site_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        site_detail_filter_rows(
+          reports$enrollments,
+          year = input$year,
+          site = input$site
+        )
+      })
+
+      enrolment_kpis <- reactive({
+
+        site_detail_enrolment_kpis(
+          selected_enrollments()
+        )
+      })
+
+      membership_trend <- reactive({
 
         site_detail_membership_trend(
           selected_memberships()
@@ -1687,27 +1851,76 @@ mod_site_detail_server <- function(
             )
           },
 
-          "Enrolments" = list(
-            list(
-              title = "Enrolments",
-              value = "—",
-              subtitle = "Selected year",
-              icon = "clipboard-data"
-            ),
-            list(
-              title = "Available Measures",
-              value = "—",
-              subtitle = "Enrolment measures",
-              icon = "bar-chart"
-            ),
-            list(
-              title = "Reporting Months",
-              value = "—",
-              subtitle = "Available periods",
-              icon = "calendar3"
-            )
-          ),
+          "Enrolments" = {
 
+            values <- enrolment_kpis()
+
+            metric_month <- function(value) {
+
+              if (
+                is.character(value) &&
+                  length(value) > 0L &&
+                  !is.na(value[[1L]])
+              ) {
+                value[[1L]]
+              } else {
+                "Latest available"
+              }
+            }
+
+            list(
+              list(
+                title = "Total Active",
+                value = site_detail_format_visit_count(
+                  values$total_active
+                ),
+                subtitle = metric_month(
+                  values$total_active_month
+                ),
+                icon = "people"
+              ),
+              list(
+                title = "Target",
+                value = site_detail_format_visit_count(
+                  values$target
+                ),
+                subtitle = metric_month(
+                  values$target_month
+                ),
+                icon = "bullseye"
+              ),
+              list(
+                title = "Active Students",
+                value = site_detail_format_visit_count(
+                  values$active_students
+                ),
+                subtitle = metric_month(
+                  values$active_students_month
+                ),
+                icon = "mortarboard"
+              ),
+              list(
+                title = "Student Share",
+                value = if (
+                  is.finite(values$student_share)
+                ) {
+                  paste0(
+                    sprintf(
+                      "%.1f",
+                      100 * values$student_share
+                    ),
+                    "%"
+                  )
+                } else {
+                  "—"
+                },
+                subtitle = metric_month(
+                  values$student_share_month
+                ),
+                icon = "percent"
+              )
+            )
+          },
           NULL
         )
       })
@@ -2165,7 +2378,9 @@ mod_site_detail_server <- function(
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
           audience_breakdown = audience_breakdown,
-          activity_breakdown = activity_breakdown
+          activity_breakdown = activity_breakdown,
+          selected_enrollments = selected_enrollments,
+          enrolment_kpis = enrolment_kpis
         )
       )
     }
