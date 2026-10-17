@@ -1096,6 +1096,109 @@ site_detail_enrolment_kpis <- function(enrollments) {
   )
 }
 
+# -------------------------------------------------------------------------
+# Enrolment trend data
+# -------------------------------------------------------------------------
+
+site_detail_enrolment_trend <- function(enrollments) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    total_active = double(),
+    target = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(enrollments) ||
+      !is.data.frame(enrollments) ||
+      nrow(enrollments) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(enrollments))) {
+    return(empty_result)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        enrollments$date[
+          !is.na(enrollments$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  metric_values <- function(metric_name) {
+
+    vapply(
+      seq_along(dates),
+      function(index) {
+
+        current_date <- dates[[index]]
+
+        values <- enrollments$value[
+          enrollments$date == current_date &
+            enrollments$metric == metric_name
+        ]
+
+        site_detail_sum_available(
+          values
+        )
+      },
+      double(1)
+    )
+  }
+
+  total_active <- metric_values(
+    "Total Active"
+  )
+
+  target <- metric_values(
+    "Target"
+  )
+
+  # In these enrolment templates, zero-filled snapshot values
+  # represent months without a meaningful reported value.
+  total_active[
+    is.finite(total_active) &
+      total_active == 0
+  ] <- NA_real_
+
+  target[
+    is.finite(target) &
+      target == 0
+  ] <- NA_real_
+
+  data.frame(
+    date = dates,
+    month = as.integer(
+      format(dates, "%m")
+    ),
+    month_label = format(
+      dates,
+      "%b"
+    ),
+    total_active = total_active,
+    target = target,
+    stringsAsFactors = FALSE
+  )
+}
+
 # UI ----------------------------------------------------------------------
 # Detailed Analysis -> Site Detail.
 # Uses Site Report files to examine one site within one year, month by month.
@@ -1504,6 +1607,13 @@ mod_site_detail_server <- function(
       enrolment_kpis <- reactive({
 
         site_detail_enrolment_kpis(
+          selected_enrollments()
+        )
+      })
+
+      enrolment_trend <- reactive({
+
+        site_detail_enrolment_trend(
           selected_enrollments()
         )
       })
@@ -2017,6 +2127,15 @@ mod_site_detail_server <- function(
           )
         }
 
+        if (identical(input$area, "Enrolments")) {
+          return(
+            plotOutput(
+              ns("enrolments_over_time"),
+              height = "440px"
+            )
+          )
+        }
+
         placeholder_chart(
           titles()$main_placeholder
         )
@@ -2072,6 +2191,42 @@ mod_site_detail_server <- function(
           )
 
           plot_site_detail_memberships_over_time(
+            trend
+          )
+        },
+        res = 96,
+        bg = "white"
+      )
+
+      output$enrolments_over_time <- renderPlot(
+        {
+
+          req(
+            identical(
+              input$area,
+              "Enrolments"
+            )
+          )
+
+          trend <- enrolment_trend()
+
+          validate(
+            need(
+              is.data.frame(trend) &&
+                nrow(trend) > 0L &&
+                any(
+                  is.finite(
+                    c(
+                      trend$total_active,
+                      trend$target
+                    )
+                  )
+                ),
+              "No monthly Total Active or Target values are available for this selection."
+            )
+          )
+
+          plot_site_detail_enrolments_over_time(
             trend
           )
         },
@@ -2374,6 +2529,7 @@ mod_site_detail_server <- function(
           membership_trend = membership_trend,
           membership_movement = membership_movement,
           membership_active_mix = membership_active_mix,
+          enrolment_trend = enrolment_trend,
           visit_kpis = visit_kpis,
           monthly_visits = monthly_visits,
           visit_type_breakdown = visit_type_breakdown,
