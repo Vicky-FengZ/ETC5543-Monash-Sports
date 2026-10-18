@@ -1,7 +1,7 @@
 # Monash Sport Performance Dashboard
 
 This repository contains a modular R Shiny dashboard and an Excel data
-pipeline. The pipeline finds recurring reports, checks their structure and
+pipeline. The pipeline reads uploaded workbooks, checks their structure and
 calculations, and converts them into long tables for use in the dashboard
 and forecasting modules.
 
@@ -19,257 +19,10 @@ to Excel. Uploaded files last for the current Shiny session, and the dashboard
 modules share data from successful imports. Overview uses Monthly Site Report
 data. Other analytical pages can be connected as their charts are completed.
 
-## Project structure
-
-```text
-app.R
-
-R/
-  config.R
-  ui_helpers.R
-  calculations.R
-  plots.R
-
-  data/
-    load.R
-    common.R
-    monthly_site/
-      import.R
-      validation.R
-      cleaning.R
-    venues/
-      import.R
-      validation.R
-      cleaning.R
-    business_unit_templates/
-      import.R
-      validation.R
-      cleaning.R
-
-  mod_overview.R
-  mod_site_comparison.R
-  mod_site_detail.R
-  mod_venues_operations.R
-  mod_forecasting.R
-  mod_data_upload.R
-
-data/
-  raw/                 # source Excel files; not tracked by Git
-  processed/           # recommended location for production caches
-
-www/
-  styles.css
-```
-
-Each file has a specific role:
-
-- `app.R`: assemble the navigation and connect Shiny modules.
-- `R/data/load.R`: source the complete data layer in dependency order.
-- `R/data/common.R`: helpers shared by all report types.
-- `R/data/*/import.R`: discover files and read the required worksheets.
-- `R/data/*/validation.R`: identify structural problems and reconciliation
-  differences.
-- `R/data/*/cleaning.R`: convert workbook layouts into analysis-ready tables.
-- `R/mod_*.R`: one dashboard page or feature per module.
-
-## Data architecture
-
-Each report type follows this workflow:
-
-```text
-data/raw Excel files
-        ↓
-file discovery and worksheet import
-        ↓
-structure and calculation validation
-        ↓
-standardised long tables
-        ↓
-dashboard calculations, charts and forecasts
-```
-
-Extracted tables keep source metadata such as `source_file`, `source_sheet`,
-`source_row` and `source_column`, so you can trace a dashboard value back to
-its original Excel cell.
-
-### Data-source summary
-
-| Source | Raw-data folder | Loader | Intended dashboard use |
-|---|---|---|---|
-| Monthly Site Reports | `data/raw/Monthly Site Report/` | `load_monthly_site_reports()` | Overview and Site & Facility Comparison |
-| Venues Tracking Reports | `data/raw/Business Unit Tracking Reports/Venues/` | `load_venues_tracking_reports()` | Venues Operations and facility-level analysis |
-| Business Unit Site/Program Reports | `data/raw/Business Unit Templates that feed master reports/` | `load_business_unit_template_reports()` | Site Detail, visits, memberships and enrolments |
-
-## Loading data during development
-
-Source the data layer once before using any loader:
-
-```r
-source("R/data/load.R")
-```
-
-The three loaders run independently. Run the one for the report type you are
-developing or testing.
-
-### 1. Monthly Site Reports
-
-```r
-monthly_reports <- load_monthly_site_reports()
-
-monthly_reports$finance
-monthly_reports$discounts
-monthly_reports$total_revenue
-monthly_reports$files
-monthly_reports$validation
-```
-
-Outputs:
-
-| Object | Description |
-|---|---|
-| `finance` | Monthly Income and Expenses by site, business unit, Budget, Actual and Variance |
-| `discounts` | Monthly Student, Staff and Other discount opportunities |
-| `total_revenue` | Annual `Actual Income + Discount Opportunity` reconciliation against the workbook value |
-| `files` | Discovered files and report years |
-| `validation` | Import, structure and calculation issues |
-
-Use `is_summary == TRUE` for site totals. The Monash Sport summary row gives
-the total for the organisation.
-
-### 2. Venues Tracking Reports
-
-```r
-venues_reports <- load_venues_tracking_reports()
-
-venues_reports$finance
-venues_reports$attendance
-venues_reports$facility_hire
-venues_reports$court_hire
-venues_reports$membership
-venues_reports$online_sales
-venues_reports$merchandise
-venues_reports$casual_hours
-venues_reports$casual_wages
-venues_reports$checks
-venues_reports$attendance_checks
-venues_reports$facility_hire_checks
-venues_reports$court_hire_checks
-venues_reports$membership_checks
-venues_reports$online_sales_checks
-venues_reports$merchandise_checks
-venues_reports$casual_hours_checks
-venues_reports$casual_wages_checks
-venues_reports$files
-venues_reports$validation
-```
-
-Outputs:
-
-| Object | Description |
-|---|---|
-| `finance` | MTD Finance values by fund, metric and value type |
-| `attendance` | Facility, activity and customer/category attendance with Month and YTD periods |
-| `facility_hire` | Facility-hire revenue and transaction measures with Month and YTD periods |
-| `court_hire` | Annual Court Hire comparisons by activity, including previous year, report year, growth achieved, monthly values and reported totals |
-| `membership` | Membership measures such as New, Renewed, Active and Retention |
-| `online_sales` | Online revenue by site, category and Month/YTD period, with reporting flags for incomplete months |
-| `merchandise` | Equipment hire, equipment sales and Monash Sport merchandise revenue/transaction measures |
-| `casual_hours` | Monthly summary only: budgeted hours, paid hours and variance, plus the reported total |
-| `casual_wages` | Budget, actual and variance for the salary-year block matching each workbook's report year |
-| `*_checks` | Independent monthly-to-YTD and finance reconciliation checks |
-
-The source workbook's `MTD Total` and `YTD Total` rows stay separate from
-fund-level rows to avoid double counting.
-
-### 3. Business Unit Site and Program Reports
-
-```r
-site_reports <- load_business_unit_template_reports()
-
-site_reports$finance
-site_reports$visits
-site_reports$memberships
-site_reports$enrollments
-site_reports$discounts
-site_reports$total_revenue
-site_reports$finance_checks
-site_reports$visit_checks
-site_reports$membership_checks
-site_reports$enrollment_checks
-site_reports$files
-site_reports$validation
-```
-
-Outputs:
-
-| Object | Description |
-|---|---|
-| `finance` | Monthly and reported annual Finance values, including Profit/Loss |
-| `visits` | Direct and Indirect visits by activity, audience, month and YTD |
-| `memberships` | Monthly membership counts and shares where a Memberships sheet exists |
-| `enrollments` | Monthly enrolment measures; multiple labelled Month blocks are supported |
-| `discounts` | Discount opportunities retained from the Finance sheet |
-| `total_revenue` | Independently recalculated Total Revenue and validation status |
-
-`visit_type` distinguishes Direct and Indirect visits. `audience` contains
-Student, Staff, Community and Total, while `period_type` distinguishes Month
-and YTD values.
-
-Visit formulas can store fractional values even when Excel displays whole
-people. Visit checks allow a difference of one visit by default. Financial
-checks use a tolerance of one cent:
-
-```r
-site_reports <- load_business_unit_template_reports(
-  validation_tolerance = 0.01,
-  visit_validation_tolerance = 1
-)
-```
-
-## Validation
-
-Validation keeps extracted data available and records source discrepancies in
-a check table or the loader's `validation` table. It does not silently overwrite
-or discard a discrepancy.
-
-Common statuses are:
-
-| Status | Meaning |
-|---|---|
-| `pass` | Reported value agrees with the independently calculated value within tolerance |
-| `fail` | Both values exist but do not reconcile |
-| `missing_reported_value` | Components exist but the workbook has no reported total |
-| `missing_components` | A reported total exists but some required detail is absent |
-| `missing_monthly_values` | An annual/YTD value cannot be fully checked against monthly data |
-
-Warnings allow extraction to continue. Structural errors stop a strict import
-to avoid mislabelling data. To review issues:
-
-```r
-print(site_reports)
-site_reports$validation
-
-subset(site_reports$visit_checks, status != "pass")
-subset(site_reports$membership_checks, status != "pass")
-
-stopifnot(!any(site_reports$validation$level == "error"))
-```
-
-## Adding future report years
-
-Add a new file to the appropriate raw-data folder and run its loader again.
-The loaders do not hard-code years or worksheet row positions.
-
-| Report type | Example future filename | Required recognisable structure |
-|---|---|---|
-| Monthly Site Report | `Monthly Site Report 2026 - December.xlsx` | Finance sections labelled Income, Expenses, months, Budget, Actual and Variance |
-| Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire, Court Hire year comparison, Membership, Online Sales, Merchandise, Casual Hours and Casual Wages sheets; a year prefix such as `2026 Casual Hours` and a comparison name such as `Court Hire 2025 vs 2026` are accepted |
-| Business Unit report | `Aquatics Site Report 2026.xlsx` | Finance, Direct Visits and Indirect Visits; Memberships and Enrollments are optional |
-
-If a workbook's structure changes, check the returned `validation` table
-before using that year's data in the dashboard.
-
 ## Data upload and review workflow
+
+Select your Excel workbooks from their existing folders on your computer. You
+do not need to move them into the application folder before uploading.
 
 The Data page has two tasks:
 
@@ -335,10 +88,9 @@ Open **View Cleaned Data** and select the report family. The preview supports:
 The preview uses the parsed R objects. You can filter, sort and move between
 pages without reading the Excel files again.
 
-The current interface is a cleaned-data viewer rather than a cell-for-cell raw
-Excel viewer. To investigate a value in its original context, use
-`source_file`, `source_sheet`, `source_row` and `source_column` to locate the
-corresponding cell in the source workbook.
+The preview shows cleaned tables. To check a value in its original Excel
+context, use `source_file`, `source_sheet`, `source_row` and `source_column` to
+find the cell in your original workbook.
 
 ### New projects, audiences and indicators
 
@@ -383,10 +135,10 @@ The default definitions live outside the parsing code in this file.
 
 ### Standard Excel templates
 
-Each upload card includes **Download Excel template**. Three blank workbooks
-are shipped in `www/templates/`, outside `data/raw/` so they are not discovered
-as real reports. They contain input areas, formula totals and a built-in guide
-showing required headings, supported additions and filename/year rules.
+Each upload card includes **Download Excel template**. The three blank
+workbooks are bundled in `www/templates/`. Each has input areas, formula totals
+and a guide to the required headings, supported additions and filename/year
+rules. Download the matching template, complete it and upload the saved file.
 The example year is 2026; change the guide's Reporting year and Save As with
 the matching year before uploading completed data.
 
@@ -415,19 +167,133 @@ clears the temporary files and parsed results. Persistent per-user storage,
 cached RDS files and background import workers are planned for a later
 deployment stage.
 
-In custom Shiny upload code, Shiny's temporary `datapath` does not retain the
-original filename. Pass both values to the loader:
+## Data architecture
 
-```r
-monthly_reports <- load_monthly_site_reports(
-  paths = input$monthly_reports$datapath,
-  source_names = input$monthly_reports$name,
-  strict = FALSE
-)
+Each report type follows this workflow:
+
+```text
+Excel files selected on the Data page
+        ↓
+temporary session copies and worksheet import
+        ↓
+structure and calculation validation
+        ↓
+standardised long tables
+        ↓
+dashboard calculations, charts and forecasts
 ```
 
-Reuse the imported R object for dashboard filters and charts to avoid calling
-a loader again.
+Extracted tables keep source metadata such as `source_file`, `source_sheet`,
+`source_row` and `source_column`, so you can trace a dashboard value back to
+its original Excel cell.
+
+### Data-source summary
+
+| Report family | Upload area | Intended dashboard use |
+|---|---|---|
+| Monthly Site Reports | Monthly Site Reports | Overview, Site & Facility Comparison and Forecasting |
+| Venues Tracking Reports | Venues Tracking Reports | Venues Operations, facility analysis and the casual-payroll reference for Forecasting |
+| Business Unit Site/Program Reports | Detailed Site Reports | Site Detail, visits, memberships and enrolments |
+
+## Report contents
+
+Each report family produces the data and checks described below. Use **View
+Cleaned Data** to browse the cleaned rows by source worksheet.
+
+### 1. Monthly Site Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | Monthly Income and Expenses by site, business unit, Budget, Actual and Variance |
+| `discounts` | Monthly discount opportunities, including Student, Staff, Other and additional labelled categories |
+| `total_revenue` | Annual `Actual Income + Discount Opportunity` reconciliation against the workbook value |
+| `files` | Discovered files and report years |
+| `validation` | Import, structure and calculation issues |
+
+Summary rows give site totals. The Monash Sport summary row gives the total
+for the organisation.
+
+### 2. Venues Tracking Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | MTD Finance values by fund, metric and value type |
+| `attendance` | Facility, activity and customer/category attendance with Month and YTD periods |
+| `facility_hire` | Facility-hire revenue and transaction measures with Month and YTD periods |
+| `court_hire` | Annual Court Hire comparisons by activity, including previous year, report year, growth achieved, monthly values and reported totals |
+| `membership` | Membership measures such as New, Renewed, Active and Retention |
+| `online_sales` | Online revenue by site, category and Month/YTD period, with reporting flags for incomplete months |
+| `merchandise` | Equipment hire, equipment sales and Monash Sport merchandise revenue/transaction measures |
+| `casual_hours` | Monthly summary only: budgeted hours, paid hours and variance, plus the reported total |
+| `casual_wages` | Budget, actual and variance for the salary-year block matching each workbook's report year |
+| `*_checks` | Independent monthly-to-YTD and finance reconciliation checks |
+
+The source workbook's `MTD Total` and `YTD Total` rows stay separate from
+fund-level rows to avoid double counting.
+
+### 3. Business Unit Site and Program Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | Monthly and reported annual Finance values, including Profit/Loss |
+| `visits` | Direct and Indirect visits by activity, audience, month and YTD |
+| `memberships` | Monthly membership counts and shares where a Memberships sheet exists |
+| `enrollments` | Monthly enrolment measures; multiple labelled Month blocks are supported |
+| `discounts` | Discount opportunities retained from the Finance sheet |
+| `total_revenue` | Independently recalculated Total Revenue and validation status |
+
+`visit_type` distinguishes Direct and Indirect visits. Common `audience` values
+include Student, Staff, Community and Total. Additional labelled audience
+columns keep their workbook names. `period_type` distinguishes Month and YTD
+values.
+
+Visit formulas can store fractional values even when Excel displays whole
+people. Visit checks allow a difference of one visit by default. Financial
+checks use a tolerance of one cent.
+
+## Validation
+
+Validation keeps extracted data available and records source discrepancies in
+check tables and validation notes. It does not silently overwrite or discard a
+discrepancy.
+
+Common statuses are:
+
+| Status | Meaning |
+|---|---|
+| `pass` | Reported value agrees with the independently calculated value within tolerance |
+| `fail` | Both values exist but do not reconcile |
+| `missing_reported_value` | Components exist but the workbook has no reported total |
+| `missing_components` | A reported total exists but some required detail is absent |
+| `missing_monthly_values` | An annual/YTD value cannot be fully checked against monthly data |
+
+Warnings allow extraction to continue. Blocking validation errors and parser
+errors exclude the affected file from the dashboard. Review the file's status
+and **View details** in **Upload & Manage**, then correct and upload the workbook
+again if needed.
+
+## Adding future report years
+
+Upload the new year's workbook through the matching report-family card in
+**Upload & Manage**. Keep its filename and reporting year consistent, and
+preserve the required headings and worksheet structure. The importers recognise
+years and row positions within the supported layouts.
+
+| Report type | Example future filename | Required recognisable structure |
+|---|---|---|
+| Monthly Site Report | `Monthly Site Report 2026 - December.xlsx` | Finance sections labelled Income, Expenses, months, Budget, Actual and Variance |
+| Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire, Court Hire year comparison, Membership, Online Sales, Merchandise, Casual Hours and Casual Wages sheets; a year prefix such as `2026 Casual Hours` and a comparison name such as `Court Hire 2025 vs 2026` are accepted |
+| Business Unit report | `Aquatics Site Report 2026.xlsx` | Finance, Direct Visits and Indirect Visits; Memberships and Enrollments are optional |
+
+If a workbook's structure changes, review its parsing status and any **View
+details** notes. Check the available cleaned rows before using the new year's
+data in the dashboard.
 
 ## Forecasting and business planning
 
@@ -465,6 +331,78 @@ is assessed only when continuous history supports rolling-origin validation.
 
 See [Forecasting and practical planning](docs/forecasting.md) for the formulas,
 data checks, limitations, model comparison and testing instructions.
+
+## Project structure
+
+```text
+app.R
+
+R/
+  config.R
+  ui_helpers.R
+  calculations.R
+  plots.R
+  forecasting.R
+  forecast_plots.R
+
+  data/
+    load.R
+    common.R
+    extensibility.R
+    monthly_site/
+      import.R
+      validation.R
+      cleaning.R
+    venues/
+      import.R
+      validation.R
+      cleaning.R
+    business_unit_templates/
+      import.R
+      validation.R
+      cleaning.R
+
+  mod_overview.R
+  mod_site_comparison.R
+  mod_site_detail.R
+  mod_venues_operations.R
+  mod_forecasting.R
+  mod_data_upload.R
+
+config/
+  metric_definitions.csv
+
+docs/
+  forecasting.md
+  excel_templates.md
+
+tests/                 # import and dashboard regression checks
+
+www/
+  styles.css
+  templates/
+    Monthly Site Report 2026.xlsx
+    New Sport Site Report 2026.xlsx
+    2026 Venues Tracking Report.xlsx
+```
+
+Each file has a specific role:
+
+- `app.R`: assemble the navigation and connect Shiny modules.
+- `R/data/load.R`: source the complete data layer in dependency order.
+- `R/data/common.R`: helpers shared by all report types.
+- `R/data/extensibility.R`: check for additional fields and apply metric definitions.
+- `config/metric_definitions.csv`: default units and aggregation rules for imported
+  metrics. The app reads this file at startup, so include it when distributing
+  the project.
+- `R/data/*/import.R`: read the uploaded workbooks and required worksheets.
+- `R/data/*/validation.R`: identify structural problems and reconciliation
+  differences.
+- `R/data/*/cleaning.R`: convert workbook layouts into analysis-ready tables.
+- `R/mod_*.R`: one dashboard page or feature per module.
+- `R/forecasting.R`: prepare histories, select models and calculate planning scenarios.
+- `R/forecast_plots.R`: draw the Income, Expenses and price-sensitivity charts.
+- `www/templates/`: blank Excel report templates with input guidance.
 
 ## Performance and website deployment
 
