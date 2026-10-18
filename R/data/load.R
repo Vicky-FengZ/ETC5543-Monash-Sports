@@ -5,6 +5,7 @@
 # reader, cleaning/layout helpers and validation functions.
 
 source("R/data/common.R")
+source("R/data/extensibility.R")
 
 source("R/data/monthly_site/import.R")
 source("R/data/monthly_site/cleaning.R")

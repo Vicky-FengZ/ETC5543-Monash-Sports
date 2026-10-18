@@ -890,7 +890,7 @@ build_venues_membership_checks <- function(
     ),
     total_period_type = "Reported Total",
     check_type = "monthly_to_reported_total",
-    metrics = c("New", "Renewed", "Total", "Expired/Cancelled"),
+    metrics = import_summable_metrics(membership, "venues_tracking", "membership"),
     validation_tolerance = validation_tolerance
   )
 }
@@ -939,7 +939,7 @@ build_venues_merchandise_checks <- function(
     ),
     total_period_type = "YTD",
     check_type = "monthly_to_ytd",
-    metrics = c("Revenue", "Transactions"),
+    metrics = import_summable_metrics(merchandise, "venues_tracking", "merchandise"),
     validation_tolerance = validation_tolerance
   )
 }

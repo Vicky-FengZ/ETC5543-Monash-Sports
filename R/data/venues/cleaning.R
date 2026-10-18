@@ -1548,7 +1548,7 @@ canonical_venues_merchandise_metric <- function(value) {
     return("Transactions")
   }
 
-  NA_character_
+  canonical_venues_operational_label(value)
 }
 
 

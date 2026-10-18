@@ -299,12 +299,19 @@ progress and a status row for each upload:
 |---|---|
 | `queued` or `parsing` | The workbook is waiting or is currently being read, cleaned and validated |
 | `ready` | Parsing completed without validation errors; the cleaned data are available to the dashboard |
-| `ready` with warnings | Data are available, but the warning count should be reviewed before analysis |
 | `failed` | The file type, workbook structure, parser or validation produced a blocking error; its data are excluded from the dashboard |
 
-Each status row shows a warning count or error message. Warnings do not block
-a file. Validation errors and parser exceptions block it to avoid silently
-mislabelling data.
+The status row displays the relevant warning count or error message. For files
+with warnings, select **View details** beneath the progress line to inspect the
+original messages and a short explanation of their impact. Notes are grouped
+by worksheet; notes without a worksheet appear under **File-level notes**.
+Details are collapsed by default and do not open a popup. The successful status
+remains `ready`, including when warnings are present.
+
+A warning does not block a file or alter its extracted values. A validation
+error or parser exception does block it, because continuing could silently
+mislabel data. If failed validation also supplies warnings, those notes can be
+inspected without including that file's data in the dashboard.
 
 A file with the same report family and filename as an existing upload replaces
 the session copy after it passes parsing and validation. If the replacement
@@ -328,10 +335,78 @@ Open **View Cleaned Data** and select the report family. The preview supports:
 The preview uses the parsed R objects. You can filter, sort and move between
 pages without reading the Excel files again.
 
-The preview shows cleaned tables, so it does not reproduce the raw Excel cells
-and layout. To check a value in its original context, use `source_file`,
-`source_sheet`, `source_row` and `source_column` to find the cell in the source
-workbook.
+The current interface is a cleaned-data viewer rather than a cell-for-cell raw
+Excel viewer. To investigate a value in its original context, use
+`source_file`, `source_sheet`, `source_row` and `source_column` to locate the
+corresponding cell in the source workbook.
+
+### New projects, audiences and indicators
+
+Uploads can grow within the supported report layouts:
+
+- Direct/Indirect Visits locate each month's columns from the next month or
+  YTD heading. New activity rows and audience columns are retained, and the
+  audience total check includes the new categories.
+- Memberships, Enrollments and Venues Membership Tracking retain new labelled
+  indicator columns. Merchandise Tracking also retains unfamiliar indicators.
+- Monthly and Detailed Site Finance accept new discount categories. Reported
+  Total Revenue is located at the beginning of each business-unit group and
+  reconciled against actual income plus the extracted discount categories.
+- The field audit checks recognised Monthly/Detailed finance data areas,
+  Detailed visits/member areas, and Venues membership/merchandise areas. Values
+  without a recognised column, and non-numeric contents in numeric fields,
+  are retained in `additional_data` with their original text and source positions.
+  They appear in the same source-sheet preview/export and are excluded from
+  existing chart totals. The corresponding warning explains where to look.
+  Existing discount subtotal columns are retained there for reference without
+  triggering an unfamiliar-field warning or double-counting discounts.
+- New worksheets without a supported layout are reported in **View details**.
+  They require an extraction rule; they are not silently treated as finance or
+  membership data. Dashboard/chart/helper/budget worksheets remain intentional
+  exclusions. The field audit is not a cell-by-cell audit of the entire workbook;
+  the chosen Casual Hours summary and reporting-year wage scope still apply.
+
+Metric definitions are automatic. Existing defaults identify known counts,
+currencies and rates. Unfamiliar indicators retain their name and reported
+value with internal Unknown/None definitions. Users do not configure them when
+uploading. Internal `unit` and `aggregation` columns are omitted from the ordinary
+preview and cleaned Excel download; the imported R objects retain them.
+New indicators do not automatically become chart/forecast targets.
+
+Default definitions are delivered in
+[`config/metric_definitions.csv`](config/metric_definitions.csv). Its columns are
+`family,dataset,metric,unit,aggregation`; names are matched without case/spacing
+differences. Supported units are Unknown, Count, Currency, Rate, Hours and Text;
+aggregations are None, Sum, Last and Mean. Restart the app after changing the
+CSV. The file is loaded once, and must be included when distributing the app.
+The default definitions live outside the parsing code in this file.
+
+### Standard Excel templates
+
+Each upload card includes **Download Excel template**. Three blank workbooks
+are shipped in `www/templates/`, outside `data/raw/` so they are not discovered
+as real reports. They contain input areas, formula totals and a built-in guide
+showing required headings, supported additions and filename/year rules.
+The example year is 2026; change the guide's Reporting year and Save As with
+the matching year before uploading completed data.
+
+- Monthly Site: organisation Finance Summary plus one example site, with
+  Income, Expenses, Discounts and Total Revenue. Update the organisation links
+  to include every site when adding more site worksheets.
+- Detailed Site: Finance, Direct Visits, Indirect Visits, Memberships and
+  Enrollments. Rename activity rows and insert new activities before Total;
+  repeated audience/indicator additions must be consistent across months.
+- Venues Tracking: all nine supported worksheets, including the selected
+  Casual Hours summary and the reporting-year Casual Salaries block.
+
+Amber cells are editable inputs. Grey labels and dark headings identify the
+required structure. Calculated cells should retain their formulas. Blank is
+unreported; enter zero only for a confirmed zero. Blank templates are starting
+files rather than reported data. Unknown fields can be viewed/downloaded, but
+new business relationships and arbitrary layouts require extraction rules.
+
+See [Excel template guide](docs/excel_templates.md) for instructions and
+the specific extension boundaries for each worksheet.
 
 ### Session scope
 

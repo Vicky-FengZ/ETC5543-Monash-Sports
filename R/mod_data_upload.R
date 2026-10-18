@@ -99,6 +99,136 @@ basic_upload_result_issues <- function(result) {
 }
 
 
+basic_upload_warning_impact <- function(message) {
+  text <- tolower(message)
+
+  if (grepl("retained as additional data", text, fixed = TRUE)) {
+    return("Open this worksheet in View Cleaned Data to inspect the retained values and their source positions.")
+  }
+  if (grepl("no configured data layout", text, fixed = TRUE)) {
+    return("This worksheet needs a layout rule before its contents can appear in the cleaned tables.")
+  }
+
+  if (startsWith(text, "sheet ") && grepl("was skipped", text, fixed = TRUE)) {
+    return("This worksheet was skipped. Other readable worksheets may still be available.")
+  }
+  if (grepl("extraction was skipped", text, fixed = TRUE)) {
+    return("This part of the worksheet was not extracted. Review the source layout before using these figures.")
+  }
+  if (grepl("discounts section was not found", text, fixed = TRUE)) {
+    return("Discount opportunity data are unavailable for this worksheet; Finance can still be viewed.")
+  }
+  if (grepl("total revenue (actual + opp) row was not found", text, fixed = TRUE)) {
+    return("The reported revenue cannot be checked against income and discounts for this worksheet.")
+  }
+  if (grepl("finance summary sheet was not found", text, fixed = TRUE)) {
+    return("The organisation summary is missing. Check site coverage before using organisation-wide totals.")
+  }
+  if (grepl("validation failed", text, fixed = TRUE)) {
+    return("Calculated and reported figures differ. Review the source totals before using these figures.")
+  }
+  if (grepl("validation was incomplete|validation incomplete", text)) {
+    return("Some checks could not be completed. Review missing inputs before using totals.")
+  }
+  if (grepl("duplicate", text, fixed = TRUE)) {
+    return("Some period labels or records repeat. Check the source before adding up these figures.")
+  }
+  if (grepl("missing month", text, fixed = TRUE)) {
+    return("Some expected months were not identified. Coverage may be incomplete.")
+  }
+  if (grepl("no reported total|no total .*block|no ytd", text)) {
+    return("A reported total was not identified, so the corresponding total check may be unavailable.")
+  }
+  if (grepl("sheet was not found|sheet is empty", text)) {
+    return("This part of the report has no extracted data. Other available parts can still be viewed.")
+  }
+  if (grepl("no recognised|no recognizable|no recognisable|could not be identified", text)) {
+    return("The expected layout was not identified; some data or checks may be unavailable.")
+  }
+
+  "Review this note against the source workbook before using the affected figures."
+}
+
+
+basic_upload_warning_rows <- function(result) {
+  empty <- data.frame(
+    sheet = character(), message = character(), impact = character(),
+    stringsAsFactors = FALSE
+  )
+  validation <- result$validation
+
+  if (!is.data.frame(validation) || nrow(validation) == 0L ||
+      !"level" %in% names(validation)) {
+    return(empty)
+  }
+
+  levels <- tolower(as.character(validation$level))
+  rows <- validation[!is.na(levels) & levels == "warning", , drop = FALSE]
+  if (nrow(rows) == 0L) {
+    return(empty)
+  }
+
+  sheets <- if ("sheet" %in% names(rows)) {
+    trimws(as.character(rows$sheet))
+  } else {
+    rep(NA_character_, nrow(rows))
+  }
+  messages <- if ("message" %in% names(rows)) {
+    as.character(rows$message)
+  } else {
+    rep(NA_character_, nrow(rows))
+  }
+  sheets[is.na(sheets) | !nzchar(sheets)] <- "File-level notes"
+  messages[is.na(messages) | !nzchar(trimws(messages))] <-
+    "No warning description was supplied by the importer."
+
+  data.frame(
+    sheet = sheets,
+    message = messages,
+    impact = vapply(messages, basic_upload_warning_impact, character(1L)),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+basic_upload_warning_details_ui <- function(warnings, file_name) {
+  if (is.null(warnings) || nrow(warnings) == 0L) {
+    return(NULL)
+  }
+
+  count <- nrow(warnings)
+  label <- paste(count, if (count == 1L) "warning" else "warnings")
+  tags$details(
+    class = "basic-upload-warning-details",
+    tags$summary(
+      `aria-label` = paste("View", label, "for", file_name),
+      bs_icon("chevron-right", class = "basic-upload-warning-chevron", size = "12px"),
+      span(class = "basic-upload-warning-count", label),
+      span(class = "basic-upload-warning-toggle", "View details")
+    ),
+    div(
+      class = "basic-upload-warning-body",
+      lapply(unique(warnings$sheet), function(sheet) {
+        rows <- warnings[warnings$sheet == sheet, , drop = FALSE]
+        div(
+          class = "basic-upload-warning-group",
+          div(class = "basic-upload-warning-group-heading", sheet),
+          tags$ul(lapply(seq_len(nrow(rows)), function(index) {
+            tags$li(
+              p(class = "basic-upload-warning-message", rows$message[[index]]),
+              p(
+                class = "basic-upload-warning-impact",
+                span("What this means: "), rows$impact[[index]]
+              )
+            )
+          }))
+        )
+      })
+    )
+  )
+}
+
+
 combine_basic_upload_results <- function(objects, result_class) {
   objects <- Filter(Negate(is.null), objects)
 
@@ -195,7 +325,11 @@ basic_preview_table_names <- function(report, report_type = NULL) {
   if (length(report_type) == 1L &&
       !is.na(report_type) &&
       report_type %in% names(BASIC_PREVIEW_TABLES)) {
-    return(intersect(BASIC_PREVIEW_TABLES[[report_type]], data_frame_fields))
+    tables <- intersect(BASIC_PREVIEW_TABLES[[report_type]], data_frame_fields)
+    if (is.data.frame(report$additional_data) && nrow(report$additional_data) > 0L) {
+      tables <- c(tables, "additional_data")
+    }
+    return(tables)
   }
 
   excluded <- data_frame_fields %in% c("validation", "files", "checks") |
@@ -427,6 +561,17 @@ basic_preview_monthly_site_data <- function(report) {
     }
   }
 
+  extra <- report$additional_data
+  if (is.data.frame(extra) && nrow(extra) > 0L) {
+    retained <- make_monthly_site_preview_rows(
+      data = extra, data_section = "Additional data", period_date = as.Date(NA),
+      period_type = "Unclassified", measure = extra$field,
+      value_type = extra$interpretation, value = extra$value, section_order = 4L
+    )
+    retained$raw_value <- extra$raw_value
+    rows[[length(rows) + 1L]] <- retained
+  }
+
   rows <- Filter(
     function(data) is.data.frame(data) && nrow(data) > 0L,
     rows
@@ -436,7 +581,7 @@ basic_preview_monthly_site_data <- function(report) {
     return(empty_monthly_site_preview_table())
   }
 
-  result <- do.call(rbind, rows)
+  result <- bind_basic_preview_tables(rows)
   sheet_key <- basic_preview_sheet_key(result$source_sheet)
   row_order <- order(
     result$report_year,
@@ -537,6 +682,7 @@ basic_preview_combined_report_data <- function(report, report_type) {
     }
   )
   result <- bind_basic_preview_tables(tables)
+  result <- result[, setdiff(names(result), c("unit", "aggregation")), drop = FALSE]
 
   if (nrow(result) == 0L) {
     result$.preview_table_order <- NULL
@@ -1220,7 +1366,8 @@ basic_upload_card <- function(
   input_id,
   heading,
   description,
-  icon
+  icon,
+  template_filename = NULL
 ) {
   card(
     class = "basic-upload-source-card",
@@ -1242,6 +1389,13 @@ basic_upload_card <- function(
         tags$small(
           class = "text-secondary",
           "Files are parsed immediately and kept for this session only."
+        ),
+        if (!is.null(template_filename)) tags$a(
+          class = "basic-template-download",
+          href = paste0("templates/", utils::URLencode(template_filename)),
+          download = template_filename,
+          bs_icon("file-earmark-arrow-down"),
+          "Download Excel template"
         )
       )
     )
@@ -1306,7 +1460,8 @@ mod_data_upload_ui <- function(id) {
                   "Upload one or more annual Monthly Site Report",
                   "workbooks."
                 ),
-                icon = "cloud-arrow-up"
+                icon = "cloud-arrow-up",
+                template_filename = "Monthly Site Report 2026.xlsx"
               ),
               basic_upload_card(
                 ns = ns,
@@ -1317,7 +1472,8 @@ mod_data_upload_ui <- function(id) {
                   "Upload Business Unit Template site or program",
                   "reports."
                 ),
-                icon = "building"
+                icon = "building",
+                template_filename = "New Sport Site Report 2026.xlsx"
               ),
               basic_upload_card(
                 ns = ns,
@@ -1327,7 +1483,8 @@ mod_data_upload_ui <- function(id) {
                 description = paste(
                   "Upload annual Venues Tracking Report workbooks."
                 ),
-                icon = "activity"
+                icon = "activity",
+                template_filename = "2026 Venues Tracking Report.xlsx"
               ),
               col_widths = c(4, 4, 4)
             ),
@@ -1550,6 +1707,7 @@ mod_data_upload_server <- function(
 
       registry <- reactiveVal(empty_basic_upload_registry())
       parsed_results <- reactiveVal(list())
+      warning_details <- reactiveVal(list())
 
       session$onSessionEnded(function() {
         if (dir.exists(session_directory)) {
@@ -1595,6 +1753,9 @@ mod_data_upload_server <- function(
         parsed <- parsed_results()
         parsed[file_ids] <- NULL
         parsed_results(parsed)
+        notes <- warning_details()
+        notes[file_ids] <- NULL
+        warning_details(notes)
         registry(rows[!rows$file_id %in% file_ids, , drop = FALSE])
         invisible(TRUE)
       }
@@ -1715,6 +1876,12 @@ mod_data_upload_server <- function(
             )
           } else {
             issues <- basic_upload_result_issues(parsed)
+            # Keep notes separate so failed validation can also be inspected
+            # without making that file's data available to the dashboard.
+            file_warnings <- basic_upload_warning_rows(parsed)
+            notes <- warning_details()
+            notes[[file_id]] <- if (nrow(file_warnings) > 0L) file_warnings else NULL
+            warning_details(notes)
 
             if (issues$errors > 0L) {
               update_registry_row(
@@ -1813,6 +1980,7 @@ mod_data_upload_server <- function(
 
       output$file_status <- renderUI({
         rows <- registry()
+        notes <- warning_details()
 
         if (nrow(rows) == 0L) {
           return(div(
@@ -1876,7 +2044,10 @@ mod_data_upload_server <- function(
               ),
               if (!is.na(error_text) && nzchar(error_text)) {
                 div(class = "basic-upload-error", error_text)
-              }
+              },
+              basic_upload_warning_details_ui(
+                notes[[row$file_id[[1L]]]], row$original_name[[1L]]
+              )
             )
           }
         ))
@@ -1938,10 +2109,11 @@ mod_data_upload_server <- function(
 
       preview_report <- reactive({
         basic_preview_report(
-          analysis_data(),
+          dashboard_data(),
           selected_preview_report_type()
         )
       })
+
 
       preview_table_data <- reactive({
         report <- preview_report()
