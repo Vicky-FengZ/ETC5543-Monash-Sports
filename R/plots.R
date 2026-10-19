@@ -5928,6 +5928,347 @@ plot_venues_attendance_over_time <- function(attendance_data) {
 }
 
 # -------------------------------------------------------------------------
+# Venues Operations - Facility Hire Revenue Over Time
+# -------------------------------------------------------------------------
+
+plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
+
+  if (
+    is.null(revenue_data) ||
+      !is.data.frame(revenue_data) ||
+      nrow(revenue_data) == 0L
+  ) {
+    stop(
+      "No monthly Facility Hire revenue values are available.",
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    revenue_data$date
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      revenue_data$value
+    )
+  )
+
+  keep <-
+    !is.na(dates) &
+    is.finite(values)
+
+  dates <- dates[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No finite Facility Hire revenue values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  values <- values[order_index]
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  y_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.15
+  }
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits + c(-15, 15)
+  } else {
+    x_limits <- x_limits + c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(4.8, 6.5, 3.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = c(0, y_max),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    c(0, y_max),
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= 0 &
+      y_ticks <= y_max
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  lines(
+    dates,
+    values,
+    col = "#2563EB",
+    lwd = 2.6
+  )
+
+  points(
+    dates,
+    values,
+    pch = 21,
+    cex = 1,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  axis.Date(
+    1,
+    at = dates,
+    format = "%b",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.86
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = paste0(
+      "$",
+      format(
+        round(y_ticks),
+        big.mark = ",",
+        scientific = FALSE,
+        trim = TRUE
+      )
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  invisible(NULL)
+}
+
+
+# -------------------------------------------------------------------------
+# Venues Operations - Facility Hire by Facility
+# -------------------------------------------------------------------------
+
+plot_venues_facility_hire_by_facility <- function(
+    facility_data,
+    currency = FALSE
+) {
+
+  if (
+    is.null(facility_data) ||
+      !is.data.frame(facility_data) ||
+      nrow(facility_data) == 0L
+  ) {
+    stop(
+      "No Facility Hire values are available.",
+      call. = FALSE
+    )
+  }
+
+  facilities <- as.character(
+    facility_data$facility
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      facility_data$value
+    )
+  )
+
+  keep <-
+    !is.na(facilities) &
+    nzchar(trimws(facilities)) &
+    is.finite(values)
+
+  facilities <- facilities[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No finite Facility Hire values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(
+    values,
+    decreasing = FALSE
+  )
+
+  facilities <- facilities[order_index]
+  values <- values[order_index]
+
+  wrapped_facilities <- vapply(
+    facilities,
+    function(label) {
+      paste(
+        strwrap(
+          label,
+          width = 20
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
+  )
+
+  max_value <- max(
+    values,
+    na.rm = TRUE
+  )
+
+  x_max <- if (
+    !is.finite(max_value) ||
+      max_value <= 0
+  ) {
+    1
+  } else {
+    max_value * 1.18
+  }
+
+  old_par <- par(
+    mar = c(4.5, 10, 2.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  positions <- barplot(
+    values,
+    names.arg = wrapped_facilities,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = c(0, x_max),
+    axes = FALSE,
+    cex.names = 0.72
+  )
+
+  x_ticks <- pretty(
+    c(0, x_max),
+    n = 5
+  )
+
+  x_ticks <- x_ticks[
+    x_ticks >= 0 &
+      x_ticks <= x_max
+  ]
+
+  abline(
+    v = x_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  barplot(
+    values,
+    names.arg = wrapped_facilities,
+    horiz = TRUE,
+    las = 1,
+    border = NA,
+    col = "#2563EB",
+    xlim = c(0, x_max),
+    axes = FALSE,
+    cex.names = 0.72,
+    add = TRUE
+  )
+
+  axis_labels <- format(
+    round(x_ticks),
+    big.mark = ",",
+    scientific = FALSE,
+    trim = TRUE
+  )
+
+  if (currency) {
+    axis_labels <- paste0(
+      "$",
+      axis_labels
+    )
+  }
+
+  axis(
+    1,
+    at = x_ticks,
+    labels = axis_labels,
+    tick = FALSE,
+    line = -0.3,
+    col.axis = "#64748B",
+    cex.axis = 0.78
+  )
+
+  value_labels <- format(
+    round(values),
+    big.mark = ",",
+    scientific = FALSE,
+    trim = TRUE
+  )
+
+  if (currency) {
+    value_labels <- paste0(
+      "$",
+      value_labels
+    )
+  }
+
+  text(
+    x = values,
+    y = positions,
+    labels = value_labels,
+    pos = 4,
+    offset = 0.35,
+    cex = 0.7,
+    col = "#475569"
+  )
+
+  invisible(NULL)
+}
+
+# -------------------------------------------------------------------------
 # Venues Operations - Attendance by Activity
 # -------------------------------------------------------------------------
 

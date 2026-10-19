@@ -73,6 +73,614 @@ venues_operations_available_years <- function(
 }
 
 # -------------------------------------------------------------------------
+# Facility Hire calculations
+# -------------------------------------------------------------------------
+
+venues_operations_facility_hire_kpis <- function(facility_hire) {
+
+  empty_result <- list(
+    revenue = NA_real_,
+    transactions = NA_real_,
+    revenue_per_transaction = NA_real_
+  )
+
+  if (
+    is.null(facility_hire) ||
+      !is.data.frame(facility_hire) ||
+      nrow(facility_hire) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "row_type",
+    "facility",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(facility_hire))) {
+    return(empty_result)
+  }
+
+  rows <- facility_hire[
+    facility_hire$period_type == "YTD" &
+      !is.na(facility_hire$facility) &
+      nzchar(trimws(facility_hire$facility)),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  rows <- rows[
+    is.finite(rows$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  facilities <- unique(
+    as.character(rows$facility)
+  )
+
+  resolved <- list()
+
+  for (facility_name in facilities) {
+
+    facility_rows <- rows[
+      rows$facility == facility_name,
+      ,
+      drop = FALSE
+    ]
+
+    for (metric_name in c(
+      "Revenue",
+      "Transactions"
+    )) {
+
+      metric_rows <- facility_rows[
+        facility_rows$metric == metric_name,
+        ,
+        drop = FALSE
+      ]
+
+      if (nrow(metric_rows) == 0L) {
+        next
+      }
+
+      total_rows <- metric_rows[
+        metric_rows$row_type == "Total",
+        ,
+        drop = FALSE
+      ]
+
+      value <- if (nrow(total_rows) > 0L) {
+
+        # Prefer the reported facility total when available.
+        sum(
+          total_rows$value,
+          na.rm = TRUE
+        )
+
+      } else {
+
+        # Otherwise calculate the facility total from its components.
+        detail_rows <- metric_rows[
+          metric_rows$row_type == "Detail",
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(detail_rows) == 0L) {
+          next
+        }
+
+        sum(
+          detail_rows$value,
+          na.rm = TRUE
+        )
+      }
+
+      resolved[[length(resolved) + 1L]] <-
+        data.frame(
+          facility = facility_name,
+          metric = metric_name,
+          value = value,
+          stringsAsFactors = FALSE
+        )
+    }
+  }
+
+  if (length(resolved) == 0L) {
+    return(empty_result)
+  }
+
+  resolved <- do.call(
+    rbind,
+    resolved
+  )
+
+  revenue_values <- resolved$value[
+    resolved$metric == "Revenue"
+  ]
+
+  transaction_values <- resolved$value[
+    resolved$metric == "Transactions"
+  ]
+
+  revenue <- if (
+    length(revenue_values) > 0L
+  ) {
+    sum(
+      revenue_values,
+      na.rm = TRUE
+    )
+  } else {
+    NA_real_
+  }
+
+  transactions <- if (
+    length(transaction_values) > 0L
+  ) {
+    sum(
+      transaction_values,
+      na.rm = TRUE
+    )
+  } else {
+    NA_real_
+  }
+
+  revenue_per_transaction <- if (
+    is.finite(revenue) &&
+      is.finite(transactions) &&
+      transactions > 0
+  ) {
+    revenue / transactions
+  } else {
+    NA_real_
+  }
+
+  list(
+    revenue = revenue,
+    transactions = transactions,
+    revenue_per_transaction =
+      revenue_per_transaction
+  )
+}
+
+venues_operations_monthly_facility_hire <- function(
+    facility_hire,
+    metric = "Revenue"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(facility_hire) ||
+      !is.data.frame(facility_hire) ||
+      nrow(facility_hire) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "month_label",
+    "period_type",
+    "facility",
+    "row_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(facility_hire))) {
+    return(empty_result)
+  }
+
+  rows <- facility_hire[
+    facility_hire$period_type == "Month" &
+      facility_hire$metric == metric &
+      !is.na(facility_hire$date) &
+      !is.na(facility_hire$facility) &
+      nzchar(trimws(facility_hire$facility)),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  keys <- unique(
+    rows[
+      ,
+      c(
+        "date",
+        "month",
+        "month_label",
+        "facility"
+      ),
+      drop = FALSE
+    ]
+  )
+
+  resolved <- list()
+
+  for (index in seq_len(nrow(keys))) {
+
+    key <- keys[index, , drop = FALSE]
+
+    facility_rows <- rows[
+      rows$date == key$date &
+        rows$facility == key$facility,
+      ,
+      drop = FALSE
+    ]
+
+    total_values <- facility_rows$value[
+      facility_rows$row_type == "Total" &
+        is.finite(facility_rows$value)
+    ]
+
+    detail_values <- facility_rows$value[
+      facility_rows$row_type == "Detail" &
+        is.finite(facility_rows$value)
+    ]
+
+    value <- if (length(total_values) > 0L) {
+
+      sum(total_values, na.rm = TRUE)
+
+    } else if (length(detail_values) > 0L) {
+
+      sum(detail_values, na.rm = TRUE)
+
+    } else {
+      next
+    }
+
+    resolved[[length(resolved) + 1L]] <-
+      data.frame(
+        date = as.Date(key$date),
+        month = as.integer(key$month),
+        month_label = as.character(key$month_label),
+        value = value,
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(resolved) == 0L) {
+    return(empty_result)
+  }
+
+  resolved <- do.call(
+    rbind,
+    resolved
+  )
+
+  monthly <- aggregate(
+    value ~ date + month + month_label,
+    data = resolved,
+    FUN = sum
+  )
+
+  monthly <- monthly[
+    order(monthly$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(monthly) <- NULL
+
+  monthly
+}
+
+
+venues_operations_facility_hire_by_facility <- function(
+    facility_hire,
+    metric = "Revenue"
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(facility_hire) ||
+      !is.data.frame(facility_hire) ||
+      nrow(facility_hire) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "facility",
+    "row_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(facility_hire))) {
+    return(empty_result)
+  }
+
+  rows <- facility_hire[
+    facility_hire$period_type == "YTD" &
+      facility_hire$metric == metric &
+      !is.na(facility_hire$facility) &
+      nzchar(trimws(facility_hire$facility)),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  facilities <- unique(
+    as.character(rows$facility)
+  )
+
+  resolved <- list()
+
+  for (facility_name in facilities) {
+
+    facility_rows <- rows[
+      rows$facility == facility_name,
+      ,
+      drop = FALSE
+    ]
+
+    total_values <- facility_rows$value[
+      facility_rows$row_type == "Total" &
+        is.finite(facility_rows$value)
+    ]
+
+    detail_values <- facility_rows$value[
+      facility_rows$row_type == "Detail" &
+        is.finite(facility_rows$value)
+    ]
+
+    value <- if (length(total_values) > 0L) {
+
+      sum(total_values, na.rm = TRUE)
+
+    } else if (length(detail_values) > 0L) {
+
+      sum(detail_values, na.rm = TRUE)
+
+    } else {
+      next
+    }
+
+    resolved[[length(resolved) + 1L]] <-
+      data.frame(
+        facility = facility_name,
+        value = value,
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(resolved) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    resolved
+  )
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+venues_operations_facility_hire_group <- function(facility) {
+
+  sports_facilities <- c(
+    "Badminton",
+    "Basketball/Soccer (Games Hall)",
+    "Squash",
+    "Table Tennis",
+    "Tennis",
+    "Volleyball"
+  )
+
+  facility <- trimws(
+    as.character(facility)
+  )
+
+  result <- rep(
+    NA_character_,
+    length(facility)
+  )
+
+  valid <-
+    !is.na(facility) &
+    nzchar(facility)
+
+  result[
+    valid &
+      facility %in% sports_facilities
+  ] <- "Sports Facilities"
+
+  result[
+    valid &
+      !(facility %in% sports_facilities)
+  ] <- "Venue & Space Hire"
+
+  result
+}
+
+
+venues_operations_facility_hire_detail <- function(
+    facility_hire,
+    facility,
+    metric = "Revenue"
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(facility_hire) ||
+      !is.data.frame(facility_hire) ||
+      nrow(facility_hire) == 0L ||
+      is.null(facility) ||
+      length(facility) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "row_type",
+    "facility",
+    "raw_label",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(facility_hire))) {
+    return(empty_result)
+  }
+
+  selected_facility <- trimws(
+    as.character(facility[[1L]])
+  )
+
+  if (
+    is.na(selected_facility) ||
+      !nzchar(selected_facility) ||
+      identical(
+        selected_facility,
+        "All Facilities"
+      )
+  ) {
+    return(empty_result)
+  }
+
+  select_rows <- function(period_type) {
+
+    rows <- facility_hire[
+      facility_hire$period_type == period_type &
+        facility_hire$row_type == "Detail" &
+        facility_hire$metric == metric &
+        !is.na(facility_hire$facility) &
+        trimws(
+          as.character(
+            facility_hire$facility
+          )
+        ) == selected_facility &
+        !is.na(facility_hire$raw_label) &
+        nzchar(
+          trimws(
+            as.character(
+              facility_hire$raw_label
+            )
+          )
+        ),
+      ,
+      drop = FALSE
+    ]
+
+    rows$value <- suppressWarnings(
+      as.numeric(rows$value)
+    )
+
+    rows <- rows[
+      is.finite(rows$value),
+      ,
+      drop = FALSE
+    ]
+
+    rows
+  }
+
+  # Prefer the workbook's YTD category values.
+  rows <- select_rows("YTD")
+
+  # Fall back to summing monthly category values if YTD is unavailable.
+  if (nrow(rows) == 0L) {
+    rows <- select_rows("Month")
+  }
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$display_label <- trimws(
+    as.character(rows$raw_label)
+  )
+
+  totals <- aggregate(
+    value ~ display_label,
+    data = rows,
+    FUN = sum
+  )
+
+  result <- data.frame(
+    facility = totals$display_label,
+    value = totals$value,
+    stringsAsFactors = FALSE
+  )
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+# -------------------------------------------------------------------------
 # Attendance calculations
 # -------------------------------------------------------------------------
 
@@ -447,6 +1055,33 @@ venues_operations_format_count <- function(value) {
   )
 }
 
+venues_operations_format_currency <- function(
+    value,
+    digits = 0L
+) {
+
+  if (
+    length(value) == 0L ||
+      !is.finite(value[[1L]])
+  ) {
+    return("—")
+  }
+
+  paste0(
+    "$",
+    format(
+      round(
+        value[[1L]],
+        digits = digits
+      ),
+      big.mark = ",",
+      nsmall = digits,
+      scientific = FALSE,
+      trim = TRUE
+    )
+  )
+}
+
 # -------------------------------------------------------------------------
 # Attendance by area
 # -------------------------------------------------------------------------
@@ -668,25 +1303,8 @@ mod_venues_operations_ui <- function(id) {
             )
           ),
 
-          layout_columns(
-
-            selectInput(
-              ns("attendance_breakdown_area"),
-              "Area",
-              choices = "All Areas",
-              selected = "All Areas",
-              width = "100%"
-            ),
-
-            selectInput(
-              ns("attendance_breakdown_activity"),
-              "Activity",
-              choices = "All Activities",
-              selected = "All Activities",
-              width = "100%"
-            ),
-
-            col_widths = c(4, 8)
+          uiOutput(
+            ns("breakdown_controls")
           ),
 
           plotOutput(
@@ -816,6 +1434,161 @@ mod_venues_operations_server <- function(
           reports$attendance,
           year = input$year
         )
+      })
+
+      selected_facility_hire <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$facility_hire,
+          year = input$year
+        )
+      })
+
+      facility_hire_kpis <- reactive({
+
+        venues_operations_facility_hire_kpis(
+          selected_facility_hire()
+        )
+      })
+
+      monthly_facility_hire_revenue <- reactive({
+
+        venues_operations_monthly_facility_hire(
+          selected_facility_hire(),
+          metric = "Revenue"
+        )
+      })
+
+
+      facility_hire_revenue_by_facility <- reactive({
+
+        venues_operations_facility_hire_by_facility(
+          selected_facility_hire(),
+          metric = "Revenue"
+        )
+      })
+
+
+      facility_hire_transactions_by_facility <- reactive({
+
+        venues_operations_facility_hire_by_facility(
+          selected_facility_hire(),
+          metric = "Transactions"
+        )
+      })
+
+      facility_hire_revenue_breakdown <- reactive({
+
+        selected_facility <-
+          input$facility_hire_facility
+
+        if (
+          !is.null(selected_facility) &&
+            length(selected_facility) > 0L &&
+            !identical(
+              selected_facility,
+              "All Facilities"
+            )
+        ) {
+          return(
+            venues_operations_facility_hire_detail(
+              selected_facility_hire(),
+              facility = selected_facility,
+              metric = "Revenue"
+            )
+          )
+        }
+
+        facility_data <-
+          facility_hire_revenue_by_facility()
+
+        selected_group <-
+          input$facility_hire_group
+
+        if (
+          is.null(selected_group) ||
+            length(selected_group) == 0L ||
+            identical(
+              selected_group,
+              "All Facilities"
+            )
+        ) {
+          return(facility_data)
+        }
+
+        groups <-
+          venues_operations_facility_hire_group(
+            facility_data$facility
+          )
+
+        facility_data[
+          !is.na(groups) &
+            groups == selected_group,
+          ,
+          drop = FALSE
+        ]
+      })
+
+
+      facility_hire_transactions_breakdown <- reactive({
+
+        selected_facility <-
+          input$facility_hire_facility
+
+        if (
+          !is.null(selected_facility) &&
+            length(selected_facility) > 0L &&
+            !identical(
+              selected_facility,
+              "All Facilities"
+            )
+        ) {
+          return(
+            venues_operations_facility_hire_detail(
+              selected_facility_hire(),
+              facility = selected_facility,
+              metric = "Transactions"
+            )
+          )
+        }
+
+        facility_data <-
+          facility_hire_transactions_by_facility()
+
+        selected_group <-
+          input$facility_hire_group
+
+        if (
+          is.null(selected_group) ||
+            length(selected_group) == 0L ||
+            identical(
+              selected_group,
+              "All Facilities"
+            )
+        ) {
+          return(facility_data)
+        }
+
+        groups <-
+          venues_operations_facility_hire_group(
+            facility_data$facility
+          )
+
+        facility_data[
+          !is.na(groups) &
+            groups == selected_group,
+          ,
+          drop = FALSE
+        ]
       })
 
       attendance_kpis <- reactive({
@@ -952,57 +1725,6 @@ mod_venues_operations_server <- function(
         )
       })
 
-      observeEvent(
-        attendance_activity(),
-        {
-
-          activity_data <- attendance_activity()
-
-          areas <- if (
-            is.data.frame(activity_data) &&
-              nrow(activity_data) > 0L
-          ) {
-            sort(
-              unique(
-                as.character(activity_data$area)
-              )
-            )
-          } else {
-            character()
-          }
-
-          areas <- areas[
-            !is.na(areas) &
-              nzchar(trimws(areas))
-          ]
-
-          choices <- c(
-            "All Areas",
-            areas
-          )
-
-          current_selection <-
-            input$attendance_breakdown_area
-
-          selected <- if (
-            !is.null(current_selection) &&
-              current_selection %in% choices
-          ) {
-            current_selection
-          } else {
-            "All Areas"
-          }
-
-          updateSelectInput(
-            session,
-            "attendance_breakdown_area",
-            choices = choices,
-            selected = selected
-          )
-        },
-        ignoreInit = FALSE
-      )
-
       attendance_area <- reactive({
 
         venues_operations_attendance_area_totals(
@@ -1052,18 +1774,30 @@ mod_venues_operations_server <- function(
           input$year
         ),
         {
-
           attendance <- selected_attendance()
+            facility_hire <- selected_facility_hire()
 
-          areas <- if (
-            is.data.frame(attendance) &&
-              nrow(attendance) > 0L
-          ) {
-            "Attendance"
-          } else {
-            character()
-          }
+            areas <- character()
 
+            if (
+              is.data.frame(attendance) &&
+                nrow(attendance) > 0L
+            ) {
+              areas <- c(
+                areas,
+                "Attendance"
+              )
+            }
+
+            if (
+              is.data.frame(facility_hire) &&
+                nrow(facility_hire) > 0L
+            ) {
+              areas <- c(
+                areas,
+                "Facility Hire"
+              )
+            }
           updateSelectInput(
             session,
             "area",
@@ -1144,6 +1878,41 @@ mod_venues_operations_server <- function(
 
         req(input$area)
 
+        if (identical(input$area, "Facility Hire")) {
+
+          values <- facility_hire_kpis()
+
+          return(
+            list(
+              list(
+                title = "Total Revenue",
+                value = venues_operations_format_currency(
+                  values$revenue
+                ),
+                subtitle = "Selected year",
+                icon = "currency-dollar"
+              ),
+              list(
+                title = "Total Transactions",
+                value = venues_operations_format_count(
+                  values$transactions
+                ),
+                subtitle = "Facility hire transactions",
+                icon = "receipt"
+              ),
+              list(
+                title = "Revenue / Transaction",
+                value = venues_operations_format_currency(
+                  values$revenue_per_transaction,
+                  digits = 2L
+                ),
+                subtitle = "Average transaction value",
+                icon = "calculator"
+              )
+            )
+          )
+        }
+
         if (!identical(input$area, "Attendance")) {
           return(NULL)
         }
@@ -1206,6 +1975,10 @@ mod_venues_operations_server <- function(
           return("Attendance Over Time")
         }
 
+        if (identical(input$area, "Facility Hire")) {
+          return("Facility Hire Revenue Over Time")
+        }
+
         "Operational Trend"
       })
 
@@ -1215,6 +1988,17 @@ mod_venues_operations_server <- function(
           input$year,
           input$area
         )
+
+        if (identical(input$area, "Facility Hire")) {
+          return(
+            chart_subtitle(
+              paste0(
+                "Monthly revenue · January–December ",
+                input$year
+              )
+            )
+          )
+        }
 
         chart_subtitle(
           paste0(
@@ -1228,35 +2012,239 @@ mod_venues_operations_server <- function(
       output$attendance_over_time <- renderPlot(
         {
 
-          req(
-            identical(
-              input$area,
-              "Attendance"
+          req(input$area)
+
+          if (identical(input$area, "Attendance")) {
+
+            monthly <- monthly_attendance()
+
+            validate(
+              need(
+                is.data.frame(monthly) &&
+                  nrow(monthly) > 0L &&
+                  any(is.finite(monthly$value)),
+                "No monthly attendance values are available for this selection."
+              )
             )
-          )
 
-          monthly <- monthly_attendance()
-
-          validate(
-            need(
-              is.data.frame(monthly) &&
-                nrow(monthly) > 0L &&
-                any(is.finite(monthly$value)),
-              "No monthly attendance values are available for this selection."
+            return(
+              plot_venues_attendance_over_time(
+                monthly
+              )
             )
-          )
+          }
 
-          plot_venues_attendance_over_time(
-            monthly
-          )
+          if (identical(input$area, "Facility Hire")) {
+
+            monthly <- monthly_facility_hire_revenue()
+
+            validate(
+              need(
+                is.data.frame(monthly) &&
+                  nrow(monthly) > 0L &&
+                  any(is.finite(monthly$value)),
+                "No monthly Facility Hire revenue values are available for this selection."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_revenue_over_time(
+                monthly
+              )
+            )
+          }
+
         },
         res = 96,
         bg = "white"
       )
 
+      output$breakdown_controls <- renderUI({
+
+        req(input$area)
+
+        if (identical(input$area, "Attendance")) {
+
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "attendance_breakdown_area"
+                ),
+                "Area",
+                choices = "All Areas",
+                selected = "All Areas",
+                width = "100%"
+              ),
+
+              selectInput(
+                session$ns(
+                  "attendance_breakdown_activity"
+                ),
+                "Activity",
+                choices = "All Activities",
+                selected = "All Activities",
+                width = "100%"
+              ),
+
+              col_widths = c(4, 8)
+            )
+          )
+        }
+
+        if (identical(input$area, "Facility Hire")) {
+
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "facility_hire_group"
+                ),
+                "Facility Group",
+                choices = c(
+                  "All Facilities",
+                  "Sports Facilities",
+                  "Venue & Space Hire"
+                ),
+                selected = "All Facilities",
+                width = "100%"
+              ),
+
+              selectInput(
+                session$ns(
+                  "facility_hire_facility"
+                ),
+                "Facility",
+                choices = "All Facilities",
+                selected = "All Facilities",
+                width = "100%"
+              ),
+
+              col_widths = c(4, 8)
+            )
+          )
+        }
+
+        NULL
+      })
+
+      observeEvent(
+        list(
+          input$area,
+          input$facility_hire_group,
+          selected_facility_hire()
+        ),
+        {
+
+          if (!identical(
+            input$area,
+            "Facility Hire"
+          )) {
+            return()
+          }
+
+          facility_hire <-
+            selected_facility_hire()
+
+          if (
+            !is.data.frame(facility_hire) ||
+              nrow(facility_hire) == 0L
+          ) {
+            return()
+          }
+
+          facilities <- sort(
+            unique(
+              trimws(
+                as.character(
+                  facility_hire$facility
+                )
+              )
+            )
+          )
+
+          facilities <- facilities[
+            !is.na(facilities) &
+              nzchar(facilities)
+          ]
+
+          selected_group <-
+            input$facility_hire_group
+
+          if (
+            !is.null(selected_group) &&
+              length(selected_group) > 0L &&
+              !identical(
+                selected_group,
+                "All Facilities"
+              )
+          ) {
+
+            groups <-
+              venues_operations_facility_hire_group(
+                facilities
+              )
+
+            facilities <- facilities[
+              !is.na(groups) &
+                groups == selected_group
+            ]
+          }
+
+          choices <- c(
+            "All Facilities",
+            facilities
+          )
+
+          current_selection <-
+            isolate(
+              input$facility_hire_facility
+            )
+
+          selected <- if (
+            !is.null(current_selection) &&
+              length(current_selection) > 0L &&
+              current_selection %in% choices
+          ) {
+            current_selection
+          } else {
+            "All Facilities"
+          }
+
+          updateSelectInput(
+            session,
+            "facility_hire_facility",
+            choices = choices,
+            selected = selected
+          )
+        },
+        ignoreInit = FALSE
+      )
+
       output$breakdown_title <- renderUI({
 
         req(input$area)
+
+        if (identical(input$area, "Facility Hire")) {
+
+          selected_facility <-
+            input$facility_hire_facility
+
+          if (
+            !is.null(selected_facility) &&
+              length(selected_facility) > 0L &&
+              !identical(
+                selected_facility,
+                "All Facilities"
+              )
+          ) {
+            return("Revenue Breakdown")
+          }
+
+          return("Revenue by Facility")
+        }
 
         if (!identical(input$area, "Attendance")) {
           return("Operational Breakdown")
@@ -1278,10 +2266,29 @@ mod_venues_operations_server <- function(
 
         "Attendance by Activity"
       })
-
+      
       output$secondary_title <- renderUI({
 
         req(input$area)
+
+        if (identical(input$area, "Facility Hire")) {
+
+          selected_facility <-
+            input$facility_hire_facility
+
+          if (
+            !is.null(selected_facility) &&
+              length(selected_facility) > 0L &&
+              !identical(
+                selected_facility,
+                "All Facilities"
+              )
+          ) {
+            return("Transactions Breakdown")
+          }
+
+          return("Transactions by Facility")
+        }
 
         if (identical(input$area, "Attendance")) {
           return("Attendance by Area")
@@ -1296,6 +2303,53 @@ mod_venues_operations_server <- function(
           input$year,
           input$area
         )
+
+        if (identical(input$area, "Facility Hire")) {
+
+          selected_group <-
+            input$facility_hire_group
+
+          selected_facility <-
+            input$facility_hire_facility
+
+          if (
+            !is.null(selected_facility) &&
+              length(selected_facility) > 0L &&
+              !identical(
+                selected_facility,
+                "All Facilities"
+              )
+          ) {
+            return(
+              chart_subtitle(
+                paste0(
+                  selected_facility,
+                  " · Original hire categories · ",
+                  input$year
+                )
+              )
+            )
+          }
+
+          group_label <- if (
+            is.null(selected_group) ||
+              length(selected_group) == 0L
+          ) {
+            "All Facilities"
+          } else {
+            selected_group
+          }
+
+          return(
+            chart_subtitle(
+              paste0(
+                group_label,
+                " · Annual revenue · ",
+                input$year
+              )
+            )
+          )
+        }
 
         if (!identical(input$area, "Attendance")) {
           return(
@@ -1399,6 +2453,53 @@ mod_venues_operations_server <- function(
           input$area
         )
 
+        if (identical(input$area, "Facility Hire")) {
+
+          selected_group <-
+            input$facility_hire_group
+
+          selected_facility <-
+            input$facility_hire_facility
+
+          if (
+            !is.null(selected_facility) &&
+              length(selected_facility) > 0L &&
+              !identical(
+                selected_facility,
+                "All Facilities"
+              )
+          ) {
+            return(
+              chart_subtitle(
+                paste0(
+                  selected_facility,
+                  " · Original hire categories · ",
+                  input$year
+                )
+              )
+            )
+          }
+
+          group_label <- if (
+            is.null(selected_group) ||
+              length(selected_group) == 0L
+          ) {
+            "All Facilities"
+          } else {
+            selected_group
+          }
+
+          return(
+            chart_subtitle(
+              paste0(
+                group_label,
+                " · Annual transactions · ",
+                input$year
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Attendance")) {
           return(
             chart_subtitle(
@@ -1421,62 +2522,108 @@ mod_venues_operations_server <- function(
       output$attendance_by_activity <- renderPlot(
         {
 
-          req(
-            identical(
-              input$area,
-              "Attendance"
+          req(input$area)
+
+          if (identical(input$area, "Attendance")) {
+
+            activity_data <- attendance_breakdown_data()
+
+            validate(
+              need(
+                is.data.frame(activity_data) &&
+                  nrow(activity_data) > 0L &&
+                  any(is.finite(activity_data$value)),
+                "No activity attendance values are available for this selection."
+              )
             )
-          )
 
-          activity_data <- attendance_breakdown_data()
-
-          validate(
-            need(
-              is.data.frame(activity_data) &&
-                nrow(activity_data) > 0L &&
-                any(is.finite(activity_data$value)),
-              "No activity attendance values are available for this selection."
+            return(
+              plot_venues_attendance_by_activity(
+                activity_data
+              )
             )
-          )
+          }
 
-          plot_venues_attendance_by_activity(
-            activity_data
-          )
-        },
-        res = 96,
-        bg = "white"
+          if (identical(input$area, "Facility Hire")) {
+
+            facility_data <-
+              facility_hire_revenue_breakdown()
+
+            validate(
+              need(
+                is.data.frame(facility_data) &&
+                  nrow(facility_data) > 0L &&
+                  any(is.finite(facility_data$value)),
+                "No Facility Hire revenue values are available for this selection."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_by_facility(
+                facility_data,
+                currency = TRUE
+              )
+            )
+          }
+
+      },
+      res = 96,
+      bg = "white"
+    )
+
+    output$attendance_by_area <- renderPlot(
+  {
+
+    req(input$area)
+
+    if (identical(input$area, "Attendance")) {
+
+      area_data <- attendance_area()
+
+      validate(
+        need(
+          is.data.frame(area_data) &&
+            nrow(area_data) > 0L &&
+            any(is.finite(area_data$value)),
+          "No area attendance values are available for this selection."
+        )
       )
 
-      output$attendance_by_area <- renderPlot(
-        {
+      return(
+        plot_venues_attendance_by_area(
+          area_data
+        )
+      )
+    }
 
-          req(
-            identical(
-              input$area,
-              "Attendance"
-            )
-          )
+    if (identical(input$area, "Facility Hire")) {
 
-          area_data <- attendance_area()
+      facility_data <-
+       facility_hire_transactions_breakdown()
 
-          validate(
-            need(
-              is.data.frame(area_data) &&
-                nrow(area_data) > 0L &&
-                any(is.finite(area_data$value)),
-              "No area attendance values are available for this selection."
-            )
-          )
-
-          plot_venues_attendance_by_area(
-            area_data
-          )
-        },
-        res = 96,
-        bg = "white"
+      validate(
+        need(
+          is.data.frame(facility_data) &&
+            nrow(facility_data) > 0L &&
+            any(is.finite(facility_data$value)),
+          "No Facility Hire transaction values are available for this selection."
+        )
       )
 
-      invisible(
+      return(
+        plot_venues_facility_hire_by_facility(
+          facility_data,
+          currency = FALSE
+        )
+      )
+    }
+
+  },
+  res = 96,
+  bg = "white"
+ )
+      
+       invisible(
         list(
           year = reactive(input$year),
           area = reactive(input$area)
