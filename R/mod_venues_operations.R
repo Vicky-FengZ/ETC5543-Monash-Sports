@@ -681,6 +681,1064 @@ venues_operations_facility_hire_detail <- function(
 }
 
 # -------------------------------------------------------------------------
+# Membership calculations
+# -------------------------------------------------------------------------
+
+venues_operations_membership_group_display <- function(group) {
+
+  display_names <- c(
+    "Fitness" = "Fitness",
+    "Fitness & Aquatics" = "Fitness & Aquatics",
+    "Staff Memberships" =
+      "Staff Memberships (Fitness & Aquatics)",
+    "Aquatics Memberships" =
+      "Aquatics Memberships",
+    "Free Offerings" =
+      "Free Offerings - (Fitness & Aquatics)"
+  )
+
+  group <- as.character(group)
+
+  result <- group
+
+  matched <-
+    !is.na(group) &
+    group %in% names(display_names)
+
+  result[matched] <-
+    unname(
+      display_names[
+        group[matched]
+      ]
+    )
+
+  result
+}
+
+
+venues_operations_membership_group_choices <- function(
+    membership
+) {
+
+  default_choice <- c(
+    "All Memberships" =
+      "All Memberships"
+  )
+
+  if (
+    is.null(membership) ||
+      !is.data.frame(membership) ||
+      nrow(membership) == 0L ||
+      !"membership_group" %in% names(membership)
+  ) {
+    return(default_choice)
+  }
+
+  groups <- as.character(
+    membership$membership_group
+  )
+
+  groups <- unique(
+    groups[
+      !is.na(groups) &
+        nzchar(trimws(groups)) &
+        groups != "Supplementary Metrics"
+    ]
+  )
+
+  preferred_order <- c(
+    "Fitness",
+    "Fitness & Aquatics",
+    "Staff Memberships",
+    "Aquatics Memberships",
+    "Free Offerings"
+  )
+
+  groups <- c(
+    preferred_order[
+      preferred_order %in% groups
+    ],
+    setdiff(
+      groups,
+      preferred_order
+    )
+  )
+
+  if (length(groups) == 0L) {
+    return(default_choice)
+  }
+
+  labels <-
+    venues_operations_membership_group_display(
+      groups
+    )
+
+  c(
+    default_choice,
+    stats::setNames(
+      groups,
+      labels
+    )
+  )
+}
+
+
+venues_operations_membership_type_choices <- function(
+    membership,
+    group
+) {
+
+  default_choice <- c(
+    "All Membership Types" =
+      "All Membership Types"
+  )
+
+  if (
+    is.null(membership) ||
+      !is.data.frame(membership) ||
+      nrow(membership) == 0L ||
+      is.null(group) ||
+      length(group) == 0L ||
+      identical(
+        group,
+        "All Memberships"
+      )
+  ) {
+    return(default_choice)
+  }
+
+  rows <- membership[
+    !is.na(membership$membership_group) &
+      membership$membership_group == group &
+      membership$row_type == "Detail" &
+      !is.na(membership$membership_type),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(default_choice)
+  }
+
+  if ("source_row" %in% names(rows)) {
+
+    rows <- rows[
+      order(rows$source_row),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  membership_types <- unique(
+    trimws(
+      as.character(
+        rows$membership_type
+      )
+    )
+  )
+
+  membership_types <-
+    membership_types[
+      !is.na(membership_types) &
+        nzchar(membership_types)
+    ]
+
+  if (length(membership_types) == 0L) {
+    return(default_choice)
+  }
+
+  c(
+    default_choice,
+    stats::setNames(
+      membership_types,
+      membership_types
+    )
+  )
+}
+
+venues_operations_membership_scope <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  if (
+    is.null(membership) ||
+      !is.data.frame(membership) ||
+      nrow(membership) == 0L
+  ) {
+    return(membership)
+  }
+
+  rows <- membership[
+    !is.na(membership$membership_group) &
+      membership$membership_group !=
+        "Supplementary Metrics",
+    ,
+    drop = FALSE
+  ]
+
+  # Specific membership product selected.
+  # Use only the underlying Detail row.
+  if (
+    !identical(
+      membership_type,
+      "All Membership Types"
+    )
+  ) {
+
+    return(
+      rows[
+        rows$row_type == "Detail" &
+          rows$membership_group == group &
+          rows$membership_type ==
+            membership_type,
+        ,
+        drop = FALSE
+      ]
+    )
+  }
+
+  # Specific membership group selected.
+  if (
+    !identical(
+      group,
+      "All Memberships"
+    )
+  ) {
+
+    rows <- rows[
+      rows$membership_group == group,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  # Keep both levels.
+  # The resolver below decides whether to use
+  # Section Total or Detail for each group.
+  rows[
+    rows$row_type %in%
+      c(
+        "Section Total",
+        "Detail"
+      ),
+    ,
+    drop = FALSE
+  ]
+}
+
+
+venues_operations_membership_resolve <- function(
+    membership,
+    metric,
+    period_type,
+    group = "All Memberships",
+    membership_type = "All Membership Types",
+    date = NULL
+) {
+
+  rows <-
+    venues_operations_membership_scope(
+      membership,
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (
+    is.null(rows) ||
+      !is.data.frame(rows) ||
+      nrow(rows) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "membership_group",
+    "membership_type",
+    "row_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(rows))) {
+    return(NA_real_)
+  }
+
+  rows <- rows[
+    rows$metric == metric &
+      rows$period_type == period_type,
+    ,
+    drop = FALSE
+  ]
+
+  if (!is.null(date)) {
+
+    if (!"date" %in% names(rows)) {
+      return(NA_real_)
+    }
+
+    rows <- rows[
+      !is.na(rows$date) &
+        rows$date == as.Date(date),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  # If one specific membership product was selected,
+  # there is no higher-level group total to prefer.
+  if (
+    !identical(
+      membership_type,
+      "All Membership Types"
+    )
+  ) {
+
+    values <- rows$value[
+      is.finite(rows$value)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    return(
+      sum(
+        values,
+        na.rm = TRUE
+      )
+    )
+  }
+
+  groups <- unique(
+    as.character(
+      rows$membership_group
+    )
+  )
+
+  groups <- groups[
+    !is.na(groups) &
+      nzchar(trimws(groups)) &
+      groups != "Supplementary Metrics"
+  ]
+
+  if (length(groups) == 0L) {
+    return(NA_real_)
+  }
+
+  resolved <- numeric()
+
+  for (group_name in groups) {
+
+    group_rows <- rows[
+      rows$membership_group ==
+        group_name,
+      ,
+      drop = FALSE
+    ]
+
+    section_values <-
+      group_rows$value[
+        group_rows$row_type ==
+          "Section Total" &
+          is.finite(group_rows$value)
+      ]
+
+    # Prefer the group's reported section total
+    # when that cell actually contains a value.
+    if (length(section_values) > 0L) {
+
+      resolved <- c(
+        resolved,
+        sum(
+          section_values,
+          na.rm = TRUE
+        )
+      )
+
+      next
+    }
+
+    # Otherwise calculate that group's value
+    # from its membership products.
+    detail_values <-
+      group_rows$value[
+        group_rows$row_type ==
+          "Detail" &
+          is.finite(group_rows$value)
+      ]
+
+    if (length(detail_values) > 0L) {
+
+      resolved <- c(
+        resolved,
+        sum(
+          detail_values,
+          na.rm = TRUE
+        )
+      )
+    }
+  }
+
+  if (length(resolved) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(
+    resolved,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_membership_scope_label <- function(
+    group,
+    membership_type
+) {
+
+  if (
+    !is.null(membership_type) &&
+      length(membership_type) > 0L &&
+      !identical(
+        membership_type,
+        "All Membership Types"
+      )
+  ) {
+    return(
+      as.character(
+        membership_type[[1L]]
+      )
+    )
+  }
+
+  if (
+    !is.null(group) &&
+      length(group) > 0L &&
+      !identical(
+        group,
+        "All Memberships"
+      )
+  ) {
+    return(
+      venues_operations_membership_group_display(
+        group[[1L]]
+      )
+    )
+  }
+
+  "All Memberships"
+}
+
+
+venues_operations_membership_annual_value <- function(
+    membership,
+    metric,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  # First preference:
+  # use the workbook's reported Total block.
+  reported_value <-
+    venues_operations_membership_resolve(
+      membership,
+      metric = metric,
+      period_type = "Reported Total",
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (is.finite(reported_value)) {
+    return(reported_value)
+  }
+
+  # Fallback:
+  # add the resolved monthly flow values.
+  rows <-
+    venues_operations_membership_scope(
+      membership,
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (
+    is.null(rows) ||
+      !is.data.frame(rows) ||
+      nrow(rows) == 0L ||
+      !"date" %in% names(rows)
+  ) {
+    return(NA_real_)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        rows$date[
+          rows$period_type == "Month" &
+            rows$metric == metric &
+            !is.na(rows$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(NA_real_)
+  }
+
+  values <- vapply(
+    dates,
+    function(current_date) {
+
+      venues_operations_membership_resolve(
+        membership,
+        metric = metric,
+        period_type = "Month",
+        group = group,
+        membership_type = membership_type,
+        date = as.Date(
+          current_date,
+          origin = "1970-01-01"
+        )
+      )
+    },
+    numeric(1)
+  )
+
+  values <- values[
+    is.finite(values)
+  ]
+
+  if (length(values) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(
+    values,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_membership_active_value <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  rows <-
+    venues_operations_membership_scope(
+      membership,
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (
+    is.null(rows) ||
+      !is.data.frame(rows) ||
+      nrow(rows) == 0L ||
+      !"date" %in% names(rows)
+  ) {
+    return(NA_real_)
+  }
+
+  dates <- as.Date(
+    rows$date[
+      rows$period_type == "Month" &
+        rows$metric == "Active" &
+        !is.na(rows$date)
+    ]
+  )
+
+  if (length(dates) == 0L) {
+    return(NA_real_)
+  }
+
+  latest_date <- max(
+    dates,
+    na.rm = TRUE
+  )
+
+  venues_operations_membership_resolve(
+    membership,
+    metric = "Active",
+    period_type = "Month",
+    group = group,
+    membership_type = membership_type,
+    date = latest_date
+  )
+}
+
+
+venues_operations_membership_kpis <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  list(
+    new =
+      venues_operations_membership_annual_value(
+        membership,
+        metric = "New",
+        group = group,
+        membership_type =
+          membership_type
+      ),
+
+    expired_cancelled =
+      venues_operations_membership_annual_value(
+        membership,
+        metric = "Expired/Cancelled",
+        group = group,
+        membership_type =
+          membership_type
+      ),
+
+    active =
+      venues_operations_membership_active_value(
+        membership,
+        group = group,
+        membership_type =
+          membership_type
+      )
+  )
+}
+
+
+venues_operations_membership_active_trend <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  rows <-
+    venues_operations_membership_scope(
+      membership,
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (
+    is.null(rows) ||
+      !is.data.frame(rows) ||
+      nrow(rows) == 0L ||
+      !"date" %in% names(rows)
+  ) {
+    return(empty_result)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        rows$date[
+          rows$period_type == "Month" &
+            rows$metric == "Active" &
+            !is.na(rows$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  values <- vapply(
+    dates,
+    function(current_date) {
+
+      venues_operations_membership_resolve(
+        membership,
+        metric = "Active",
+        period_type = "Month",
+        group = group,
+        membership_type = membership_type,
+        date = as.Date(
+          current_date,
+          origin = "1970-01-01"
+        )
+      )
+    },
+    numeric(1)
+  )
+
+  keep <- is.finite(values)
+
+  dates <- dates[keep]
+  values <- values[keep]
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  data.frame(
+    date = as.Date(dates),
+    month = as.integer(
+      format(
+        as.Date(dates),
+        "%m"
+      )
+    ),
+    month_label = format(
+      as.Date(dates),
+      "%b"
+    ),
+    value = values,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+venues_operations_membership_movement <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month_label = character(),
+    new_members = double(),
+    expired_cancelled = double(),
+    stringsAsFactors = FALSE
+  )
+
+  rows <-
+    venues_operations_membership_scope(
+      membership,
+      group = group,
+      membership_type = membership_type
+    )
+
+  if (
+    is.null(rows) ||
+      !is.data.frame(rows) ||
+      nrow(rows) == 0L ||
+      !"date" %in% names(rows)
+  ) {
+    return(empty_result)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        rows$date[
+          rows$period_type == "Month" &
+            !is.na(rows$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  new_values <- vapply(
+    dates,
+    function(current_date) {
+
+      venues_operations_membership_resolve(
+        membership,
+        metric = "New",
+        period_type = "Month",
+        group = group,
+        membership_type = membership_type,
+        date = as.Date(
+          current_date,
+          origin = "1970-01-01"
+        )
+      )
+    },
+    numeric(1)
+  )
+
+  expired_values <- vapply(
+    dates,
+    function(current_date) {
+
+      venues_operations_membership_resolve(
+        membership,
+        metric = "Expired/Cancelled",
+        period_type = "Month",
+        group = group,
+        membership_type = membership_type,
+        date = as.Date(
+          current_date,
+          origin = "1970-01-01"
+        )
+      )
+    },
+    numeric(1)
+  )
+
+  keep <-
+    is.finite(new_values) |
+    is.finite(expired_values)
+
+  if (!any(keep)) {
+    return(empty_result)
+  }
+
+  data.frame(
+    date = as.Date(
+      dates[keep]
+    ),
+    month_label = format(
+      as.Date(
+        dates[keep]
+      ),
+      "%b"
+    ),
+    new_members =
+      new_values[keep],
+    expired_cancelled =
+      expired_values[keep],
+    stringsAsFactors = FALSE
+  )
+}
+
+
+venues_operations_membership_breakdown <- function(
+    membership,
+    group = "All Memberships",
+    membership_type = "All Membership Types"
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(membership) ||
+      !is.data.frame(membership) ||
+      nrow(membership) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  # Specific membership product:
+  # show its three headline measures.
+  if (
+    !identical(
+      membership_type,
+      "All Membership Types"
+    )
+  ) {
+
+    result <- data.frame(
+      facility = c(
+        "New Memberships",
+        "Expired / Cancelled",
+        "Active Members"
+      ),
+      value = c(
+        venues_operations_membership_annual_value(
+          membership,
+          metric = "New",
+          group = group,
+          membership_type =
+            membership_type
+        ),
+        venues_operations_membership_annual_value(
+          membership,
+          metric = "Expired/Cancelled",
+          group = group,
+          membership_type =
+            membership_type
+        ),
+        venues_operations_membership_active_value(
+          membership,
+          group = group,
+          membership_type =
+            membership_type
+        )
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    result <- result[
+      is.finite(result$value),
+      ,
+      drop = FALSE
+    ]
+
+    rownames(result) <- NULL
+
+    return(result)
+  }
+
+  # All Memberships:
+  # compare Active Members across the five groups.
+  if (
+    identical(
+      group,
+      "All Memberships"
+    )
+  ) {
+
+    groups <- unique(
+      as.character(
+        membership$membership_group
+      )
+    )
+
+    groups <- groups[
+      !is.na(groups) &
+        nzchar(trimws(groups)) &
+        groups != "Supplementary Metrics"
+    ]
+
+    preferred_order <- c(
+      "Fitness",
+      "Fitness & Aquatics",
+      "Staff Memberships",
+      "Aquatics Memberships",
+      "Free Offerings"
+    )
+
+    groups <- c(
+      preferred_order[
+        preferred_order %in% groups
+      ],
+      setdiff(
+        groups,
+        preferred_order
+      )
+    )
+
+    results <- lapply(
+      groups,
+      function(group_name) {
+
+        data.frame(
+          facility =
+            venues_operations_membership_group_display(
+              group_name
+            ),
+          value =
+            venues_operations_membership_active_value(
+              membership,
+              group = group_name,
+              membership_type =
+                "All Membership Types"
+            ),
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+
+  } else {
+
+    # Specific group:
+    # compare all products within that group.
+    rows <- membership[
+      membership$membership_group == group &
+        membership$row_type == "Detail" &
+        !is.na(membership$membership_type),
+      ,
+      drop = FALSE
+    ]
+
+    if ("source_row" %in% names(rows)) {
+
+      rows <- rows[
+        order(rows$source_row),
+        ,
+        drop = FALSE
+      ]
+    }
+
+    membership_types <- unique(
+      as.character(
+        rows$membership_type
+      )
+    )
+
+    membership_types <-
+      membership_types[
+        !is.na(membership_types) &
+          nzchar(trimws(membership_types))
+      ]
+
+    if (length(membership_types) == 0L) {
+      return(empty_result)
+    }
+
+    results <- lapply(
+      membership_types,
+      function(type_name) {
+
+        data.frame(
+          facility = type_name,
+          value =
+            venues_operations_membership_active_value(
+              membership,
+              group = group,
+              membership_type =
+                type_name
+            ),
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+  }
+
+  if (length(results) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    results
+  )
+
+  result <- result[
+    is.finite(result$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+# -------------------------------------------------------------------------
 # Attendance calculations
 # -------------------------------------------------------------------------
 
@@ -1453,6 +2511,114 @@ mod_venues_operations_server <- function(
         )
       })
 
+      selected_membership <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$membership,
+          year = input$year
+        )
+      })
+
+
+      membership_group_selection <- reactive({
+
+        value <- input$membership_group
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Memberships")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      membership_type_selection <- reactive({
+
+        value <- input$membership_type
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Membership Types")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      membership_scope_label <- reactive({
+
+        venues_operations_membership_scope_label(
+          membership_group_selection(),
+          membership_type_selection()
+        )
+      })
+
+
+      membership_kpis <- reactive({
+
+        venues_operations_membership_kpis(
+          selected_membership(),
+          group =
+            membership_group_selection(),
+          membership_type =
+            membership_type_selection()
+        )
+      })
+
+
+      membership_active_trend <- reactive({
+
+        venues_operations_membership_active_trend(
+          selected_membership(),
+          group =
+            membership_group_selection(),
+          membership_type =
+            membership_type_selection()
+        )
+      })
+
+
+      membership_movement <- reactive({
+
+        venues_operations_membership_movement(
+          selected_membership(),
+          group =
+            membership_group_selection(),
+          membership_type =
+            membership_type_selection()
+        )
+      })
+
+
+      membership_breakdown <- reactive({
+
+        venues_operations_membership_breakdown(
+          selected_membership(),
+          group =
+            membership_group_selection(),
+          membership_type =
+            membership_type_selection()
+        )
+      })
+
       facility_hire_kpis <- reactive({
 
         venues_operations_facility_hire_kpis(
@@ -1775,7 +2941,8 @@ mod_venues_operations_server <- function(
         ),
         {
           attendance <- selected_attendance()
-            facility_hire <- selected_facility_hire()
+          facility_hire <- selected_facility_hire()
+          membership <- selected_membership()
 
             areas <- character()
 
@@ -1798,6 +2965,17 @@ mod_venues_operations_server <- function(
                 "Facility Hire"
               )
             }
+          
+          if (
+            is.data.frame(membership) &&
+              nrow(membership) > 0L
+          ) {
+            areas <- c(
+              areas,
+              "Membership"
+            )
+          }
+          
           updateSelectInput(
             session,
             "area",
@@ -1827,23 +3005,47 @@ mod_venues_operations_server <- function(
           )
         }
 
-        attendance <- selected_attendance()
+        available <- character()
 
         if (
-          !is.data.frame(attendance) ||
-            nrow(attendance) == 0L
+          is.data.frame(selected_attendance()) &&
+            nrow(selected_attendance()) > 0L
         ) {
-          return(
-            tags$small(
-              class = "text-secondary",
-              "No Attendance data is available for this year."
-            )
+          available <- c(
+            available,
+            "Attendance"
+          )
+        }
+
+        if (
+          is.data.frame(selected_facility_hire()) &&
+            nrow(selected_facility_hire()) > 0L
+        ) {
+          available <- c(
+            available,
+            "Facility Hire"
+          )
+        }
+
+        if (
+          is.data.frame(selected_membership()) &&
+            nrow(selected_membership()) > 0L
+        ) {
+          available <- c(
+            available,
+            "Membership"
           )
         }
 
         tags$small(
           class = "text-secondary",
-          "Available from uploaded reports: Attendance"
+          paste0(
+            "Available from uploaded reports: ",
+            paste(
+              available,
+              collapse = ", "
+            )
+          )
         )
       })
 
@@ -1908,6 +3110,45 @@ mod_venues_operations_server <- function(
                 ),
                 subtitle = "Average transaction value",
                 icon = "calculator"
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Membership")) {
+
+          values <- membership_kpis()
+
+          scope <- membership_scope_label()
+
+          return(
+            list(
+              list(
+                title = "New Memberships",
+                value =
+                  venues_operations_format_count(
+                    values$new
+                  ),
+                subtitle = scope,
+                icon = "person-plus"
+              ),
+              list(
+                title = "Expired / Cancelled",
+                value =
+                  venues_operations_format_count(
+                    values$expired_cancelled
+                  ),
+                subtitle = scope,
+                icon = "person-dash"
+              ),
+              list(
+                title = "Active Members",
+                value =
+                  venues_operations_format_count(
+                    values$active
+                  ),
+                subtitle = "Latest monthly snapshot",
+                icon = "people"
               )
             )
           )
@@ -1979,6 +3220,10 @@ mod_venues_operations_server <- function(
           return("Facility Hire Revenue Over Time")
         }
 
+        if (identical(input$area, "Membership")) {
+          return("Active Memberships Over Time")
+        }
+
         "Operational Trend"
       })
 
@@ -1994,6 +3239,19 @@ mod_venues_operations_server <- function(
             chart_subtitle(
               paste0(
                 "Monthly revenue · January–December ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Membership")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                membership_scope_label(),
+                " · January–December ",
                 input$year
               )
             )
@@ -2050,6 +3308,31 @@ mod_venues_operations_server <- function(
             return(
               plot_venues_facility_hire_revenue_over_time(
                 monthly
+              )
+            )
+          }
+
+          if (identical(input$area, "Membership")) {
+
+            membership_data <-
+              membership_active_trend()
+
+            validate(
+              need(
+                is.data.frame(membership_data) &&
+                  nrow(membership_data) > 0L &&
+                  any(
+                    is.finite(
+                      membership_data$value
+                    )
+                  ),
+                "No active membership values are available for this selection."
+              )
+            )
+
+            return(
+              plot_venues_attendance_over_time(
+                membership_data
               )
             )
           }
@@ -2123,6 +3406,43 @@ mod_venues_operations_server <- function(
               ),
 
               col_widths = c(4, 8)
+            )
+          )
+        }
+
+        if (identical(input$area, "Membership")) {
+
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "membership_group"
+                ),
+                "Membership Group",
+                choices =
+                  venues_operations_membership_group_choices(
+                    selected_membership()
+                  ),
+                selected = "All Memberships",
+                width = "100%"
+              ),
+
+              selectInput(
+                session$ns(
+                  "membership_type"
+                ),
+                "Membership Type",
+                choices = c(
+                  "All Membership Types" =
+                    "All Membership Types"
+                ),
+                selected =
+                  "All Membership Types",
+                width = "100%"
+              ),
+
+              col_widths = c(5, 7)
             )
           )
         }
@@ -2223,6 +3543,53 @@ mod_venues_operations_server <- function(
         ignoreInit = FALSE
       )
 
+      observeEvent(
+        list(
+          input$area,
+          input$membership_group,
+          selected_membership()
+        ),
+        {
+
+          if (!identical(
+            input$area,
+            "Membership"
+          )) {
+            return()
+          }
+
+          group <- membership_group_selection()
+
+          choices <-
+            venues_operations_membership_type_choices(
+              selected_membership(),
+              group
+            )
+
+          current <- isolate(
+            input$membership_type
+          )
+
+          selected <- if (
+            !is.null(current) &&
+              length(current) > 0L &&
+              current %in% unname(choices)
+          ) {
+            current
+          } else {
+            "All Membership Types"
+          }
+
+          updateSelectInput(
+            session,
+            "membership_type",
+            choices = choices,
+            selected = selected
+          )
+        },
+        ignoreInit = FALSE
+      )
+
       output$breakdown_title <- renderUI({
 
         req(input$area)
@@ -2244,6 +3611,10 @@ mod_venues_operations_server <- function(
           }
 
           return("Revenue by Facility")
+        }
+
+        if (identical(input$area, "Membership")) {
+          return("Membership Movement")
         }
 
         if (!identical(input$area, "Attendance")) {
@@ -2288,6 +3659,31 @@ mod_venues_operations_server <- function(
           }
 
           return("Transactions by Facility")
+        }
+
+        if (identical(input$area, "Membership")) {
+
+          if (
+            !identical(
+              membership_type_selection(),
+              "All Membership Types"
+            )
+          ) {
+            return("Membership Summary")
+          }
+
+          if (
+            !identical(
+              membership_group_selection(),
+              "All Memberships"
+            )
+          ) {
+            return(
+              "Active Members by Membership Type"
+            )
+          }
+
+          return("Active Members by Group")
         }
 
         if (identical(input$area, "Attendance")) {
@@ -2345,6 +3741,20 @@ mod_venues_operations_server <- function(
               paste0(
                 group_label,
                 " · Annual revenue · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Membership")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "New vs Expired / Cancelled · ",
+                membership_scope_label(),
+                " · ",
                 input$year
               )
             )
@@ -2500,6 +3910,19 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(input$area, "Membership")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                membership_scope_label(),
+                " · ",
+                input$year
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Attendance")) {
           return(
             chart_subtitle(
@@ -2566,6 +3989,25 @@ mod_venues_operations_server <- function(
             )
           }
 
+          if (identical(input$area, "Membership")) {
+
+            movement <- membership_movement()
+
+            validate(
+              need(
+                is.data.frame(movement) &&
+                  nrow(movement) > 0L,
+                "No membership movement values are available for this selection."
+              )
+            )
+
+            return(
+              plot_site_detail_membership_movement(
+                movement
+              )
+            )
+          }
+
       },
       res = 96,
       bg = "white"
@@ -2613,6 +4055,32 @@ mod_venues_operations_server <- function(
       return(
         plot_venues_facility_hire_by_facility(
           facility_data,
+          currency = FALSE
+        )
+      )
+    }
+
+    if (identical(input$area, "Membership")) {
+
+      membership_data <-
+        membership_breakdown()
+
+      validate(
+        need(
+          is.data.frame(membership_data) &&
+            nrow(membership_data) > 0L &&
+            any(
+              is.finite(
+                membership_data$value
+              )
+            ),
+          "No membership breakdown values are available for this selection."
+        )
+      )
+
+      return(
+        plot_venues_facility_hire_by_facility(
+          membership_data,
           currency = FALSE
         )
       )
