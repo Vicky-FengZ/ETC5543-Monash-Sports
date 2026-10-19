@@ -1,5 +1,6 @@
+
 ---
-title: "Monash Sport Dashboard"
+title: "Modelling resource and space for Monash Sport"
 subtitle: "ETC5543 Project Presentation"
 author: "Ayush Pandia, Ziqi Feng"
 date: 21 Oct 2026
@@ -19,74 +20,55 @@ library(dplyr)
 options(width = 70)
 ```
 
-# Goals
+## About Monash Sport
 
-## Goals
+<!-- Presenter: Ayush -->
 
+- **Health, fitness & wellbeing**
+- **Sports facilities & community engagement**
+- **Industry mentors:** Alicia Stack & Darren McLeod
+- **Our project:** Data-driven dashboard for Monash Sport
 
-The main goals for this slide:
+## Business Problem & Objectives
 
-- This is just to show you how this \emph{template} works
-- The blue in this template is based on the official Monash University color palette
+<!-- Presenter: Ayush -->
 
-### beamer options
+### Business Problem
+- Outdated, Excel-based reporting
+- Multiple files and manual navigation
+- Difficult to interpret and compare data
 
-- Use the `titlegraphic` option to include a different background image for the title slide
-- Use the `titlecolor` option to change the color for the text on the title slide.
+### Objectives
+- Simplify and modernise data analysis
+- Develop an interactive dashboard
+- Provide a single-view summary for reporting and presentations
 
-# Tables and graphs
+## Our Thinking
 
-## Slide 2
+<!-- Presenter: Ayush -->
+- **Easy access:** Web-based dashboard via URL
+- **Simple uploads:** Drag-and-drop Excel files
+- **Technology:** R and ShinyLive
+- **Visual insights:** Interactive graphs & KPIs
+- **Two views:** Overall summary & detailed analysis
+- **Data coverage:** Income, expenses, attendance, court & venue hire and many more 
 
-A nice table
+## Problems We Are Facing
 
-```{r}
-mtcars |>
-  select(mpg:wt) |>
-  head() |>
-  kable(booktabs = TRUE)
-```
+<!-- Presenters: Vicky / Ayush -->
 
-## Slide 3
+### Data Challenges
+<!-- Vicky's points to be added here -->
 
-And a graph
+### Dashboard Visualisation Challenges
 
-```{r}
-#| fig-height: 3.8
-mtcars |>
-  ggplot(aes(x=wt, y = mpg)) +
-  geom_point()
-```
+- **Layout constraints:** Graphs struggled to fit and remain readable.
+- **Data complexity:** Multiple subcategories required separate visualisations.
 
-## Slide 4
+## Results
 
-The sample standard deviation is given by
-$$
-  s = \sqrt{\frac{1}{n-1} \sum_{i=1}^n (x_i - \bar{x})^2}
-$$
+<!-- Presenter: Vicky -->
 
-## Testing monospace font
+## In & Out of Scope
 
-```{r}
-#| echo: true
-mtcars |> as_tibble() |> head()
-```
-
-
-## Testing math fonts
-
-* Calligraphic
-
-  * $\mathcal{ABCDE}$
-
-* Script
-
-  * $\mathscr{ABCDE}$
-
-* Fraktur
-
-  * $\mathfrak{ABCDE}$
-
-* Mathbb
-
-  * $\mathbb{ABCDE}$
+<!-- Presenter: Vicky -->
