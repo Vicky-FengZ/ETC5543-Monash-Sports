@@ -1,12 +1,13 @@
 ---
-title: My great presentation
-author: Hypatia of Alexandria
-date: today
+title: "Monash Sport Dashboard"
+subtitle: "ETC5543 Project Presentation"
+author: "Ayush Pandia, Ziqi Feng"
+date: 21 Oct 2026
 toc: false
-format: # Use only one of these
-  presentation-typst: default
-  presentation-beamer: default
-  presentation-revealjs+letterbox: default
+format:
+  presentation-revealjs+letterbox:
+    slide-number: true
+    embed-resources: true
 ---
 
 ```{r}
