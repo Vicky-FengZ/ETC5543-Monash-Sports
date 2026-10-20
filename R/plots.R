@@ -6646,3 +6646,431 @@ plot_venues_attendance_by_area <- function(area_data) {
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Venues Operations - Workforce
+# -------------------------------------------------------------------------
+
+plot_workforce_hours_over_time <- function(
+    workforce_hours
+) {
+
+  if (
+    is.null(workforce_hours) ||
+      !is.data.frame(workforce_hours) ||
+      nrow(workforce_hours) == 0L
+  ) {
+    stop(
+      "No monthly workforce hour values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "budget_hours",
+    "paid_hours"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(workforce_hours)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Workforce hour data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  workforce_hours <- workforce_hours[
+    order(workforce_hours$date),
+    ,
+    drop = FALSE
+  ]
+
+  dates <- as.Date(
+    workforce_hours$date
+  )
+
+  budget <- suppressWarnings(
+    as.numeric(
+      workforce_hours$budget_hours
+    )
+  )
+
+  paid <- suppressWarnings(
+    as.numeric(
+      workforce_hours$paid_hours
+    )
+  )
+
+  keep <-
+    !is.na(dates) &
+    (
+      is.finite(budget) |
+        is.finite(paid)
+    )
+
+  dates <- dates[keep]
+  budget <- budget[keep]
+  paid <- paid[keep]
+
+  if (length(dates) == 0L) {
+    stop(
+      "No monthly workforce hour values are available.",
+      call. = FALSE
+    )
+  }
+
+  values <- c(
+    0,
+    budget[is.finite(budget)],
+    paid[is.finite(paid)]
+  )
+
+  limits <- range(
+    values,
+    na.rm = TRUE
+  )
+
+  padding <- diff(limits) * 0.12
+
+  if (
+    !is.finite(padding) ||
+      padding == 0
+  ) {
+    padding <- max(
+      abs(values),
+      1,
+      na.rm = TRUE
+    ) * 0.12
+  }
+
+  limits <- c(
+    min(0, limits[[1L]]),
+    limits[[2L]] + padding
+  )
+
+  x_limits <- range(dates)
+
+  if (x_limits[[1L]] == x_limits[[2L]]) {
+    x_limits <- x_limits +
+      c(-15, 15)
+  } else {
+    x_limits <- x_limits +
+      c(-8, 8)
+  }
+
+  old_par <- par(
+    mar = c(4.8, 5.8, 3.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= limits[[1L]] &
+      y_ticks <= limits[[2L]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  lines(
+    dates,
+    budget,
+    col = "#94A3B8",
+    lwd = 2.4,
+    lty = 2
+  )
+
+  points(
+    dates,
+    budget,
+    pch = 21,
+    cex = 0.95,
+    lwd = 1.5,
+    col = "#94A3B8",
+    bg = "white"
+  )
+
+  lines(
+    dates,
+    paid,
+    col = "#2563EB",
+    lwd = 2.8
+  )
+
+  points(
+    dates,
+    paid,
+    pch = 21,
+    cex = 1,
+    lwd = 1.7,
+    col = "#2563EB",
+    bg = "white"
+  )
+
+  axis.Date(
+    1,
+    at = dates,
+    format = "%b",
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.86
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  legend(
+    "topright",
+    legend = c(
+      "Budgeted Hours",
+      "Paid Hours"
+    ),
+    col = c(
+      "#94A3B8",
+      "#2563EB"
+    ),
+    lty = c(2, 1),
+    lwd = c(2.4, 2.8),
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.8,
+    text.col = "#475569"
+  )
+
+  invisible(NULL)
+}
+
+
+plot_workforce_hours_variance <- function(
+    workforce_hours
+) {
+
+  if (
+    is.null(workforce_hours) ||
+      !is.data.frame(workforce_hours) ||
+      nrow(workforce_hours) == 0L
+  ) {
+    stop(
+      "No monthly workforce variance values are available.",
+      call. = FALSE
+    )
+  }
+
+  required_columns <- c(
+    "date",
+    "variance_hours"
+  )
+
+  missing_columns <- setdiff(
+    required_columns,
+    names(workforce_hours)
+  )
+
+  if (length(missing_columns) > 0L) {
+    stop(
+      paste0(
+        "Workforce variance data is missing: ",
+        paste(
+          missing_columns,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  dates <- as.Date(
+    workforce_hours$date
+  )
+
+  values <- suppressWarnings(
+    as.numeric(
+      workforce_hours$variance_hours
+    )
+  )
+
+  keep <-
+    !is.na(dates) &
+    is.finite(values)
+
+  dates <- dates[keep]
+  values <- values[keep]
+
+  if (length(values) == 0L) {
+    stop(
+      "No reported workforce variance values are available.",
+      call. = FALSE
+    )
+  }
+
+  order_index <- order(dates)
+
+  dates <- dates[order_index]
+  values <- values[order_index]
+
+  limits <- range(
+    c(
+      0,
+      values
+    ),
+    na.rm = TRUE
+  )
+
+  padding <- diff(limits) * 0.15
+
+  if (
+    !is.finite(padding) ||
+      padding == 0
+  ) {
+    padding <- max(
+      abs(values),
+      1
+    ) * 0.15
+  }
+
+  limits <- c(
+    limits[[1L]] -
+      if (limits[[1L]] < 0) padding else 0,
+    limits[[2L]] + padding
+  )
+
+  positions <- barplot(
+    values,
+    plot = FALSE
+  )
+
+  x_limits <- range(positions) +
+    c(-0.7, 0.7)
+
+  old_par <- par(
+    mar = c(4.8, 5.8, 3.2, 1.2),
+    xaxs = "i",
+    yaxs = "i",
+    family = "sans"
+  )
+
+  on.exit(
+    par(old_par),
+    add = TRUE
+  )
+
+  plot(
+    NA,
+    xlim = x_limits,
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    type = "n"
+  )
+
+  y_ticks <- pretty(
+    limits,
+    n = 5
+  )
+
+  y_ticks <- y_ticks[
+    y_ticks >= limits[[1L]] &
+      y_ticks <= limits[[2L]]
+  ]
+
+  abline(
+    h = y_ticks,
+    col = "#E2E8F0",
+    lwd = 1
+  )
+
+  abline(
+    h = 0,
+    col = "#94A3B8",
+    lwd = 1.1
+  )
+
+  barplot(
+    values,
+    add = TRUE,
+    axes = FALSE,
+    border = NA,
+    col = "#2563EB"
+  )
+
+  axis(
+    1,
+    at = positions,
+    labels = format(
+      dates,
+      "%b"
+    ),
+    tick = FALSE,
+    line = -0.2,
+    col.axis = "#64748B",
+    cex.axis = 0.86
+  )
+
+  axis(
+    2,
+    at = y_ticks,
+    labels = format(
+      round(y_ticks),
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    ),
+    las = 1,
+    tick = FALSE,
+    line = -0.5,
+    col.axis = "#64748B",
+    cex.axis = 0.82
+  )
+
+  invisible(NULL)
+}

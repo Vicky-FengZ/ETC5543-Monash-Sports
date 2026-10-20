@@ -73,6 +73,501 @@ venues_operations_available_years <- function(
 }
 
 # -------------------------------------------------------------------------
+# Workforce calculations
+# -------------------------------------------------------------------------
+
+venues_operations_workforce_hours_monthly <- function(
+    casual_hours
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    budget_hours = double(),
+    paid_hours = double(),
+    variance_hours = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(casual_hours) ||
+      !is.data.frame(casual_hours) ||
+      nrow(casual_hours) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "month_label",
+    "period_type",
+    "record_group",
+    "metric",
+    "value"
+  )
+
+  if (!all(
+    required_columns %in%
+      names(casual_hours)
+  )) {
+    return(empty_result)
+  }
+
+  rows <- casual_hours[
+    casual_hours$period_type == "Month" &
+      casual_hours$record_group ==
+        "Monthly Summary" &
+      casual_hours$metric %in%
+        c(
+          "Budgeted Hours",
+          "Paid Hours",
+          "Variance"
+        ) &
+      !is.na(casual_hours$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  if ("is_reported" %in% names(rows)) {
+    rows$value[
+      !(rows$is_reported %in% TRUE)
+    ] <- NA_real_
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(rows$date)
+    )
+  )
+
+  result <- list()
+
+  value_for <- function(
+      month_rows,
+      metric_name
+  ) {
+
+    values <- month_rows$value[
+      month_rows$metric ==
+        metric_name &
+        is.finite(month_rows$value)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    sum(
+      values,
+      na.rm = TRUE
+    )
+  }
+
+  for (index in seq_along(dates)) {
+
+    current_date <- as.Date(
+      dates[[index]],
+      origin = "1970-01-01"
+    )
+
+    month_rows <- rows[
+      as.Date(rows$date) ==
+        current_date,
+      ,
+      drop = FALSE
+    ]
+
+    result[[length(result) + 1L]] <-
+      data.frame(
+        date = current_date,
+        month = as.integer(
+          format(
+            current_date,
+            "%m"
+          )
+        ),
+        month_label = format(
+          current_date,
+          "%b"
+        ),
+        budget_hours =
+          value_for(
+            month_rows,
+            "Budgeted Hours"
+          ),
+        paid_hours =
+          value_for(
+            month_rows,
+            "Paid Hours"
+          ),
+        variance_hours =
+          value_for(
+            month_rows,
+            "Variance"
+          ),
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  keep <-
+    is.finite(result$budget_hours) |
+    is.finite(result$paid_hours) |
+    is.finite(result$variance_hours)
+
+  result <- result[
+    keep,
+    ,
+    drop = FALSE
+  ]
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_workforce_wages_monthly <- function(
+    casual_wages
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    wage_budget = double(),
+    wage_actual = double(),
+    wage_variance = double(),
+    net_budget = double(),
+    net_actual = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(casual_wages) ||
+      !is.data.frame(casual_wages) ||
+      nrow(casual_wages) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "month_label",
+    "period_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(
+    required_columns %in%
+      names(casual_wages)
+  )) {
+    return(empty_result)
+  }
+
+  rows <- casual_wages[
+    casual_wages$period_type ==
+      "Month" &
+      casual_wages$metric %in%
+        c(
+          "Budget",
+          "Actual",
+          "Variance"
+        ) &
+      !is.na(casual_wages$date),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  if ("is_reported" %in% names(rows)) {
+    rows$value[
+      !(rows$is_reported %in% TRUE)
+    ] <- NA_real_
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(rows$date)
+    )
+  )
+
+  result <- list()
+
+  value_for <- function(
+      month_rows,
+      metric_name
+  ) {
+
+    values <- month_rows$value[
+      month_rows$metric ==
+        metric_name &
+        is.finite(month_rows$value)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    sum(
+      values,
+      na.rm = TRUE
+    )
+  }
+
+  for (index in seq_along(dates)) {
+
+    current_date <- as.Date(
+      dates[[index]],
+      origin = "1970-01-01"
+    )
+
+    month_rows <- rows[
+      as.Date(rows$date) ==
+        current_date,
+      ,
+      drop = FALSE
+    ]
+
+    budget <-
+      value_for(
+        month_rows,
+        "Budget"
+      )
+
+    actual <-
+      value_for(
+        month_rows,
+        "Actual"
+      )
+
+    variance <-
+      value_for(
+        month_rows,
+        "Variance"
+      )
+
+    result[[length(result) + 1L]] <-
+      data.frame(
+        date = current_date,
+        month = as.integer(
+          format(
+            current_date,
+            "%m"
+          )
+        ),
+        month_label = format(
+          current_date,
+          "%b"
+        ),
+        wage_budget = budget,
+        wage_actual = actual,
+        wage_variance = variance,
+
+        # These aliases let us reuse the
+        # existing Budget vs Actual finance plot.
+        net_budget = budget,
+        net_actual = actual,
+
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  keep <-
+    is.finite(result$wage_budget) |
+    is.finite(result$wage_actual) |
+    is.finite(result$wage_variance)
+
+  result <- result[
+    keep,
+    ,
+    drop = FALSE
+  ]
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_workforce_annual_value <- function(
+    data,
+    metric,
+    record_group = NULL
+) {
+
+  if (
+    is.null(data) ||
+      !is.data.frame(data) ||
+      nrow(data) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  required_columns <- c(
+    "period_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(
+    required_columns %in%
+      names(data)
+  )) {
+    return(NA_real_)
+  }
+
+  rows <- data[
+    data$metric == metric,
+    ,
+    drop = FALSE
+  ]
+
+  if (!is.null(record_group)) {
+
+    if (!"record_group" %in% names(rows)) {
+      return(NA_real_)
+    }
+
+    rows <- rows[
+      rows$record_group ==
+        record_group,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  reported <- if (
+    "is_reported" %in% names(rows)
+  ) {
+    rows$is_reported %in% TRUE
+  } else {
+    is.finite(rows$value)
+  }
+
+  # Prefer the workbook's reported total
+  # when it has been validated as complete.
+  total_values <- rows$value[
+    rows$period_type ==
+      "Reported Total" &
+      reported &
+      is.finite(rows$value)
+  ]
+
+  if (length(total_values) > 0L) {
+
+    return(
+      sum(
+        total_values,
+        na.rm = TRUE
+      )
+    )
+  }
+
+  # Partial year fallback:
+  # sum only genuinely reported months.
+  monthly_values <- rows$value[
+    rows$period_type == "Month" &
+      reported &
+      is.finite(rows$value)
+  ]
+
+  if (length(monthly_values) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(
+    monthly_values,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_workforce_kpis <- function(
+    casual_hours,
+    casual_wages
+) {
+
+  list(
+    paid_hours =
+      venues_operations_workforce_annual_value(
+        casual_hours,
+        metric = "Paid Hours",
+        record_group =
+          "Monthly Summary"
+      ),
+
+    actual_wages =
+      venues_operations_workforce_annual_value(
+        casual_wages,
+        metric = "Actual"
+      ),
+
+    wage_variance =
+      venues_operations_workforce_annual_value(
+        casual_wages,
+        metric = "Variance"
+      )
+  )
+}
+
+# -------------------------------------------------------------------------
 # Merchandise calculations
 # -------------------------------------------------------------------------
 
@@ -4821,6 +5316,66 @@ mod_venues_operations_server <- function(
         )
       })
 
+      selected_casual_hours <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$casual_hours,
+          year = input$year
+        )
+      })
+
+
+      selected_casual_wages <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$casual_wages,
+          year = input$year
+        )
+      })
+
+
+      workforce_hours_monthly <- reactive({
+
+        venues_operations_workforce_hours_monthly(
+          selected_casual_hours()
+        )
+      })
+
+
+      workforce_wages_monthly <- reactive({
+
+        venues_operations_workforce_wages_monthly(
+          selected_casual_wages()
+        )
+      })
+
+
+      workforce_kpis <- reactive({
+
+        venues_operations_workforce_kpis(
+          selected_casual_hours(),
+          selected_casual_wages()
+        )
+      })
+
       selected_finance <- reactive({
 
         reports <- venues_reports()
@@ -5333,6 +5888,8 @@ mod_venues_operations_server <- function(
           finance <- selected_finance()
           online_sales <- selected_online_sales()
           merchandise <- selected_merchandise()
+          casual_hours <- selected_casual_hours()
+          casual_wages <- selected_casual_wages()
 
             areas <- character()
 
@@ -5395,6 +5952,22 @@ mod_venues_operations_server <- function(
               "Merchandise"
             )
           }
+
+          if (
+            (
+              is.data.frame(casual_hours) &&
+                nrow(casual_hours) > 0L
+            ) ||
+              (
+                is.data.frame(casual_wages) &&
+                  nrow(casual_wages) > 0L
+              )
+          ) {
+            areas <- c(
+              areas,
+              "Workforce"
+            )
+          } 
           
           updateSelectInput(
             session,
@@ -5480,6 +6053,44 @@ mod_venues_operations_server <- function(
             "Online Sales"
           )
         }
+
+            if (
+      is.data.frame(
+        selected_merchandise()
+      ) &&
+        nrow(
+          selected_merchandise()
+        ) > 0L
+    ) {
+      available <- c(
+        available,
+        "Merchandise"
+      )
+    }
+
+    if (
+      (
+        is.data.frame(
+          selected_casual_hours()
+        ) &&
+          nrow(
+            selected_casual_hours()
+          ) > 0L
+      ) ||
+        (
+          is.data.frame(
+            selected_casual_wages()
+          ) &&
+            nrow(
+              selected_casual_wages()
+            ) > 0L
+        )
+    ) {
+      available <- c(
+        available,
+        "Workforce"
+      )
+    }
 
         tags$small(
           class = "text-secondary",
@@ -5672,6 +6283,49 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(
+          input$area,
+          "Workforce"
+        )) {
+
+          values <- workforce_kpis()
+
+          return(
+            list(
+              list(
+                title = "Paid Hours",
+                value =
+                  venues_operations_format_count(
+                    values$paid_hours
+                  ),
+                subtitle =
+                  "Reported casual hours",
+                icon = "clock"
+              ),
+              list(
+                title = "Actual Wages",
+                value =
+                  venues_operations_format_currency(
+                    values$actual_wages
+                  ),
+                subtitle =
+                  "Reported casual wages",
+                icon = "cash-stack"
+              ),
+              list(
+                title = "Wage Variance",
+                value =
+                  venues_operations_format_currency(
+                    values$wage_variance
+                  ),
+                subtitle =
+                  "Budget vs Actual",
+                icon = "graph-up-arrow"
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Merchandise")) {
 
           values <- merchandise_kpis()
@@ -5829,6 +6483,9 @@ mod_venues_operations_server <- function(
         
         if (identical(input$area,"Merchandise")) {
           return("Merchandise Revenue Over Time")}
+        
+        if (identical(input$area, "Workforce")) {
+          return("Budgeted vs Paid Hours Over Time")}
 
         "Operational Trend"
       })
@@ -5898,6 +6555,18 @@ mod_venues_operations_server <- function(
               paste0(
                 merchandise_scope_label(),
                 " · January–December ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Workforce")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Monthly casual hours · January–December ",
                 input$year
               )
             )
@@ -6056,6 +6725,34 @@ mod_venues_operations_server <- function(
             return(
               plot_venues_facility_hire_revenue_over_time(
                 monthly
+              )
+            )
+          }
+
+          if (identical(input$area, "Workforce")) {
+
+            workforce_data <-
+              workforce_hours_monthly()
+
+            validate(
+              need(
+                is.data.frame(workforce_data) &&
+                  nrow(workforce_data) > 0L &&
+                  any(
+                    is.finite(
+                      c(
+                        workforce_data$budget_hours,
+                        workforce_data$paid_hours
+                      )
+                    )
+                  ),
+                "No monthly Casual Hours values are available."
+              )
+            )
+
+            return(
+              plot_workforce_hours_over_time(
+                workforce_data
               )
             )
           }
@@ -6514,6 +7211,9 @@ mod_venues_operations_server <- function(
           return("Operational Breakdown")
         }
 
+        if (identical(input$area, "Workforce")) {
+          return("Hours Variance by Month")}
+
         selected_activity <-
           input$attendance_breakdown_activity
 
@@ -6600,6 +7300,9 @@ mod_venues_operations_server <- function(
 
           return("Active Members by Group")
         }
+
+        if (identical(input$area, "Workforce")) {
+          return("Budget vs Actual Casual Wages")}
 
         if (identical(input$area, "Attendance")) {
           return("Attendance by Area")
@@ -6712,6 +7415,18 @@ mod_venues_operations_server <- function(
                 "New vs Expired / Cancelled · ",
                 membership_scope_label(),
                 " · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Workforce")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Budgeted vs Paid hours variance · ",
                 input$year
               )
             )
@@ -6918,6 +7633,18 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(input$area, "Workforce")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Monthly Budget vs Actual wages · ",
+                input$year
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Attendance")) {
           return(
             chart_subtitle(
@@ -6980,6 +7707,31 @@ mod_venues_operations_server <- function(
               plot_venues_facility_hire_by_facility(
                 facility_data,
                 currency = TRUE
+              )
+            )
+          }
+
+          if (identical(input$area, "Workforce")) {
+
+            workforce_data <-
+              workforce_hours_monthly()
+
+            validate(
+              need(
+                is.data.frame(workforce_data) &&
+                  nrow(workforce_data) > 0L &&
+                  any(
+                    is.finite(
+                      workforce_data$variance_hours
+                    )
+                  ),
+                "No monthly Casual Hours variance values are available."
+              )
+            )
+
+            return(
+              plot_workforce_hours_variance(
+                workforce_data
               )
             )
           }
@@ -7136,6 +7888,36 @@ mod_venues_operations_server <- function(
         plot_venues_facility_hire_by_facility(
           facility_data,
           currency = FALSE
+        )
+      )
+    }
+
+    if (identical(input$area, "Workforce")) {
+
+      wage_data <-
+        workforce_wages_monthly()
+
+      validate(
+        need(
+          is.data.frame(wage_data) &&
+            nrow(wage_data) > 0L &&
+            any(
+              is.finite(
+                wage_data$net_budget
+              )
+            ) &&
+            any(
+              is.finite(
+                wage_data$net_actual
+              )
+            ),
+          "No complete Casual Wages Budget and Actual values are available."
+        )
+      )
+
+      return(
+        plot_monthly_budget_vs_actual_net_result(
+          wage_data
         )
       )
     }
