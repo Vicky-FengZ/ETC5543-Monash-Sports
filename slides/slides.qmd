@@ -95,6 +95,8 @@ options(width = 70)
 
 ## Conclusion
 
+<!-- Presenter: Vicky -->
+
 - The dashboard brings financial and operational reports together.
 - Users can review overall performance and compare sites and facilities.
 - Forecasting supports planning around changes in costs and prices.
