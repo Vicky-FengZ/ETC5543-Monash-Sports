@@ -73,6 +73,707 @@ venues_operations_available_years <- function(
 }
 
 # -------------------------------------------------------------------------
+# Merchandise calculations
+# -------------------------------------------------------------------------
+
+venues_operations_merchandise_section_choices <- function(
+    merchandise
+) {
+
+  default_choice <- c(
+    "All Sections" = "All Sections"
+  )
+
+  if (
+    is.null(merchandise) ||
+      !is.data.frame(merchandise) ||
+      nrow(merchandise) == 0L ||
+      !"section" %in% names(merchandise)
+  ) {
+    return(default_choice)
+  }
+
+  rows <- merchandise
+
+  if ("source_row" %in% names(rows)) {
+    rows <- rows[
+      order(rows$source_row),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  sections <- unique(
+    trimws(
+      as.character(rows$section)
+    )
+  )
+
+  sections <- sections[
+    !is.na(sections) &
+      nzchar(sections)
+  ]
+
+  if (length(sections) == 0L) {
+    return(default_choice)
+  }
+
+  c(
+    default_choice,
+    stats::setNames(
+      sections,
+      sections
+    )
+  )
+}
+
+
+venues_operations_merchandise_item_choices <- function(
+    merchandise,
+    section = "All Sections"
+) {
+
+  default_choice <- c(
+    "All Items" = "All Items"
+  )
+
+  if (
+    is.null(merchandise) ||
+      !is.data.frame(merchandise) ||
+      nrow(merchandise) == 0L ||
+      identical(
+        section,
+        "All Sections"
+      )
+  ) {
+    return(default_choice)
+  }
+
+  rows <- merchandise[
+    merchandise$row_type == "Item" &
+      !is.na(merchandise$section) &
+      trimws(
+        as.character(
+          merchandise$section
+        )
+      ) == section,
+    ,
+    drop = FALSE
+  ]
+
+  if ("source_row" %in% names(rows)) {
+    rows <- rows[
+      order(rows$source_row),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  items <- unique(
+    trimws(
+      as.character(rows$item)
+    )
+  )
+
+  items <- items[
+    !is.na(items) &
+      nzchar(items)
+  ]
+
+  if (length(items) == 0L) {
+    return(default_choice)
+  }
+
+  c(
+    default_choice,
+    stats::setNames(
+      items,
+      items
+    )
+  )
+}
+
+
+venues_operations_merchandise_scope_label <- function(
+    section = "All Sections",
+    item = "All Items"
+) {
+
+  if (!identical(
+    item,
+    "All Items"
+  )) {
+    return(item)
+  }
+
+  if (!identical(
+    section,
+    "All Sections"
+  )) {
+    return(section)
+  }
+
+  "All Merchandise"
+}
+
+
+venues_operations_merchandise_resolve <- function(
+    merchandise,
+    metric,
+    period_type,
+    section = "All Sections",
+    item = "All Items",
+    date = NULL
+) {
+
+  if (
+    is.null(merchandise) ||
+      !is.data.frame(merchandise) ||
+      nrow(merchandise) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  required_columns <- c(
+    "date",
+    "period_type",
+    "section",
+    "item",
+    "row_type",
+    "metric",
+    "value"
+  )
+
+  if (!all(
+    required_columns %in%
+      names(merchandise)
+  )) {
+    return(NA_real_)
+  }
+
+  rows <- merchandise[
+    merchandise$metric == metric &
+      merchandise$period_type ==
+        period_type,
+    ,
+    drop = FALSE
+  ]
+
+  if (!is.null(date)) {
+
+    selected_date <- as.Date(date)
+
+    rows <- rows[
+      !is.na(rows$date) &
+        as.Date(rows$date) ==
+          selected_date,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  # One specific item selected.
+  if (!identical(
+    item,
+    "All Items"
+  )) {
+
+    rows <- rows[
+      rows$row_type == "Item" &
+        !is.na(rows$item) &
+        trimws(
+          as.character(rows$item)
+        ) == item,
+      ,
+      drop = FALSE
+    ]
+
+    if (!identical(
+      section,
+      "All Sections"
+    )) {
+
+      rows <- rows[
+        !is.na(rows$section) &
+          trimws(
+            as.character(
+              rows$section
+            )
+          ) == section,
+        ,
+        drop = FALSE
+      ]
+    }
+
+    values <- rows$value[
+      is.finite(rows$value)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    return(
+      sum(
+        values,
+        na.rm = TRUE
+      )
+    )
+  }
+
+  # Resolve section-by-section so a reported
+  # Section Total is never added to its items.
+  sections <- if (
+    identical(
+      section,
+      "All Sections"
+    )
+  ) {
+
+    unique(
+      trimws(
+        as.character(rows$section)
+      )
+    )
+
+  } else {
+
+    section
+  }
+
+  sections <- sections[
+    !is.na(sections) &
+      nzchar(sections)
+  ]
+
+  if (length(sections) == 0L) {
+    return(NA_real_)
+  }
+
+  resolved <- numeric()
+
+  for (section_name in sections) {
+
+    section_rows <- rows[
+      !is.na(rows$section) &
+        trimws(
+          as.character(
+            rows$section
+          )
+        ) == section_name,
+      ,
+      drop = FALSE
+    ]
+
+    total_values <-
+      section_rows$value[
+        section_rows$row_type ==
+          "Section Total" &
+          is.finite(section_rows$value)
+      ]
+
+    if (length(total_values) > 0L) {
+
+      resolved <- c(
+        resolved,
+        sum(
+          total_values,
+          na.rm = TRUE
+        )
+      )
+
+      next
+    }
+
+    item_values <-
+      section_rows$value[
+        section_rows$row_type ==
+          "Item" &
+          is.finite(section_rows$value)
+      ]
+
+    if (length(item_values) > 0L) {
+
+      resolved <- c(
+        resolved,
+        sum(
+          item_values,
+          na.rm = TRUE
+        )
+      )
+    }
+  }
+
+  if (length(resolved) == 0L) {
+    return(NA_real_)
+  }
+
+  sum(
+    resolved,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_merchandise_monthly <- function(
+    merchandise,
+    metric = "Revenue",
+    section = "All Sections",
+    item = "All Items"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(merchandise) ||
+      !is.data.frame(merchandise) ||
+      nrow(merchandise) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        merchandise$date[
+          merchandise$period_type ==
+            "Month" &
+            merchandise$metric ==
+              metric &
+            !is.na(merchandise$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  result <- list()
+
+  for (index in seq_along(dates)) {
+
+    current_date <- as.Date(
+      dates[[index]],
+      origin = "1970-01-01"
+    )
+
+    value <-
+      venues_operations_merchandise_resolve(
+        merchandise,
+        metric = metric,
+        period_type = "Month",
+        section = section,
+        item = item,
+        date = current_date
+      )
+
+    if (!is.finite(value)) {
+      next
+    }
+
+    result[[length(result) + 1L]] <-
+      data.frame(
+        date = current_date,
+        month = as.integer(
+          format(
+            current_date,
+            "%m"
+          )
+        ),
+        month_label = format(
+          current_date,
+          "%b"
+        ),
+        value = value,
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_merchandise_annual_value <- function(
+    merchandise,
+    metric,
+    section = "All Sections",
+    item = "All Items"
+) {
+
+  ytd_value <-
+    venues_operations_merchandise_resolve(
+      merchandise,
+      metric = metric,
+      period_type = "YTD",
+      section = section,
+      item = item
+    )
+
+  if (is.finite(ytd_value)) {
+    return(ytd_value)
+  }
+
+  monthly <-
+    venues_operations_merchandise_monthly(
+      merchandise,
+      metric = metric,
+      section = section,
+      item = item
+    )
+
+  if (
+    !is.data.frame(monthly) ||
+      nrow(monthly) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  sum(
+    monthly$value,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_merchandise_kpis <- function(
+    merchandise,
+    section = "All Sections",
+    item = "All Items"
+) {
+
+  revenue <-
+    venues_operations_merchandise_annual_value(
+      merchandise,
+      metric = "Revenue",
+      section = section,
+      item = item
+    )
+
+  transactions <-
+    venues_operations_merchandise_annual_value(
+      merchandise,
+      metric = "Transactions",
+      section = section,
+      item = item
+    )
+
+  revenue_per_transaction <- if (
+    is.finite(revenue) &&
+      is.finite(transactions) &&
+      transactions > 0
+  ) {
+    revenue / transactions
+  } else {
+    NA_real_
+  }
+
+  list(
+    revenue = revenue,
+    transactions = transactions,
+    revenue_per_transaction =
+      revenue_per_transaction
+  )
+}
+
+
+venues_operations_merchandise_breakdown <- function(
+    merchandise,
+    metric,
+    section = "All Sections",
+    top_n = 10L
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(merchandise) ||
+      !is.data.frame(merchandise) ||
+      nrow(merchandise) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  if (identical(
+    section,
+    "All Sections"
+  )) {
+
+    labels <- unique(
+      trimws(
+        as.character(
+          merchandise$section
+        )
+      )
+    )
+
+    labels <- labels[
+      !is.na(labels) &
+        nzchar(labels)
+    ]
+
+    result <- lapply(
+      labels,
+      function(section_name) {
+
+        data.frame(
+          facility = section_name,
+          value =
+            venues_operations_merchandise_annual_value(
+              merchandise,
+              metric = metric,
+              section =
+                section_name,
+              item = "All Items"
+            ),
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+
+  } else {
+
+    rows <- merchandise[
+      merchandise$row_type ==
+        "Item" &
+        !is.na(merchandise$section) &
+        trimws(
+          as.character(
+            merchandise$section
+          )
+        ) == section,
+      ,
+      drop = FALSE
+    ]
+
+    if ("source_row" %in% names(rows)) {
+
+      rows <- rows[
+        order(rows$source_row),
+        ,
+        drop = FALSE
+      ]
+    }
+
+    labels <- unique(
+      trimws(
+        as.character(rows$item)
+      )
+    )
+
+    labels <- labels[
+      !is.na(labels) &
+        nzchar(labels)
+    ]
+
+    result <- lapply(
+      labels,
+      function(item_name) {
+
+        data.frame(
+          facility = item_name,
+          value =
+            venues_operations_merchandise_annual_value(
+              merchandise,
+              metric = metric,
+              section = section,
+              item = item_name
+            ),
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+  }
+
+  if (
+    length(result) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  result <- result[
+    is.finite(result$value),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  if (
+    !identical(
+      section,
+      "All Sections"
+    ) &&
+      is.finite(top_n) &&
+      top_n > 0L &&
+      nrow(result) > top_n
+  ) {
+
+    result <- result[
+      seq_len(top_n),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  rownames(result) <- NULL
+
+  result
+}
+
+# -------------------------------------------------------------------------
 # Online Sales calculations
 # -------------------------------------------------------------------------
 
@@ -4011,6 +4712,115 @@ mod_venues_operations_server <- function(
         )
       })
 
+      selected_merchandise <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$merchandise,
+          year = input$year
+        )
+      })
+
+
+      merchandise_section_selection <- reactive({
+
+        value <- input$merchandise_section
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Sections")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      merchandise_item_selection <- reactive({
+
+        value <- input$merchandise_item
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Items")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      merchandise_scope_label <- reactive({
+
+        venues_operations_merchandise_scope_label(
+          section =
+            merchandise_section_selection(),
+          item =
+            merchandise_item_selection()
+        )
+      })
+
+
+      merchandise_monthly_revenue <- reactive({
+
+        venues_operations_merchandise_monthly(
+          selected_merchandise(),
+          metric = "Revenue",
+          section =
+            merchandise_section_selection(),
+          item =
+            merchandise_item_selection()
+        )
+      })
+
+
+      merchandise_kpis <- reactive({
+
+        venues_operations_merchandise_kpis(
+          selected_merchandise(),
+          section =
+            merchandise_section_selection(),
+          item =
+            merchandise_item_selection()
+        )
+      })
+
+
+      merchandise_revenue_breakdown <- reactive({
+
+        venues_operations_merchandise_breakdown(
+          selected_merchandise(),
+          metric = "Revenue",
+          section =
+            merchandise_section_selection()
+        )
+      })
+
+
+      merchandise_transactions_breakdown <- reactive({
+
+        venues_operations_merchandise_breakdown(
+          selected_merchandise(),
+          metric = "Transactions",
+          section =
+            merchandise_section_selection()
+        )
+      })
+
       selected_finance <- reactive({
 
         reports <- venues_reports()
@@ -4522,6 +5332,7 @@ mod_venues_operations_server <- function(
           membership <- selected_membership()
           finance <- selected_finance()
           online_sales <- selected_online_sales()
+          merchandise <- selected_merchandise()
 
             areas <- character()
 
@@ -4572,6 +5383,16 @@ mod_venues_operations_server <- function(
             areas <- c(
               areas,
               "Online Sales"
+            )
+          }
+
+          if (
+            is.data.frame(merchandise) &&
+              nrow(merchandise) > 0L
+          ) {
+            areas <- c(
+              areas,
+              "Merchandise"
             )
           }
           
@@ -4738,10 +5559,7 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Venue Finances"
-        )) {
+        if (identical(input$area, "Venue Finances")) {
 
           values <- finance_kpis()
 
@@ -4792,10 +5610,7 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Online Sales"
-        )) {
+        if (identical(input$area, "Online Sales")) {
 
           values <- online_sales_kpis()
 
@@ -4852,6 +5667,46 @@ mod_venues_operations_server <- function(
                 subtitle =
                   peak_month,
                 icon = "bar-chart-line"
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          values <- merchandise_kpis()
+
+          scope <- merchandise_scope_label()
+
+          return(
+            list(
+              list(
+                title = "Total Revenue",
+                value =
+                  venues_operations_format_currency(
+                    values$revenue
+                  ),
+                subtitle = scope,
+                icon = "currency-dollar"
+              ),
+              list(
+                title = "Total Transactions",
+                value =
+                  venues_operations_format_count(
+                    values$transactions
+                  ),
+                subtitle = scope,
+                icon = "receipt"
+              ),
+              list(
+                title = "Revenue / Transaction",
+                value =
+                  venues_operations_format_currency(
+                    values$revenue_per_transaction,
+                    digits = 2L
+                  ),
+                subtitle = scope,
+                icon = "calculator"
               )
             )
           )
@@ -4971,6 +5826,9 @@ mod_venues_operations_server <- function(
         
         if (identical( input$area, "Online Sales")) {
           return("Online Sales Revenue Over Time")}
+        
+        if (identical(input$area,"Merchandise")) {
+          return("Merchandise Revenue Over Time")}
 
         "Operational Trend"
       })
@@ -5006,10 +5864,7 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Venue Finances"
-        )) {
+        if (identical(input$area, "Venue Finances")) {
 
           return(
             chart_subtitle(
@@ -5023,15 +5878,25 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Online Sales"
-        )) {
+        if (identical(input$area, "Online Sales")) {
 
           return(
             chart_subtitle(
               paste0(
                 online_sales_scope_label(),
+                " · January–December ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                merchandise_scope_label(),
                 " · January–December ",
                 input$year
               )
@@ -5170,6 +6035,31 @@ mod_venues_operations_server <- function(
             )
           }
 
+          if (identical(input$area,"Merchandise")) {
+
+            monthly <-
+              merchandise_monthly_revenue()
+
+            validate(
+              need(
+                is.data.frame(monthly) &&
+                  nrow(monthly) > 0L &&
+                  any(
+                    is.finite(
+                      monthly$value
+                    )
+                  ),
+                "No monthly Merchandise revenue values are available for this selection."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_revenue_over_time(
+                monthly
+              )
+            )
+          }
+
         },
         res = 96,
         bg = "white"
@@ -5272,6 +6162,44 @@ mod_venues_operations_server <- function(
                 ),
                 selected =
                   "All Membership Types",
+                width = "100%"
+              ),
+
+              col_widths = c(5, 7)
+            )
+          )
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "merchandise_section"
+                ),
+                "Section",
+                choices =
+                  venues_operations_merchandise_section_choices(
+                    selected_merchandise()
+                  ),
+                selected =
+                  "All Sections",
+                width = "100%"
+              ),
+
+              selectInput(
+                session$ns(
+                  "merchandise_item"
+                ),
+                "Item",
+                choices = c(
+                  "All Items" =
+                    "All Items"
+                ),
+                selected =
+                  "All Items",
                 width = "100%"
               ),
 
@@ -5483,6 +6411,55 @@ mod_venues_operations_server <- function(
         ignoreInit = FALSE
       )
 
+      observeEvent(
+        list(
+          input$area,
+          input$merchandise_section,
+          selected_merchandise()
+        ),
+        {
+
+          if (!identical(
+            input$area,
+            "Merchandise"
+          )) {
+            return()
+          }
+
+          section <-
+            merchandise_section_selection()
+
+          choices <-
+            venues_operations_merchandise_item_choices(
+              selected_merchandise(),
+              section = section
+            )
+
+          current <- isolate(
+            input$merchandise_item
+          )
+
+          selected <- if (
+            !is.null(current) &&
+              length(current) > 0L &&
+              current %in%
+                unname(choices)
+          ) {
+            current
+          } else {
+            "All Items"
+          }
+
+          updateSelectInput(
+            session,
+            "merchandise_item",
+            choices = choices,
+            selected = selected
+          )
+        },
+        ignoreInit = FALSE
+      )
+
       output$breakdown_title <- renderUI({
 
         req(input$area)
@@ -5504,6 +6481,22 @@ mod_venues_operations_server <- function(
           }
 
           return("Revenue by Facility")
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          if (identical(
+            merchandise_section_selection(),
+            "All Sections"
+          )) {
+            return(
+              "Revenue by Section"
+            )
+          }
+
+          return(
+            "Revenue by Item"
+          )
         }
 
         if (identical(input$area, "Venue Finances")) {
@@ -5559,6 +6552,22 @@ mod_venues_operations_server <- function(
           }
 
           return("Transactions by Facility")
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          if (identical(
+            merchandise_section_selection(),
+            "All Sections"
+          )) {
+            return(
+              "Transactions by Section"
+            )
+          }
+
+          return(
+            "Transactions by Item"
+          )
         }
 
         if (identical(input$area, "Online Sales")) {
@@ -5647,6 +6656,19 @@ mod_venues_operations_server <- function(
               paste0(
                 group_label,
                 " · Annual revenue · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Merchandise")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                merchandise_section_selection(),
+                " · YTD revenue · ",
                 input$year
               )
             )
@@ -5845,6 +6867,19 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(input$area, "Merchandise")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                merchandise_section_selection(),
+                " · YTD transactions · ",
+                input$year
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Online Sales")) {
 
           return(
@@ -6023,6 +7058,36 @@ mod_venues_operations_server <- function(
             )
           }
 
+          if (identical(input$area, "Merchandise")) {
+
+            merchandise_data <-
+              merchandise_revenue_breakdown()
+
+            validate(
+              need(
+                is.data.frame(
+                  merchandise_data
+                ) &&
+                  nrow(
+                    merchandise_data
+                  ) > 0L &&
+                  any(
+                    is.finite(
+                      merchandise_data$value
+                    )
+                  ),
+                "No Merchandise revenue breakdown is available."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_by_facility(
+                merchandise_data,
+                currency = TRUE
+              )
+            )
+          }
+
       },
       res = 96,
       bg = "white"
@@ -6148,6 +7213,36 @@ mod_venues_operations_server <- function(
         plot_venues_facility_hire_by_facility(
           category_data,
           currency = TRUE
+        )
+      )
+    }
+
+    if (identical(input$area, "Merchandise")) {
+
+      merchandise_data <-
+        merchandise_transactions_breakdown()
+
+      validate(
+        need(
+          is.data.frame(
+            merchandise_data
+          ) &&
+            nrow(
+              merchandise_data
+            ) > 0L &&
+            any(
+              is.finite(
+                merchandise_data$value
+              )
+            ),
+          "No Merchandise transaction breakdown is available."
+        )
+      )
+
+      return(
+        plot_venues_facility_hire_by_facility(
+          merchandise_data,
+          currency = FALSE
         )
       )
     }
