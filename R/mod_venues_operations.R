@@ -73,6 +73,610 @@ venues_operations_available_years <- function(
 }
 
 # -------------------------------------------------------------------------
+# Venue Finance calculations
+# -------------------------------------------------------------------------
+
+venues_operations_finance_fund_choices <- function(finance) {
+
+  default_choice <- c(
+    "All Funds" = "All Funds"
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L ||
+      !"fund" %in% names(finance)
+  ) {
+    return(default_choice)
+  }
+
+  funds <- unique(
+    trimws(
+      as.character(
+        finance$fund[
+          finance$row_type == "Fund"
+        ]
+      )
+    )
+  )
+
+  funds <- funds[
+    !is.na(funds) &
+      nzchar(funds)
+  ]
+
+  if (length(funds) == 0L) {
+    return(default_choice)
+  }
+
+  c(
+    default_choice,
+    stats::setNames(
+      funds,
+      funds
+    )
+  )
+}
+
+
+venues_operations_finance_monthly <- function(
+    finance,
+    fund = "All Funds"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    income_actual = double(),
+    income_budget = double(),
+    expenses_actual = double(),
+    expenses_budget = double(),
+    net_actual = double(),
+    net_budget = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  required_columns <- c(
+    "date",
+    "month",
+    "month_label",
+    "fund",
+    "row_type",
+    "metric",
+    "value_type",
+    "value"
+  )
+
+  if (!all(required_columns %in% names(finance))) {
+    return(empty_result)
+  }
+
+  if (identical(
+    fund,
+    "All Funds"
+  )) {
+
+    rows <- finance[
+      finance$row_type == "MTD Total" &
+        !is.na(finance$date),
+      ,
+      drop = FALSE
+    ]
+
+  } else {
+
+    rows <- finance[
+      finance$row_type == "Fund" &
+        !is.na(finance$fund) &
+        trimws(
+          as.character(finance$fund)
+        ) == fund &
+        !is.na(finance$date),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(empty_result)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  dates <- sort(
+    unique(
+      as.Date(rows$date)
+    )
+  )
+
+  result <- list()
+
+  value_for <- function(
+      month_rows,
+      metric_name,
+      value_type_name
+  ) {
+
+    values <- month_rows$value[
+      month_rows$metric == metric_name &
+        month_rows$value_type ==
+          value_type_name &
+        is.finite(month_rows$value)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    sum(
+      values,
+      na.rm = TRUE
+    )
+  }
+
+  for (current_date in dates) {
+
+    current_date <- as.Date(
+      current_date,
+      origin = "1970-01-01"
+    )
+
+    month_rows <- rows[
+      as.Date(rows$date) ==
+        current_date,
+      ,
+      drop = FALSE
+    ]
+
+    income_actual <- value_for(
+      month_rows,
+      "Income",
+      "Actual"
+    )
+
+    income_budget <- value_for(
+      month_rows,
+      "Income",
+      "Budget"
+    )
+
+    expenses_actual <- value_for(
+      month_rows,
+      "Expenses",
+      "Actual"
+    )
+
+    expenses_budget <- value_for(
+      month_rows,
+      "Expenses",
+      "Budget"
+    )
+
+    net_actual <- if (
+      is.finite(income_actual) &&
+        is.finite(expenses_actual)
+    ) {
+      income_actual -
+        expenses_actual
+    } else {
+      NA_real_
+    }
+
+    net_budget <- if (
+      is.finite(income_budget) &&
+        is.finite(expenses_budget)
+    ) {
+      income_budget -
+        expenses_budget
+    } else {
+      NA_real_
+    }
+
+    result[[length(result) + 1L]] <-
+      data.frame(
+        date = as.Date(current_date),
+        month = as.integer(
+          format(
+            current_date,
+            "%m"
+          )
+        ),
+        month_label = format(
+          current_date,
+          "%b"
+        ),
+        income_actual = income_actual,
+        income_budget = income_budget,
+        expenses_actual = expenses_actual,
+        expenses_budget = expenses_budget,
+        net_actual = net_actual,
+        net_budget = net_budget,
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  keep <-
+    is.finite(result$income_actual) |
+    is.finite(result$income_budget) |
+    is.finite(result$expenses_actual) |
+    is.finite(result$expenses_budget)
+
+  result <- result[
+    keep,
+    ,
+    drop = FALSE
+  ]
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_finance_ytd <- function(
+    finance,
+    fund = "All Funds"
+) {
+
+  empty_result <- list(
+    income_actual = NA_real_,
+    income_budget = NA_real_,
+    expenses_actual = NA_real_,
+    expenses_budget = NA_real_,
+    net_actual = NA_real_,
+    net_budget = NA_real_
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  monthly <-
+    venues_operations_finance_monthly(
+      finance,
+      fund = fund
+    )
+
+  sum_column <- function(column) {
+
+    if (
+      !is.data.frame(monthly) ||
+        nrow(monthly) == 0L ||
+        !column %in% names(monthly)
+    ) {
+      return(NA_real_)
+    }
+
+    values <- monthly[[column]]
+
+    values <- values[
+      is.finite(values)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    sum(
+      values,
+      na.rm = TRUE
+    )
+  }
+
+  # Individual funds are MTD rows, so YTD is
+  # calculated by summing the monthly values.
+  if (!identical(
+    fund,
+    "All Funds"
+  )) {
+
+    income_actual <-
+      sum_column("income_actual")
+
+    income_budget <-
+      sum_column("income_budget")
+
+    expenses_actual <-
+      sum_column("expenses_actual")
+
+    expenses_budget <-
+      sum_column("expenses_budget")
+
+  } else {
+
+    # For All Funds, prefer the workbook's
+    # latest reported YTD Total.
+    rows <- finance[
+      finance$row_type ==
+        "YTD Total" &
+        !is.na(finance$date),
+      ,
+      drop = FALSE
+    ]
+
+    rows$value <- suppressWarnings(
+      as.numeric(rows$value)
+    )
+
+    latest_date <- if (
+      nrow(rows) > 0L
+    ) {
+      max(
+        as.Date(rows$date),
+        na.rm = TRUE
+      )
+    } else {
+      as.Date(NA)
+    }
+
+    latest <- if (
+      !is.na(latest_date)
+    ) {
+      rows[
+        as.Date(rows$date) ==
+          latest_date,
+        ,
+        drop = FALSE
+      ]
+    } else {
+      rows[0, , drop = FALSE]
+    }
+
+    value_for <- function(
+        metric_name,
+        value_type_name
+    ) {
+
+      values <- latest$value[
+        latest$metric == metric_name &
+          latest$value_type ==
+            value_type_name &
+          is.finite(latest$value)
+      ]
+
+      if (length(values) == 0L) {
+        return(NA_real_)
+      }
+
+      sum(
+        values,
+        na.rm = TRUE
+      )
+    }
+
+    income_actual <- value_for(
+      "Income",
+      "Actual"
+    )
+
+    income_budget <- value_for(
+      "Income",
+      "Budget"
+    )
+
+    expenses_actual <- value_for(
+      "Expenses",
+      "Actual"
+    )
+
+    expenses_budget <- value_for(
+      "Expenses",
+      "Budget"
+    )
+
+    # Fall back to accumulated MTD values
+    # if any YTD value is unavailable.
+    if (!is.finite(income_actual)) {
+      income_actual <-
+        sum_column("income_actual")
+    }
+
+    if (!is.finite(income_budget)) {
+      income_budget <-
+        sum_column("income_budget")
+    }
+
+    if (!is.finite(expenses_actual)) {
+      expenses_actual <-
+        sum_column("expenses_actual")
+    }
+
+    if (!is.finite(expenses_budget)) {
+      expenses_budget <-
+        sum_column("expenses_budget")
+    }
+  }
+
+  net_actual <- if (
+    is.finite(income_actual) &&
+      is.finite(expenses_actual)
+  ) {
+    income_actual -
+      expenses_actual
+  } else {
+    NA_real_
+  }
+
+  net_budget <- if (
+    is.finite(income_budget) &&
+      is.finite(expenses_budget)
+  ) {
+    income_budget -
+      expenses_budget
+  } else {
+    NA_real_
+  }
+
+  list(
+    income_actual = income_actual,
+    income_budget = income_budget,
+    expenses_actual = expenses_actual,
+    expenses_budget = expenses_budget,
+    net_actual = net_actual,
+    net_budget = net_budget
+  )
+}
+
+
+venues_operations_finance_kpis <- function(
+    finance,
+    fund = "All Funds"
+) {
+
+  values <-
+    venues_operations_finance_ytd(
+      finance,
+      fund = fund
+    )
+
+  list(
+    income = values$income_actual,
+    expenses = values$expenses_actual,
+    net_result = values$net_actual
+  )
+}
+
+
+venues_operations_finance_by_fund <- function(finance) {
+
+  empty_result <- data.frame(
+    report_year = integer(),
+    site = character(),
+    income_actual = double(),
+    income_budget = double(),
+    expenses_actual = double(),
+    expenses_budget = double(),
+    net_actual = double(),
+    net_budget = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(finance) ||
+      !is.data.frame(finance) ||
+      nrow(finance) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  funds <- unique(
+    trimws(
+      as.character(
+        finance$fund[
+          finance$row_type ==
+            "Fund"
+        ]
+      )
+    )
+  )
+
+  funds <- funds[
+    !is.na(funds) &
+      nzchar(funds)
+  ]
+
+  if (length(funds) == 0L) {
+    return(empty_result)
+  }
+
+  years <- unique(
+    suppressWarnings(
+      as.integer(
+        finance$report_year
+      )
+    )
+  )
+
+  years <- years[
+    !is.na(years)
+  ]
+
+  report_year <- if (
+    length(years) > 0L
+  ) {
+    years[[1L]]
+  } else {
+    NA_integer_
+  }
+
+  rows <- lapply(
+    funds,
+    function(fund_name) {
+
+      values <-
+        venues_operations_finance_ytd(
+          finance,
+          fund = fund_name
+        )
+
+      data.frame(
+        report_year = report_year,
+        site = fund_name,
+        income_actual =
+          values$income_actual,
+        income_budget =
+          values$income_budget,
+        expenses_actual =
+          values$expenses_actual,
+        expenses_budget =
+          values$expenses_budget,
+        net_actual =
+          values$net_actual,
+        net_budget =
+          values$net_budget,
+        stringsAsFactors = FALSE
+      )
+    }
+  )
+
+  result <- do.call(
+    rbind,
+    rows
+  )
+
+  result <- result[
+    is.finite(result$net_actual),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+# -------------------------------------------------------------------------
 # Facility Hire calculations
 # -------------------------------------------------------------------------
 
@@ -2511,6 +3115,83 @@ mod_venues_operations_server <- function(
         )
       })
 
+      selected_finance <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$finance,
+          year = input$year
+        )
+      })
+
+
+      finance_fund_selection <- reactive({
+
+        value <- input$finance_fund
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Funds")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      finance_scope_label <- reactive({
+
+        fund <- finance_fund_selection()
+
+        if (identical(
+          fund,
+          "All Funds"
+        )) {
+          return("All Funds")
+        }
+
+        fund
+      })
+
+
+      finance_monthly <- reactive({
+
+        venues_operations_finance_monthly(
+          selected_finance(),
+          fund =
+            finance_fund_selection()
+        )
+      })
+
+
+      finance_kpis <- reactive({
+
+        venues_operations_finance_kpis(
+          selected_finance(),
+          fund =
+            finance_fund_selection()
+        )
+      })
+
+
+      finance_by_fund <- reactive({
+
+        venues_operations_finance_by_fund(
+          selected_finance()
+        )
+      })
+
       selected_membership <- reactive({
 
         reports <- venues_reports()
@@ -2943,6 +3624,7 @@ mod_venues_operations_server <- function(
           attendance <- selected_attendance()
           facility_hire <- selected_facility_hire()
           membership <- selected_membership()
+          finance <- selected_finance()
 
             areas <- character()
 
@@ -2973,6 +3655,16 @@ mod_venues_operations_server <- function(
             areas <- c(
               areas,
               "Membership"
+            )
+          }
+
+          if (
+            is.data.frame(finance) &&
+              nrow(finance) > 0L
+          ) {
+            areas <- c(
+              areas,
+              "Venue Finances"
             )
           }
           
@@ -3034,6 +3726,16 @@ mod_venues_operations_server <- function(
           available <- c(
             available,
             "Membership"
+          )
+        }
+
+        if (
+          is.data.frame(selected_finance()) &&
+            nrow(selected_finance()) > 0L
+        ) {
+          available <- c(
+            available,
+            "Venue Finances"
           )
         }
 
@@ -3110,6 +3812,60 @@ mod_venues_operations_server <- function(
                 ),
                 subtitle = "Average transaction value",
                 icon = "calculator"
+              )
+            )
+          )
+        }
+
+        if (identical(
+          input$area,
+          "Venue Finances"
+        )) {
+
+          values <- finance_kpis()
+
+          scope <- finance_scope_label()
+
+          return(
+            list(
+              list(
+                title = "Actual Income",
+                value =
+                  venues_operations_format_currency(
+                    values$income
+                  ),
+                subtitle =
+                  paste0(
+                    "YTD · ",
+                    scope
+                  ),
+                icon = "cash-stack"
+              ),
+              list(
+                title = "Actual Expenses",
+                value =
+                  venues_operations_format_currency(
+                    values$expenses
+                  ),
+                subtitle =
+                  paste0(
+                    "YTD · ",
+                    scope
+                  ),
+                icon = "receipt"
+              ),
+              list(
+                title = "Net Result",
+                value =
+                  venues_operations_format_currency(
+                    values$net_result
+                  ),
+                subtitle =
+                  paste0(
+                    "YTD · ",
+                    scope
+                  ),
+                icon = "graph-up-arrow"
               )
             )
           )
@@ -3224,6 +3980,9 @@ mod_venues_operations_server <- function(
           return("Active Memberships Over Time")
         }
 
+        if (identical(input$area, "Venue Finances")) {
+          return("Monthly Income vs Expenses")}
+
         "Operational Trend"
       })
 
@@ -3252,6 +4011,23 @@ mod_venues_operations_server <- function(
               paste0(
                 membership_scope_label(),
                 " · January–December ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(
+          input$area,
+          "Venue Finances"
+        )) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "Actual Income vs Actual Expenses · ",
+                finance_scope_label(),
+                " · ",
                 input$year
               )
             )
@@ -3333,6 +4109,36 @@ mod_venues_operations_server <- function(
             return(
               plot_venues_attendance_over_time(
                 membership_data
+              )
+            )
+          }
+
+          if (identical(
+            input$area,
+            "Venue Finances"
+          )) {
+
+            finance_data <- finance_monthly()
+
+            validate(
+              need(
+                is.data.frame(finance_data) &&
+                  nrow(finance_data) > 0L &&
+                  any(
+                    is.finite(
+                      c(
+                        finance_data$income_actual,
+                        finance_data$expenses_actual
+                      )
+                    )
+                  ),
+                "No Venue Finance values are available for this selection."
+              )
+            )
+
+            return(
+              plot_monthly_income_expenses(
+                finance_data
               )
             )
           }
@@ -3443,6 +4249,32 @@ mod_venues_operations_server <- function(
               ),
 
               col_widths = c(5, 7)
+            )
+          )
+        }
+
+        if (identical(
+          input$area,
+          "Venue Finances"
+        )) {
+
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "finance_fund"
+                ),
+                "Fund",
+                choices =
+                  venues_operations_finance_fund_choices(
+                    selected_finance()
+                  ),
+                selected = "All Funds",
+                width = "100%"
+              ),
+
+              col_widths = 6
             )
           )
         }
@@ -3613,6 +4445,10 @@ mod_venues_operations_server <- function(
           return("Revenue by Facility")
         }
 
+        if (identical(input$area, "Venue Finances")) {
+          return("Budget vs Actual Net Result")
+        }
+
         if (identical(input$area, "Membership")) {
           return("Membership Movement")
         }
@@ -3660,6 +4496,9 @@ mod_venues_operations_server <- function(
 
           return("Transactions by Facility")
         }
+
+        if (identical( input$area, "Venue Finances")) {
+          return("Net Result by Fund")}
 
         if (identical(input$area, "Membership")) {
 
@@ -3741,6 +4580,22 @@ mod_venues_operations_server <- function(
               paste0(
                 group_label,
                 " · Annual revenue · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(
+          input$area,
+          "Venue Finances"
+        )) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                finance_scope_label(),
+                " · Monthly Net Result · ",
                 input$year
               )
             )
@@ -3910,6 +4765,21 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(
+          input$area,
+          "Venue Finances"
+        )) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                "YTD Actual Net Result · ",
+                input$year
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Membership")) {
 
           return(
@@ -4008,6 +4878,38 @@ mod_venues_operations_server <- function(
             )
           }
 
+          if (identical(
+            input$area,
+            "Venue Finances"
+          )) {
+
+            finance_data <- finance_monthly()
+
+            validate(
+              need(
+                is.data.frame(finance_data) &&
+                  nrow(finance_data) > 0L &&
+                  any(
+                    is.finite(
+                      finance_data$net_actual
+                    )
+                  ) &&
+                  any(
+                    is.finite(
+                      finance_data$net_budget
+                    )
+                  ),
+                "No complete Budget and Actual finance values are available for this selection."
+              )
+            )
+
+            return(
+              plot_monthly_budget_vs_actual_net_result(
+                finance_data
+              )
+            )
+          }
+
       },
       res = 96,
       bg = "white"
@@ -4082,6 +4984,34 @@ mod_venues_operations_server <- function(
         plot_venues_facility_hire_by_facility(
           membership_data,
           currency = FALSE
+        )
+      )
+    }
+
+    if (identical(
+      input$area,
+      "Venue Finances"
+    )) {
+
+      fund_data <- finance_by_fund()
+
+      validate(
+        need(
+          is.data.frame(fund_data) &&
+            nrow(fund_data) > 0L &&
+            any(
+              is.finite(
+                fund_data$net_actual
+              )
+            ),
+          "No fund-level Net Result values are available."
+        )
+      )
+
+      return(
+        plot_site_ranking(
+          fund_data,
+          "Net Result"
         )
       )
     }
