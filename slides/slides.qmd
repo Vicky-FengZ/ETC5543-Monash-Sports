@@ -1,0 +1,102 @@
+
+---
+title: "Monash Sport Performance Dashboard"
+subtitle: "ETC5543 Project Presentation"
+author: "Ayush Pandia, Ziqi Feng"
+date: 21 Oct 2026
+toc: false
+format:
+  presentation-revealjs+letterbox:
+    slide-number: true
+    embed-resources: true
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+library(knitr)
+library(ggplot2)
+library(dplyr)
+options(width = 70)
+```
+
+## About Monash Sport
+
+<!-- Presenter: Ayush -->
+
+- **Health, fitness & wellbeing**
+- **Sports facilities & community engagement**
+- **Industry mentors:** Alicia Stack & Darren McLeod
+- **Our project:** Data-driven dashboard for Monash Sport
+
+## Business Problem & Objectives
+
+<!-- Presenter: Ayush -->
+
+### Business Problem
+- Outdated, Excel-based reporting
+- Multiple files and manual navigation
+- Difficult to interpret and compare data
+
+### Objectives
+- Simplify and modernise data analysis
+- Develop an interactive dashboard
+- Provide a single-view summary for reporting and presentations
+
+## Our Thinking
+
+<!-- Presenter: Ayush -->
+- **Easy access:** Web-based dashboard via URL
+- **Simple uploads:** Select and upload Excel reports
+- **Technology:** R and ShinyLive
+- **Visual insights:** Interactive graphs & KPIs
+- **Two views:** Overall summary & detailed analysis
+- **Data coverage:** Income, expenses, attendance, court & venue hire and many more 
+
+## Challenges and Our Approach
+
+<!-- Presenters: Vicky / Ayush -->
+
+### Data Challenges
+
+- **Different layouts:** Report structures vary across files and years.
+- **Overlapping totals:** Summary and detailed rows require careful aggregation.
+- **Data quality:** Missing values and inconsistent totals need validation.
+
+### Dashboard Visualisation Challenges
+
+- **Layout constraints:** Graphs struggled to fit and remain readable.
+- **Data complexity:** Multiple subcategories required separate visualisations.
+
+## Results
+
+<!-- Presenter: Vicky -->
+
+- **Data preparation:** Upload, validate and review Excel reports.
+- **Performance analysis:** Review overall results and compare sites.
+- **Operational detail:** Explore site activity and venue operations.
+- **Planning:** Test payroll and pricing scenarios.
+
+## In & Out of Scope
+
+<!-- Presenter: Vicky -->
+
+### In Scope
+
+- Financial and operational reporting from supported Excel files
+- Comparisons across sites, facilities and reporting periods
+- Income and expense forecasting with user-defined scenarios
+
+### Out of Scope
+
+- Live booking and payroll administration
+- Automatic staffing or facility allocation
+- Importing arbitrary Excel layouts
+
+## Conclusion
+
+<!-- Presenter: Vicky -->
+
+- The dashboard brings financial and operational reports together.
+- Users can review overall performance and compare sites and facilities.
+- Forecasting supports planning around changes in costs and prices.

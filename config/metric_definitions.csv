@@ -1,0 +1,30 @@
+family,dataset,metric,unit,aggregation
+site_detail,memberships,New Members,Count,Sum
+site_detail,memberships,New Student Members,Count,Sum
+site_detail,memberships,New Staff Members,Count,Sum
+site_detail,memberships,New Community Members,Count,Sum
+site_detail,memberships,Expired/Cancelled,Count,Sum
+site_detail,memberships,Free Trials,Count,Sum
+site_detail,memberships,Target,Count,Last
+site_detail,memberships,Total Active,Count,Last
+site_detail,memberships,Active Student Members,Count,Last
+site_detail,memberships,Active Staff Members,Count,Last
+site_detail,memberships,Active Community Members,Count,Last
+site_detail,memberships,Membership Share,Rate,None
+site_detail,memberships,Student Share,Rate,None
+site_detail,memberships,Staff Share,Rate,None
+site_detail,memberships,Community Share,Rate,None
+site_detail,enrollments,Students,Count,Sum
+site_detail,enrollments,Staff,Count,Sum
+site_detail,enrollments,Community,Count,Sum
+site_detail,enrollments,Total Enrollments,Count,Sum
+site_detail,enrollments,Free Trials,Count,Sum
+site_detail,enrollments,Target,Count,Last
+venues_tracking,membership,New,Count,Sum
+venues_tracking,membership,Renewed,Count,Sum
+venues_tracking,membership,Total,Count,Sum
+venues_tracking,membership,Expired/Cancelled,Count,Sum
+venues_tracking,membership,Active,Count,Last
+venues_tracking,membership,Retention,Rate,None
+venues_tracking,merchandise,Revenue,Currency,Sum
+venues_tracking,merchandise,Transactions,Count,Sum

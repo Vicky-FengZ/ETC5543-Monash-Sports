@@ -365,15 +365,7 @@ extract_monthly_discount_section <- function(
     character(1)
   )
 
-  discount_type_map <- c(
-    students = "Student",
-    staff = "Staff",
-    other = "Other"
-  )
-
-  value_columns <- which(
-    header_labels %in% names(discount_type_map)
-  )
+  value_columns <- discount_value_columns(header_labels)
 
   if (length(value_columns) == 0L) {
     return(empty_monthly_discount_table())
@@ -435,8 +427,8 @@ extract_monthly_discount_section <- function(
         site_code = site_code,
         business_unit = business_unit,
         is_summary = normalise_excel_label(business_unit) == "ytd summary",
-        discount_type = unname(
-          discount_type_map[[header_labels[[source_column]]]]
+        discount_type = canonical_discount_type(
+          cell_as_text(raw_sheet, header_row, source_column)
         ),
         value = cell_as_number(
           raw_sheet,
@@ -509,18 +501,17 @@ extract_monthly_total_revenue_section <- function(
     character(1)
   )
 
-  # Each business-unit group begins with the Students discount column. The
-  # source Total Revenue value is stored in this first column of the group.
-  reported_columns <- which(header_labels == "students")
+  # Reported revenue sits at the start of each business-unit group; the
+  # first discount category need not be Students in future templates.
+  group_headers <- fill_group_headers(raw_sheet, discount_header_row)
+  candidates <- discount_value_columns(header_labels)
+  groups <- normalise_excel_label(group_headers[candidates])
+  reported_columns <- candidates[c(TRUE, head(groups, -1L) != tail(groups, -1L))]
+  if (length(candidates) == 0L) reported_columns <- integer()
 
   if (length(reported_columns) == 0L) {
     return(empty_monthly_total_revenue_table())
   }
-
-  group_headers <- fill_group_headers(
-    raw_sheet,
-    discount_header_row
-  )
 
   site <- canonical_site_name(sheet_name)
   site_code <- extract_site_code(

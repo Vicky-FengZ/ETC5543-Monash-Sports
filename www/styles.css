@@ -2,6 +2,173 @@ body {
   background-color: #F6F8FB;
 }
 
+/* Forecasting: a planning workflow with clearly separated assumptions. */
+.forecast-controls { margin-bottom: 20px; }
+.forecast-controls .bslib-grid { margin-bottom: 0 !important; }
+.forecast-controls .form-group { margin-bottom: 8px; }
+.forecast-controls .forecast-help { margin-bottom: 0; }
+.forecast-control-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+}
+.forecast-control-footer .btn { white-space: nowrap; }
+.forecast-advanced {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+.forecast-advanced > summary {
+  color: #243B53;
+  cursor: pointer;
+  font-weight: 600;
+}
+.forecast-advanced > summary .forecast-options-description {
+  margin-left: 12px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #64748B;
+}
+.forecast-advanced[open] > summary { margin-bottom: 20px; }
+.forecast-advanced h5 { font-size: 1rem; margin: 16px 0; }
+.forecast-options-section + .forecast-options-section {
+  border-top: 1px solid #E2E8F0;
+  margin-top: 20px;
+  padding-top: 8px;
+}
+.forecast-mode-badge {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #EFF6FF;
+  color: #1E40AF;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.forecast-payroll-controls { min-width: 0; }
+.forecast-mode-selector { margin-bottom: 20px; }
+.forecast-mode-selector .shiny-input-container { width: 100%; }
+.forecast-mode-selector .shiny-options-group { display: flex; flex-wrap: wrap; gap: 12px; }
+.forecast-mode-selector .radio-inline {
+  margin: 0 !important;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  color: #334155;
+  background: #F8FAFC;
+}
+.forecast-mode-selector .radio-inline:has(input:checked) {
+  border-color: #2563EB;
+  background: #EFF6FF;
+  color: #1E40AF;
+}
+.forecast-mode-selector input { margin-right: 8px; }
+.forecast-zero-review {
+  padding: 16px 18px;
+  margin-top: 12px;
+  border: 1px solid #D8E5F3;
+  border-radius: 10px;
+  background: #F8FAFC;
+}
+.forecast-zero-review > strong { color: #334155; font-size: 0.9rem; }
+.forecast-zero-review > p { margin: 6px 0 12px; }
+.forecast-zero-review .shiny-input-container { margin-bottom: 0; }
+.forecast-zero-review .control-label { font-size: 0.9rem; }
+.forecast-zero-review .shiny-options-group { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.forecast-zero-review .radio-inline { margin: 0; }
+.forecast-price-panel { min-width: 0; padding: 16px; border-radius: 12px; background: #F8FAFC; }
+.forecast-price-panel h5 { margin-bottom: 8px; }
+.forecast-status .bslib-grid { margin-bottom: 0 !important; }
+.forecasting-page .filter-section-title {
+  font-size: 1.05rem;
+  margin-bottom: 16px;
+}
+
+.forecast-secondary-settings {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.forecast-secondary-settings > .form-group:first-child {
+  min-width: 290px;
+  flex: 0 1 340px;
+}
+
+.forecast-status {
+  border: 1px solid #D8E5F3;
+  background: #EEF5FC;
+  color: #334155;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+}
+
+.forecast-status-title,
+.forecast-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.forecast-status-title { margin-bottom: 8px; }
+.forecast-status p { margin-bottom: 8px; }
+.forecast-status ul { margin-bottom: 0; padding-left: 22px; }
+.forecast-status li + li { margin-top: 4px; }
+.forecast-status-empty { display: flex; gap: 12px; align-items: center; }
+.forecast-status-warning { background: #FFFBEB; border-color: #FDE68A; }
+.forecast-warning { color: #92400E; }
+
+.forecasting-page .bslib-grid { margin-bottom: 20px; }
+.forecast-assumption-card { height: 100%; }
+.forecast-assumption-card .bslib-grid { margin-bottom: 0; }
+.forecast-help { color: #64748B; font-size: 0.85rem; line-height: 1.6; }
+.forecast-interval-note { margin: -4px 0 22px; }
+.forecast-break-even-copy { padding: 8px 10px; }
+.forecast-break-even-copy > p { margin-top: 16px; }
+.forecast-required-income { font-size: 2.1rem; font-weight: 600; color: #243B53; }
+
+.forecast-result-positive,
+.forecast-result-action {
+  display: inline-block;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.forecast-result-positive { background: #D1FAE5; color: #065F46; }
+.forecast-result-action { background: #FEF3C7; color: #92400E; }
+.forecast-table-scroll { overflow-x: auto; }
+.forecast-table-scroll table { white-space: nowrap; font-size: 0.88rem; }
+.forecast-table-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+.forecast-monthly-plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.forecast-monthly-plan-header .forecast-table-actions { margin: 0; }
+
+@media (max-width: 767px) {
+  .forecast-control-footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .forecast-advanced > summary .forecast-options-description { display: block; margin: 8px 0 0 18px; }
+  .forecast-advanced > summary .forecast-mode-badge { margin-top: 8px; }
+  .forecast-secondary-settings { gap: 8px; }
+  .forecast-secondary-settings > .form-group:first-child { width: 100%; min-width: 0; flex-basis: 100%; }
+  .forecast-status { padding: 14px 16px; }
+  .forecast-required-income { font-size: 1.7rem; }
+}
+
 .navbar {
   border-bottom: 1px solid #E5E7EB;
 }
@@ -325,6 +492,118 @@ body {
   margin-top: 6px;
   color: #B91C1C;
   font-size: 0.82rem;
+}
+
+/* Quiet, opt-in import notes; READY remains the successful upload status. */
+.basic-upload-warning-details {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #EEF2F6;
+  color: #475569;
+  font-size: 0.82rem;
+}
+
+.basic-upload-warning-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 3px 2px;
+  border-radius: 4px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.basic-upload-warning-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.basic-upload-warning-details > summary:hover {
+  color: #1D4ED8;
+}
+
+.basic-upload-warning-details > summary:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 3px;
+}
+
+.basic-upload-warning-chevron {
+  flex: 0 0 auto;
+}
+
+.basic-upload-warning-details[open] .basic-upload-warning-chevron {
+  transform: rotate(90deg);
+}
+
+.basic-upload-warning-count {
+  font-weight: 500;
+}
+
+.basic-upload-warning-toggle {
+  margin-left: 4px;
+  color: #2563EB;
+}
+
+.basic-upload-warning-body {
+  max-height: 28rem;
+  margin-top: 10px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  border: 1px solid #E8EDF4;
+  border-radius: 8px;
+  background: #F8FAFC;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.basic-upload-warning-group + .basic-upload-warning-group {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.basic-upload-warning-group-heading {
+  margin-bottom: 6px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.basic-upload-warning-group ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.basic-upload-warning-group li + li {
+  margin-top: 10px;
+}
+
+.basic-upload-warning-message {
+  margin: 0;
+}
+
+.basic-upload-warning-impact {
+  margin: 3px 0 0;
+  color: #64748B;
+  font-size: 0.78rem;
+}
+
+.basic-upload-warning-impact span {
+  font-weight: 500;
+}
+
+.basic-template-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.basic-template-download:hover {
+  text-decoration: underline;
 }
 
 .basic-status-badge {

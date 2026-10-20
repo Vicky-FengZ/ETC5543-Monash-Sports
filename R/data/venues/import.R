@@ -678,7 +678,7 @@ load_venues_tracking_reports <- function(
     )
   }
 
-  structure(
+  result <- structure(
     list(
       finance = finance,
       checks = checks,
@@ -704,6 +704,7 @@ load_venues_tracking_reports <- function(
     class = "venues_tracking_report_data",
     source_sheet_order = workbook_source_sheet_order(workbooks)
   )
+  finalise_extensible_report(result, valid_workbooks, "venues_tracking")
 }
 
 

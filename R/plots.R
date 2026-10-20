@@ -1891,28 +1891,58 @@ plot_site_revenue_opportunity <- function(
     max_value * 1.28
   }
 
-  max_label_width <- max(
-    nchar(plot_data$site),
-    na.rm = TRUE
+  wrapped_sites <- vapply(
+    plot_data$site,
+    function(label) {
+
+      label <- gsub(
+        "/",
+        "/ ",
+        label,
+        fixed = TRUE
+      )
+
+      paste(
+        strwrap(
+          label,
+          width = 18
+        ),
+        collapse = "\n"
+      )
+    },
+    character(1)
   )
 
-  left_margin <- max(
+label_lines <- unlist(
+  strsplit(
+    wrapped_sites,
+    "\n",
+    fixed = TRUE
+  )
+)
+
+max_label_width <- max(
+  nchar(label_lines),
+  na.rm = TRUE
+)
+
+left_margin <- max(
+  5.5,
+  min(
     8,
-    min(
-      15,
-      max_label_width * 0.65
-    )
+    max_label_width * 0.45
   )
+)
 
-  old_par <- par(
-    mar = c(
-      4.5,
-      left_margin,
-      4.2,
-      2.5
-    ),
-    family = "sans"
-  )
+old_par <- par(
+  mar = c(
+    4,
+    left_margin,
+    2.5,
+    1.5
+  ),
+  family = "sans"
+)
 
   on.exit(
     par(old_par),
@@ -1923,8 +1953,9 @@ plot_site_revenue_opportunity <- function(
     values,
     horiz = TRUE,
     beside = FALSE,
-    names.arg = plot_data$site,
+    names.arg = wrapped_sites,
     las = 1,
+    cex.names = 0.78,
     border = NA,
     col = c(
       "#2563EB",
@@ -1967,8 +1998,9 @@ plot_site_revenue_opportunity <- function(
     values,
     horiz = TRUE,
     beside = FALSE,
-    names.arg = plot_data$site,
+    names.arg = wrapped_sites,
     las = 1,
+    cex.names = 0.78,
     border = NA,
     col = c(
       "#2563EB",
