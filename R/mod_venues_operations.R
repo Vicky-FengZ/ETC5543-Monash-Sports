@@ -73,6 +73,796 @@ venues_operations_available_years <- function(
 }
 
 # -------------------------------------------------------------------------
+# Online Sales calculations
+# -------------------------------------------------------------------------
+
+venues_operations_online_sales_site_choices <- function(
+    online_sales
+) {
+
+  default_choice <- c(
+    "All Sites" = "All Sites"
+  )
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L ||
+      !"site" %in% names(online_sales) ||
+      !"site_scope" %in% names(online_sales)
+  ) {
+    return(default_choice)
+  }
+
+  sites <- unique(
+    trimws(
+      as.character(
+        online_sales$site[
+          online_sales$site_scope == "Site"
+        ]
+      )
+    )
+  )
+
+  sites <- sites[
+    !is.na(sites) &
+      nzchar(sites)
+  ]
+
+  if (length(sites) == 0L) {
+    return(default_choice)
+  }
+
+  c(
+    default_choice,
+    stats::setNames(
+      sites,
+      sites
+    )
+  )
+}
+
+
+venues_operations_online_sales_category_choices <- function(
+    online_sales
+) {
+
+  default_choice <- c(
+    "All Categories" = "All Categories"
+  )
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L ||
+      !"category" %in% names(online_sales)
+  ) {
+    return(default_choice)
+  }
+
+  categories <- unique(
+    trimws(
+      as.character(
+        online_sales$category[
+          online_sales$row_type == "Category"
+        ]
+      )
+    )
+  )
+
+  categories <- categories[
+    !is.na(categories) &
+      nzchar(categories)
+  ]
+
+  if (length(categories) == 0L) {
+    return(default_choice)
+  }
+
+  preferred_order <- c(
+    "Facility Hire",
+    "Membership/Health & Fitness",
+    "DD Rejection Fees"
+  )
+
+  categories <- c(
+    preferred_order[
+      preferred_order %in% categories
+    ],
+    setdiff(
+      categories,
+      preferred_order
+    )
+  )
+
+  c(
+    default_choice,
+    stats::setNames(
+      categories,
+      categories
+    )
+  )
+}
+
+
+venues_operations_online_sales_scope_label <- function(
+    site = "All Sites",
+    category = "All Categories"
+) {
+
+  site_label <- if (
+    identical(site, "All Sites")
+  ) {
+    "All Sites"
+  } else {
+    site
+  }
+
+  category_label <- if (
+    identical(
+      category,
+      "All Categories"
+    )
+  ) {
+    "All Categories"
+  } else {
+    category
+  }
+
+  paste(
+    site_label,
+    category_label,
+    sep = " · "
+  )
+}
+
+
+venues_operations_online_sales_resolve <- function(
+    online_sales,
+    period_type,
+    site = "All Sites",
+    category = "All Categories",
+    date = NULL
+) {
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  required_columns <- c(
+    "date",
+    "period_type",
+    "site",
+    "site_scope",
+    "category",
+    "row_type",
+    "value",
+    "is_reported"
+  )
+
+  if (!all(
+    required_columns %in%
+      names(online_sales)
+  )) {
+    return(NA_real_)
+  }
+
+  rows <- online_sales[
+    online_sales$period_type ==
+      period_type,
+    ,
+    drop = FALSE
+  ]
+
+  if (!is.null(date)) {
+
+    selected_date <- as.Date(date)
+
+    rows <- rows[
+      !is.na(rows$date) &
+        as.Date(rows$date) ==
+          selected_date,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  rows$value <- suppressWarnings(
+    as.numeric(rows$value)
+  )
+
+  # For monthly values, only count months that
+  # the cleaner identifies as reported.
+  if (identical(
+    period_type,
+    "Month"
+  )) {
+
+    rows <- rows[
+      rows$is_reported %in% TRUE,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(NA_real_)
+  }
+
+  resolve_rows <- function(x) {
+
+    if (
+      is.null(x) ||
+        !is.data.frame(x) ||
+        nrow(x) == 0L
+    ) {
+      return(NA_real_)
+    }
+
+    if (!identical(
+      category,
+      "All Categories"
+    )) {
+
+      values <- x$value[
+        x$row_type == "Category" &
+          !is.na(x$category) &
+          trimws(
+            as.character(x$category)
+          ) == category &
+          is.finite(x$value)
+      ]
+
+      if (length(values) == 0L) {
+        return(NA_real_)
+      }
+
+      return(
+        sum(
+          values,
+          na.rm = TRUE
+        )
+      )
+    }
+
+    # All Categories:
+    # prefer the reported Total row.
+    total_values <- x$value[
+      x$row_type == "Total" &
+        is.finite(x$value)
+    ]
+
+    if (length(total_values) > 0L) {
+
+      return(
+        sum(
+          total_values,
+          na.rm = TRUE
+        )
+      )
+    }
+
+    # Fallback if a workbook has no Total row.
+    category_values <- x$value[
+      x$row_type == "Category" &
+        is.finite(x$value)
+    ]
+
+    if (length(category_values) == 0L) {
+      return(NA_real_)
+    }
+
+    sum(
+      category_values,
+      na.rm = TRUE
+    )
+  }
+
+  # All Sites:
+  # preferentially use Cross Campus values.
+  if (identical(
+    site,
+    "All Sites"
+  )) {
+
+    cross_campus <- rows[
+      rows$site_scope ==
+        "Cross Campus",
+      ,
+      drop = FALSE
+    ]
+
+    cross_value <-
+      resolve_rows(
+        cross_campus
+      )
+
+    if (is.finite(cross_value)) {
+      return(cross_value)
+    }
+
+    # Fallback:
+    # resolve each actual site individually,
+    # then add them.
+    actual_sites <- unique(
+      trimws(
+        as.character(
+          rows$site[
+            rows$site_scope == "Site"
+          ]
+        )
+      )
+    )
+
+    actual_sites <- actual_sites[
+      !is.na(actual_sites) &
+        nzchar(actual_sites)
+    ]
+
+    if (length(actual_sites) == 0L) {
+      return(NA_real_)
+    }
+
+    values <- vapply(
+      actual_sites,
+      function(site_name) {
+
+        site_rows <- rows[
+          rows$site_scope == "Site" &
+            !is.na(rows$site) &
+            trimws(
+              as.character(rows$site)
+            ) == site_name,
+          ,
+          drop = FALSE
+        ]
+
+        resolve_rows(
+          site_rows
+        )
+      },
+      numeric(1)
+    )
+
+    values <- values[
+      is.finite(values)
+    ]
+
+    if (length(values) == 0L) {
+      return(NA_real_)
+    }
+
+    return(
+      sum(
+        values,
+        na.rm = TRUE
+      )
+    )
+  }
+
+  # Specific site selected.
+  site_rows <- rows[
+    rows$site_scope == "Site" &
+      !is.na(rows$site) &
+      trimws(
+        as.character(rows$site)
+      ) == site,
+    ,
+    drop = FALSE
+  ]
+
+  resolve_rows(
+    site_rows
+  )
+}
+
+
+venues_operations_online_sales_monthly <- function(
+    online_sales,
+    site = "All Sites",
+    category = "All Categories"
+) {
+
+  empty_result <- data.frame(
+    date = as.Date(character()),
+    month = integer(),
+    month_label = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  dates <- sort(
+    unique(
+      as.Date(
+        online_sales$date[
+          online_sales$period_type ==
+            "Month" &
+            !is.na(online_sales$date)
+        ]
+      )
+    )
+  )
+
+  if (length(dates) == 0L) {
+    return(empty_result)
+  }
+
+  result <- list()
+
+  for (index in seq_along(dates)) {
+
+    current_date <- as.Date(
+      dates[[index]],
+      origin = "1970-01-01"
+    )
+
+    value <-
+      venues_operations_online_sales_resolve(
+        online_sales,
+        period_type = "Month",
+        site = site,
+        category = category,
+        date = current_date
+      )
+
+    if (!is.finite(value)) {
+      next
+    }
+
+    result[[length(result) + 1L]] <-
+      data.frame(
+        date = current_date,
+        month = as.integer(
+          format(
+            current_date,
+            "%m"
+          )
+        ),
+        month_label = format(
+          current_date,
+          "%b"
+        ),
+        value = value,
+        stringsAsFactors = FALSE
+      )
+  }
+
+  if (length(result) == 0L) {
+    return(empty_result)
+  }
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  result <- result[
+    order(result$date),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_online_sales_annual_value <- function(
+    online_sales,
+    site = "All Sites",
+    category = "All Categories"
+) {
+
+  ytd_value <-
+    venues_operations_online_sales_resolve(
+      online_sales,
+      period_type = "YTD",
+      site = site,
+      category = category
+    )
+
+  if (is.finite(ytd_value)) {
+    return(ytd_value)
+  }
+
+  monthly <-
+    venues_operations_online_sales_monthly(
+      online_sales,
+      site = site,
+      category = category
+    )
+
+  if (
+    !is.data.frame(monthly) ||
+      nrow(monthly) == 0L
+  ) {
+    return(NA_real_)
+  }
+
+  sum(
+    monthly$value,
+    na.rm = TRUE
+  )
+}
+
+
+venues_operations_online_sales_kpis <- function(
+    online_sales,
+    site = "All Sites",
+    category = "All Categories"
+) {
+
+  monthly <-
+    venues_operations_online_sales_monthly(
+      online_sales,
+      site = site,
+      category = category
+    )
+
+  total_revenue <-
+    venues_operations_online_sales_annual_value(
+      online_sales,
+      site = site,
+      category = category
+    )
+
+  average_monthly <- if (
+    is.data.frame(monthly) &&
+      nrow(monthly) > 0L
+  ) {
+    mean(
+      monthly$value,
+      na.rm = TRUE
+    )
+  } else {
+    NA_real_
+  }
+
+  if (
+    is.data.frame(monthly) &&
+      nrow(monthly) > 0L
+  ) {
+
+    peak_index <- which.max(
+      monthly$value
+    )
+
+    peak_value <-
+      monthly$value[
+        peak_index
+      ]
+
+    peak_month <-
+      monthly$month_label[
+        peak_index
+      ]
+
+  } else {
+
+    peak_value <- NA_real_
+    peak_month <- NA_character_
+  }
+
+  list(
+    total_revenue =
+      total_revenue,
+    average_monthly =
+      average_monthly,
+    peak_value =
+      peak_value,
+    peak_month =
+      peak_month,
+    reporting_months =
+      if (
+        is.data.frame(monthly)
+      ) {
+        nrow(monthly)
+      } else {
+        0L
+      }
+  )
+}
+
+
+venues_operations_online_sales_by_site <- function(
+    online_sales,
+    category = "All Categories"
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  sites <- unique(
+    trimws(
+      as.character(
+        online_sales$site[
+          online_sales$site_scope == "Site"
+        ]
+      )
+    )
+  )
+
+  sites <- sites[
+    !is.na(sites) &
+      nzchar(sites)
+  ]
+
+  if (length(sites) == 0L) {
+    return(empty_result)
+  }
+
+  result <- lapply(
+    sites,
+    function(site_name) {
+
+      data.frame(
+        facility = site_name,
+        value =
+          venues_operations_online_sales_annual_value(
+            online_sales,
+            site = site_name,
+            category = category
+          ),
+        stringsAsFactors = FALSE
+      )
+    }
+  )
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  result <- result[
+    is.finite(result$value),
+    ,
+    drop = FALSE
+  ]
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+
+venues_operations_online_sales_by_category <- function(
+    online_sales,
+    site = "All Sites"
+) {
+
+  empty_result <- data.frame(
+    facility = character(),
+    value = double(),
+    stringsAsFactors = FALSE
+  )
+
+  if (
+    is.null(online_sales) ||
+      !is.data.frame(online_sales) ||
+      nrow(online_sales) == 0L
+  ) {
+    return(empty_result)
+  }
+
+  categories <- unique(
+    trimws(
+      as.character(
+        online_sales$category[
+          online_sales$row_type ==
+            "Category"
+        ]
+      )
+    )
+  )
+
+  categories <- categories[
+    !is.na(categories) &
+      nzchar(categories)
+  ]
+
+  preferred_order <- c(
+    "Facility Hire",
+    "Membership/Health & Fitness",
+    "DD Rejection Fees"
+  )
+
+  categories <- c(
+    preferred_order[
+      preferred_order %in%
+        categories
+    ],
+    setdiff(
+      categories,
+      preferred_order
+    )
+  )
+
+  if (length(categories) == 0L) {
+    return(empty_result)
+  }
+
+  result <- lapply(
+    categories,
+    function(category_name) {
+
+      data.frame(
+        facility =
+          category_name,
+        value =
+          venues_operations_online_sales_annual_value(
+            online_sales,
+            site = site,
+            category =
+              category_name
+          ),
+        stringsAsFactors = FALSE
+      )
+    }
+  )
+
+  result <- do.call(
+    rbind,
+    result
+  )
+
+  result <- result[
+    is.finite(result$value),
+    ,
+    drop = FALSE
+  ]
+
+  result <- result[
+    order(
+      result$value,
+      decreasing = TRUE
+    ),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(result) <- NULL
+
+  result
+}
+
+# -------------------------------------------------------------------------
 # Venue Finance calculations
 # -------------------------------------------------------------------------
 
@@ -3115,6 +3905,112 @@ mod_venues_operations_server <- function(
         )
       })
 
+      selected_online_sales <- reactive({
+
+        reports <- venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$online_sales,
+          year = input$year
+        )
+      })
+
+
+      online_sales_site_selection <- reactive({
+
+        value <- input$online_sales_site
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Sites")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      online_sales_category_selection <- reactive({
+
+        value <- input$online_sales_category
+
+        if (
+          is.null(value) ||
+            length(value) == 0L
+        ) {
+          return("All Categories")
+        }
+
+        as.character(
+          value[[1L]]
+        )
+      })
+
+
+      online_sales_scope_label <- reactive({
+
+        venues_operations_online_sales_scope_label(
+          site =
+            online_sales_site_selection(),
+          category =
+            online_sales_category_selection()
+        )
+      })
+
+
+      online_sales_monthly <- reactive({
+
+        venues_operations_online_sales_monthly(
+          selected_online_sales(),
+          site =
+            online_sales_site_selection(),
+          category =
+            online_sales_category_selection()
+        )
+      })
+
+
+      online_sales_kpis <- reactive({
+
+        venues_operations_online_sales_kpis(
+          selected_online_sales(),
+          site =
+            online_sales_site_selection(),
+          category =
+            online_sales_category_selection()
+        )
+      })
+
+
+      online_sales_by_site <- reactive({
+
+        venues_operations_online_sales_by_site(
+          selected_online_sales(),
+          category =
+            online_sales_category_selection()
+        )
+      })
+
+
+      online_sales_by_category <- reactive({
+
+        venues_operations_online_sales_by_category(
+          selected_online_sales(),
+          site =
+            online_sales_site_selection()
+        )
+      })
+
       selected_finance <- reactive({
 
         reports <- venues_reports()
@@ -3625,6 +4521,7 @@ mod_venues_operations_server <- function(
           facility_hire <- selected_facility_hire()
           membership <- selected_membership()
           finance <- selected_finance()
+          online_sales <- selected_online_sales()
 
             areas <- character()
 
@@ -3665,6 +4562,16 @@ mod_venues_operations_server <- function(
             areas <- c(
               areas,
               "Venue Finances"
+            )
+          }
+
+          if (
+            is.data.frame(online_sales) &&
+              nrow(online_sales) > 0L
+          ) {
+            areas <- c(
+              areas,
+              "Online Sales"
             )
           }
           
@@ -3736,6 +4643,20 @@ mod_venues_operations_server <- function(
           available <- c(
             available,
             "Venue Finances"
+          )
+        }
+
+        if (
+          is.data.frame(
+            selected_online_sales()
+          ) &&
+            nrow(
+              selected_online_sales()
+            ) > 0L
+        ) {
+          available <- c(
+            available,
+            "Online Sales"
           )
         }
 
@@ -3871,6 +4792,71 @@ mod_venues_operations_server <- function(
           )
         }
 
+        if (identical(
+          input$area,
+          "Online Sales"
+        )) {
+
+          values <- online_sales_kpis()
+
+          peak_month <- if (
+            is.character(
+              values$peak_month
+            ) &&
+              length(
+                values$peak_month
+              ) > 0L &&
+              !is.na(
+                values$peak_month[[1L]]
+              )
+          ) {
+            values$peak_month[[1L]]
+          } else {
+            "No reported month"
+          }
+
+          return(
+            list(
+              list(
+                title =
+                  "Total Online Revenue",
+                value =
+                  venues_operations_format_currency(
+                    values$total_revenue
+                  ),
+                subtitle =
+                  online_sales_scope_label(),
+                icon = "currency-dollar"
+              ),
+              list(
+                title =
+                  "Average / Month",
+                value =
+                  venues_operations_format_currency(
+                    values$average_monthly
+                  ),
+                subtitle =
+                  paste0(
+                    values$reporting_months,
+                    " reporting months"
+                  ),
+                icon = "calendar3"
+              ),
+              list(
+                title =
+                  "Peak Month",
+                value =
+                  venues_operations_format_currency(
+                    values$peak_value
+                  ),
+                subtitle =
+                  peak_month,
+                icon = "bar-chart-line"
+              )
+            )
+          )
+        }
+
         if (identical(input$area, "Membership")) {
 
           values <- membership_kpis()
@@ -3982,6 +4968,9 @@ mod_venues_operations_server <- function(
 
         if (identical(input$area, "Venue Finances")) {
           return("Monthly Income vs Expenses")}
+        
+        if (identical( input$area, "Online Sales")) {
+          return("Online Sales Revenue Over Time")}
 
         "Operational Trend"
       })
@@ -4028,6 +5017,22 @@ mod_venues_operations_server <- function(
                 "Actual Income vs Actual Expenses · ",
                 finance_scope_label(),
                 " · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(
+          input$area,
+          "Online Sales"
+        )) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                online_sales_scope_label(),
+                " · January–December ",
                 input$year
               )
             )
@@ -4113,10 +5118,7 @@ mod_venues_operations_server <- function(
             )
           }
 
-          if (identical(
-            input$area,
-            "Venue Finances"
-          )) {
+          if (identical(input$area, "Venue Finances")) {
 
             finance_data <- finance_monthly()
 
@@ -4139,6 +5141,31 @@ mod_venues_operations_server <- function(
             return(
               plot_monthly_income_expenses(
                 finance_data
+              )
+            )
+          }
+
+          if (identical(input$area, "Online Sales")) {
+
+            monthly <-
+              online_sales_monthly()
+
+            validate(
+              need(
+                is.data.frame(monthly) &&
+                  nrow(monthly) > 0L &&
+                  any(
+                    is.finite(
+                      monthly$value
+                    )
+                  ),
+                "No monthly Online Sales values are available for this selection."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_revenue_over_time(
+                monthly
               )
             )
           }
@@ -4253,10 +5280,44 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Venue Finances"
-        )) {
+        if (identical(input$area, "Online Sales")) {
+          return(
+            layout_columns(
+
+              selectInput(
+                session$ns(
+                  "online_sales_site"
+                ),
+                "Site",
+                choices =
+                  venues_operations_online_sales_site_choices(
+                    selected_online_sales()
+                  ),
+                selected =
+                  "All Sites",
+                width = "100%"
+              ),
+
+              selectInput(
+                session$ns(
+                  "online_sales_category"
+                ),
+                "Category",
+                choices =
+                  venues_operations_online_sales_category_choices(
+                    selected_online_sales()
+                  ),
+                selected =
+                  "All Categories",
+                width = "100%"
+              ),
+
+              col_widths = c(5, 7)
+            )
+          )
+        }
+
+        if (identical(input$area, "Venue Finances")) {
 
           return(
             layout_columns(
@@ -4449,6 +5510,9 @@ mod_venues_operations_server <- function(
           return("Budget vs Actual Net Result")
         }
 
+        if (identical(input$area, "Online Sales")) {
+          return("Revenue by Site")}
+
         if (identical(input$area, "Membership")) {
           return("Membership Movement")
         }
@@ -4496,6 +5560,9 @@ mod_venues_operations_server <- function(
 
           return("Transactions by Facility")
         }
+
+        if (identical(input$area, "Online Sales")) {
+          return("Revenue by Category")}
 
         if (identical( input$area, "Venue Finances")) {
           return("Net Result by Fund")}
@@ -4586,10 +5653,23 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Venue Finances"
-        )) {
+        if (identical(input$area, "Online Sales")) {
+
+          category <-
+            online_sales_category_selection()
+
+          return(
+            chart_subtitle(
+              paste0(
+                category,
+                " · YTD revenue · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Venue Finances")) {
 
           return(
             chart_subtitle(
@@ -4765,10 +5845,20 @@ mod_venues_operations_server <- function(
           )
         }
 
-        if (identical(
-          input$area,
-          "Venue Finances"
-        )) {
+        if (identical(input$area, "Online Sales")) {
+
+          return(
+            chart_subtitle(
+              paste0(
+                online_sales_site_selection(),
+                " · YTD revenue · ",
+                input$year
+              )
+            )
+          )
+        }
+
+        if (identical(input$area, "Venue Finances")) {
 
           return(
             chart_subtitle(
@@ -4878,10 +5968,7 @@ mod_venues_operations_server <- function(
             )
           }
 
-          if (identical(
-            input$area,
-            "Venue Finances"
-          )) {
+          if (identical( input$area, "Venue Finances")) {
 
             finance_data <- finance_monthly()
 
@@ -4906,6 +5993,32 @@ mod_venues_operations_server <- function(
             return(
               plot_monthly_budget_vs_actual_net_result(
                 finance_data
+              )
+            )
+          }
+
+          if (identical(input$area, "Online Sales")) {
+
+            site_data <-
+              online_sales_by_site()
+
+            validate(
+              need(
+                is.data.frame(site_data) &&
+                  nrow(site_data) > 0L &&
+                  any(
+                    is.finite(
+                      site_data$value
+                    )
+                  ),
+                "No site-level Online Sales values are available."
+              )
+            )
+
+            return(
+              plot_venues_facility_hire_by_facility(
+                site_data,
+                currency = TRUE
               )
             )
           }
@@ -4988,10 +6101,7 @@ mod_venues_operations_server <- function(
       )
     }
 
-    if (identical(
-      input$area,
-      "Venue Finances"
-    )) {
+    if (identical(input$area, "Venue Finances")) {
 
       fund_data <- finance_by_fund()
 
@@ -5012,6 +6122,32 @@ mod_venues_operations_server <- function(
         plot_site_ranking(
           fund_data,
           "Net Result"
+        )
+      )
+    }
+
+    if (identical(input$area, "Online Sales")) {
+
+      category_data <-
+        online_sales_by_category()
+
+      validate(
+        need(
+          is.data.frame(category_data) &&
+            nrow(category_data) > 0L &&
+            any(
+              is.finite(
+                category_data$value
+              )
+            ),
+          "No Online Sales category values are available."
+        )
+      )
+
+      return(
+        plot_venues_facility_hire_by_facility(
+          category_data,
+          currency = TRUE
         )
       )
     }
