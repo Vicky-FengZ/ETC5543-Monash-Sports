@@ -72,10 +72,10 @@ options(width = 70)
 
 <!-- Presenter: Vicky -->
 
-- **Data preparation:** Upload, validate and review Excel reports.
-- **Performance analysis:** Review overall results and compare sites.
-- **Operational detail:** Explore site activity and venue operations.
-- **Planning:** Test payroll and pricing scenarios.
+- **Data workflow:** Upload reports, check warnings and export cleaned data.
+- **Performance:** Track financial trends and compare sites and facilities.
+- **Operations:** Explore visits, memberships and venue activity.
+- **Planning:** Forecast income and expenses under cost and price changes.
 
 ## In & Out of Scope
 
@@ -83,14 +83,14 @@ options(width = 70)
 
 ### In Scope
 
-- Financial and operational reporting from supported Excel files
-- Comparisons across sites, facilities and reporting periods
-- Income and expense forecasting with user-defined scenarios
+- Upload, review and export of supported Excel reports
+- Financial and operational comparisons across sites and facilities
+- Income and expense forecasts with cost and price scenarios
 
 ### Out of Scope
 
-- Live booking and payroll administration
-- Automatic staffing or facility allocation
+- Live connections to booking, payroll or accounting systems
+- Automatic staffing, facility allocation or pricing decisions
 - Importing arbitrary Excel layouts
 
 ## Conclusion
@@ -98,5 +98,5 @@ options(width = 70)
 <!-- Presenter: Vicky -->
 
 - The dashboard brings financial and operational reports together.
-- Users can review overall performance and compare sites and facilities.
-- Forecasting supports planning around changes in costs and prices.
+- Users can compare performance across sites and facilities.
+- Cost and price scenarios support future planning.
