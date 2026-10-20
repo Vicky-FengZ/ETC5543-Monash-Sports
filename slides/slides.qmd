@@ -1,6 +1,6 @@
 
 ---
-title: "Modelling resource and space for Monash Sport"
+title: "Monash Sport Performance Dashboard"
 subtitle: "ETC5543 Project Presentation"
 author: "Ayush Pandia, Ziqi Feng"
 date: 21 Oct 2026
@@ -47,18 +47,21 @@ options(width = 70)
 
 <!-- Presenter: Ayush -->
 - **Easy access:** Web-based dashboard via URL
-- **Simple uploads:** Drag-and-drop Excel files
+- **Simple uploads:** Select and upload Excel reports
 - **Technology:** R and ShinyLive
 - **Visual insights:** Interactive graphs & KPIs
 - **Two views:** Overall summary & detailed analysis
 - **Data coverage:** Income, expenses, attendance, court & venue hire and many more 
 
-## Problems We Are Facing
+## Challenges and Our Approach
 
 <!-- Presenters: Vicky / Ayush -->
 
 ### Data Challenges
-<!-- Vicky's points to be added here -->
+
+- **Different layouts:** Report structures vary across files and years.
+- **Overlapping totals:** Summary and detailed rows require careful aggregation.
+- **Data quality:** Missing values and inconsistent totals need validation.
 
 ### Dashboard Visualisation Challenges
 
@@ -69,6 +72,29 @@ options(width = 70)
 
 <!-- Presenter: Vicky -->
 
+- **Data preparation:** Upload, validate and review Excel reports.
+- **Performance analysis:** Review overall results and compare sites.
+- **Operational detail:** Explore site activity and venue operations.
+- **Planning:** Test payroll and pricing scenarios.
+
 ## In & Out of Scope
 
 <!-- Presenter: Vicky -->
+
+### In Scope
+
+- Financial and operational reporting from supported Excel files
+- Comparisons across sites, facilities and reporting periods
+- Income and expense forecasting with user-defined scenarios
+
+### Out of Scope
+
+- Live booking and payroll administration
+- Automatic staffing or facility allocation
+- Importing arbitrary Excel layouts
+
+## Conclusion
+
+- The dashboard brings financial and operational reports together.
+- Users can review overall performance and compare sites and facilities.
+- Forecasting supports planning around changes in costs and prices.
