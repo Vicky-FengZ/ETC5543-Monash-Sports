@@ -7,7 +7,7 @@ date: 21 Oct 2026
 toc: false
 format:
   presentation-revealjs+letterbox:
-    slide-number: truehm
+    slide-number: true
     embed-resources: true
 ---
 
