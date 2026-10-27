@@ -1,13 +1,13 @@
 
 ---
-title: "Monash Sport Performance Dashboard"
+title: "Modelling resource and space for Monash Sport"
 subtitle: "ETC5543 Project Presentation"
 author: "Ayush Pandia, Ziqi Feng"
 date: 21 Oct 2026
 toc: false
 format:
   presentation-revealjs+letterbox:
-    slide-number: true
+    slide-number: truehm
     embed-resources: true
 ---
 
