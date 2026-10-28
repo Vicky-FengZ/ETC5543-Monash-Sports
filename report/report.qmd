@@ -1,6 +1,6 @@
 ---
 title: "Modelling resource and space for Monash Sport"
 subtitle: "ETC5543 Project Report"
-author: "Ayush Pandia, Ziqi Feng"
+author: "Ayush Pandia, Ziqi Feng"al
 format: html
 ---

@@ -38,7 +38,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -50,7 +50,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -62,7 +62,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -74,7 +74,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = FALSE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -182,7 +182,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "detailed",
     required_data = "finance",
     default_selected = FALSE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -206,7 +206,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "detailed",
     required_data = "discounts",
     default_selected = FALSE,
-    preferred_size = "standard",
+    preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),

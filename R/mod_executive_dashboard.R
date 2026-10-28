@@ -448,9 +448,15 @@ executive_visual_card_ui <- function(
   card(
     class = paste(
       "executive-visual-card",
+
       paste0(
         "executive-visual-size-",
         visual$preferred_size
+      ),
+
+      paste0(
+        "executive-visual-id-",
+        visual$id
       )
     ),
 
@@ -861,7 +867,25 @@ mod_executive_dashboard_ui <- function(id) {
                       ns("presentation_mode"),
                       "Presentation View",
                       icon = bs_icon("arrows-fullscreen"),
-                      class = "btn-primary"
+                      class = "btn-primary",
+                      title = "Press Esc to exit Presentation View",
+                      onclick = "
+                        const page = this.closest('.executive-dashboard-page');
+
+                        if (!page) {
+                          return;
+                        }
+
+                        if (!document.fullscreenElement) {
+                          if (page.requestFullscreen) {
+                            page.requestFullscreen();
+                          }
+                        } else {
+                          if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                          }
+                        }
+                      "
                     )
                   ),
 
@@ -892,7 +916,10 @@ mod_executive_dashboard_ui <- function(id) {
 
                     div(
                       class = "executive-kpi-value",
-                      "—"
+                      textOutput(
+                        ns("kpi_total_income"),
+                        inline = TRUE
+                      )
                     )
                   ),
 
@@ -915,7 +942,10 @@ mod_executive_dashboard_ui <- function(id) {
 
                     div(
                       class = "executive-kpi-value",
-                      "—"
+                      textOutput(
+                        ns("kpi_total_expenses"),
+                        inline = TRUE
+                      )
                     )
                   ),
 
@@ -938,7 +968,10 @@ mod_executive_dashboard_ui <- function(id) {
 
                     div(
                       class = "executive-kpi-value",
-                      "—"
+                      textOutput(
+                        ns("kpi_net_result"),
+                        inline = TRUE
+                      )
                     )
                   ),
 
@@ -961,7 +994,10 @@ mod_executive_dashboard_ui <- function(id) {
 
                     div(
                       class = "executive-kpi-value",
-                      "—"
+                      textOutput(
+                        ns("kpi_budget_variance"),
+                        inline = TRUE
+                      )
                     )
                   ),
 
@@ -1246,6 +1282,108 @@ mod_executive_dashboard_server <- function(
         ]
       })
 
+      executive_kpi_finance <- reactive({
+
+        x <- executive_annual_finance()
+        context <- executive_context()
+
+        selected_year <-
+          suppressWarnings(
+            as.integer(
+              context$year
+            )
+          )
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L ||
+            is.na(selected_year)
+        ) {
+          return(NULL)
+        }
+
+        x <-
+          x[
+            x$report_year == selected_year,
+            ,
+            drop = FALSE
+          ]
+
+        if (nrow(x) == 0L) {
+          return(NULL)
+        }
+
+        x[1L, , drop = FALSE]
+      })
+
+      output$kpi_total_income <- renderText({
+
+        x <- executive_kpi_finance()
+
+        if (
+          is.null(x) ||
+            !is.finite(x$income_actual[[1L]])
+        ) {
+          return("—")
+        }
+
+        format_compact_currency(
+          x$income_actual[[1L]]
+        )
+      })
+
+
+      output$kpi_total_expenses <- renderText({
+
+        x <- executive_kpi_finance()
+
+        if (
+          is.null(x) ||
+            !is.finite(x$expenses_actual[[1L]])
+        ) {
+          return("—")
+        }
+
+        format_compact_currency(
+          x$expenses_actual[[1L]]
+        )
+      })
+
+
+      output$kpi_net_result <- renderText({
+
+        x <- executive_kpi_finance()
+
+        if (
+          is.null(x) ||
+            !is.finite(x$net_actual[[1L]])
+        ) {
+          return("—")
+        }
+
+        format_compact_currency(
+          x$net_actual[[1L]]
+        )
+      })
+
+
+      output$kpi_budget_variance <- renderText({
+
+        x <- executive_kpi_finance()
+
+        if (
+          is.null(x) ||
+            !is.finite(x$budget_variance[[1L]])
+        ) {
+          return("—")
+        }
+
+        format_compact_currency(
+          x$budget_variance[[1L]]
+        )
+      })
+
 
       executive_annual_revenue <- reactive({
 
@@ -1270,6 +1408,71 @@ mod_executive_dashboard_server <- function(
       # -------------------------------------------------------------------
       # Executive all-site snapshot data
       # -------------------------------------------------------------------
+
+      executive_site_trend_finance <- reactive({
+
+        x <-
+          calculate_site_annual_finance(
+            executive_monthly_reports()
+          )
+
+        context <- executive_context()
+
+        selected_year <-
+          suppressWarnings(
+            as.integer(
+              context$year
+            )
+          )
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L ||
+            is.na(selected_year)
+        ) {
+          return(
+            x[0, , drop = FALSE]
+          )
+        }
+
+        if (
+          identical(
+            context$view_mode,
+            "Comparison"
+          ) &&
+            !is.null(
+              context$comparison_year
+            )
+        ) {
+
+          comparison_year <-
+            suppressWarnings(
+              as.integer(
+                context$comparison_year
+              )
+            )
+
+          years <- c(
+            selected_year,
+            comparison_year
+          )
+
+          return(
+            x[
+              x$report_year %in% years,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x[
+          x$report_year <= selected_year,
+          ,
+          drop = FALSE
+        ]
+      })
 
       executive_snapshot_year <- reactive({
 
@@ -1674,6 +1877,60 @@ mod_executive_dashboard_server <- function(
       # Executive Site Comparison plots
       # -------------------------------------------------------------------
 
+      output$executive_plot_site_performance <-
+        renderPlot(
+          {
+
+            x <-
+              executive_site_trend_finance()
+
+            validate_executive_site_snapshot_data(
+              x,
+              paste(
+                "No site finance data is available",
+                "for the selected period."
+              )
+            )
+
+            metric <-
+              input$metric_site_performance
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            values <-
+              site_finance_values(
+                x,
+                metric,
+                "Actual"
+              )
+
+            validate(
+              need(
+                any(
+                  is.finite(values)
+                ),
+                paste(
+                  "No Actual",
+                  metric,
+                  "values are available for the selected period."
+                )
+              )
+            )
+
+            plot_site_performance_over_time(
+              x,
+              metric
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+
       output$executive_plot_site_ranking <-
         renderPlot(
           {
@@ -1720,6 +1977,69 @@ mod_executive_dashboard_server <- function(
             )
 
             plot_site_ranking(
+              x,
+              metric
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_site_budget_performance <-
+        renderPlot(
+          {
+
+            x <-
+              executive_site_snapshot_finance()
+
+            validate_executive_site_snapshot_data(
+              x,
+              paste(
+                "No site finance data is available",
+                "for the selected year."
+              )
+            )
+
+            metric <-
+              input$metric_site_budget_performance
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            actual <-
+              site_finance_values(
+                x,
+                metric,
+                "Actual"
+              )
+
+            budget <-
+              site_finance_values(
+                x,
+                metric,
+                "Budget"
+              )
+
+            complete <-
+              is.finite(actual) &
+              is.finite(budget)
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "Complete Budget and Actual",
+                  metric,
+                  "values are not available for the selected year."
+                )
+              )
+            )
+
+            plot_site_budget_performance(
               x,
               metric
             )
@@ -1868,6 +2188,9 @@ mod_executive_dashboard_server <- function(
 
         context_label_overrides <-
           c(
+            site_performance =
+              site_snapshot_label,
+        
             site_ranking =
               site_snapshot_label,
 
