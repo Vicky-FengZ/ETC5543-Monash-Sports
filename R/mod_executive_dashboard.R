@@ -624,32 +624,31 @@ executive_site_values_card_ui <- function(
             ns("table_metric"),
             "Table metric",
             choices = c(
-              "Income",
-              "Expenses",
               "Net Result",
               "Budget Variance",
               "Discount Opportunity",
-              "Potential Revenue",
               "Revenue Capture Rate"
             ),
-            selected = "Income"
+            selected = "Net Result"
           )
         )
       )
     ),
 
-    placeholder_chart(
-      "Site performance table",
-      paste(
-        "Exact site values will be connected",
-        "after the dashboard shell is complete"
+    div(
+      class = "executive-site-values-table",
+
+      tableOutput(
+        ns("site_values_table")
       )
     )
   )
 }
 
 
-executive_key_insights_card_ui <- function() {
+executive_key_insights_card_ui <- function(
+  ns
+) {
 
   card(
     class = "executive-insights-card",
@@ -662,22 +661,8 @@ executive_key_insights_card_ui <- function() {
     div(
       class = "executive-insights-placeholder",
 
-      bs_icon(
-        "lightbulb",
-        size = "24px"
-      ),
-
-      div(
-        tags$strong(
-          "Presentation talking points will appear here."
-        ),
-
-        tags$p(
-          paste(
-            "The dashboard will automatically highlight",
-            "important performance movements, risks and opportunities."
-          )
-        )
+      uiOutput(
+        ns("key_insights")
       )
     )
   )
@@ -720,7 +705,9 @@ executive_supporting_components_ui <- function(
           ),
 
         key_insights =
-          executive_key_insights_card_ui(),
+          executive_key_insights_card_ui(
+            ns
+          ),
 
         NULL
       )
@@ -2139,6 +2126,406 @@ mod_executive_dashboard_server <- function(
           res = 96,
           bg = "white"
         )
+      
+      # -------------------------------------------------------------------
+      # Executive Site Values table
+      # -------------------------------------------------------------------
+
+      output$site_values_table <- renderTable({
+
+        metric <- input$table_metric
+
+        if (
+          is.null(metric) ||
+            !metric %in%
+              c(
+                "Net Result",
+                "Budget Variance",
+                "Discount Opportunity",
+                "Revenue Capture Rate"
+              )
+        ) {
+          metric <- "Net Result"
+        }
+
+
+        if (
+          metric %in%
+            c(
+              "Net Result",
+              "Budget Variance"
+            )
+        ) {
+
+          x <-
+            executive_site_snapshot_finance()
+
+          validate_executive_site_snapshot_data(
+            x,
+            paste(
+              "No site finance values are available",
+              "for the selected year."
+            )
+          )
+
+          values <- switch(
+            metric,
+
+            "Net Result" =
+              x$net_actual,
+
+            "Budget Variance" =
+              x$budget_variance
+          )
+
+          display_values <-
+            format_compact_currency(
+              values
+            )
+
+        } else {
+
+          x <-
+            executive_site_snapshot_revenue()
+
+          validate_executive_site_snapshot_data(
+            x,
+            paste(
+              "No site revenue values are available",
+              "for the selected year."
+            )
+          )
+
+          values <- switch(
+            metric,
+
+            "Discount Opportunity" =
+              x$discount_opportunity,
+
+            "Revenue Capture Rate" =
+              x$capture_rate
+          )
+
+          if (
+            identical(
+              metric,
+              "Revenue Capture Rate"
+            )
+          ) {
+
+            display_values <-
+              ifelse(
+                is.finite(values),
+                sprintf(
+                  "%.1f%%",
+                  values * 100
+                ),
+                "—"
+              )
+
+          } else {
+
+            display_values <-
+              format_compact_currency(
+                values
+              )
+          }
+        }
+
+
+        result <- data.frame(
+          Site = x$site,
+          Value = display_values,
+          raw_value = values,
+          stringsAsFactors = FALSE
+        )
+
+
+        result <-
+          result[
+            order(
+              -result$raw_value,
+              result$Site,
+              na.last = TRUE
+            ),
+            ,
+            drop = FALSE
+          ]
+
+
+        result$raw_value <- NULL
+
+        names(result)[[2L]] <- metric
+
+        result
+
+      },
+      striped = TRUE,
+      hover = TRUE,
+      bordered = FALSE,
+      spacing = "s")
+
+      # -------------------------------------------------------------------
+      # Executive Key Insights
+      # -------------------------------------------------------------------
+
+      output$key_insights <- renderUI({
+
+        insights <- list()
+
+        context <- executive_context()
+
+        selected_year <-
+          suppressWarnings(
+            as.integer(
+              context$year
+            )
+          )
+
+
+        # -----------------------------------------------------------------
+        # 1. Overall / selected-site Net Result vs budget
+        # -----------------------------------------------------------------
+
+        finance <-
+          executive_kpi_finance()
+
+        if (
+          !is.null(finance) &&
+            is.data.frame(finance) &&
+            nrow(finance) > 0L &&
+            is.finite(
+              finance$net_actual[[1L]]
+            )
+        ) {
+
+          net_result <-
+            finance$net_actual[[1L]]
+
+          budget_variance <-
+            finance$budget_variance[[1L]]
+
+          context_name <-
+            if (
+              identical(
+                context$site,
+                "All Monash Sport"
+              )
+            ) {
+              "Monash Sport"
+            } else {
+              context$site
+            }
+
+
+          if (
+            is.finite(
+              budget_variance
+            )
+          ) {
+
+            if (budget_variance > 0) {
+
+              sentence <- paste0(
+                context_name,
+                " recorded a Net Result of ",
+                format_compact_currency(
+                  net_result
+                ),
+                ", ",
+                format_compact_currency(
+                  abs(
+                    budget_variance
+                  )
+                ),
+                " above budget."
+              )
+
+            } else if (
+              budget_variance < 0
+            ) {
+
+              sentence <- paste0(
+                context_name,
+                " recorded a Net Result of ",
+                format_compact_currency(
+                  net_result
+                ),
+                ", ",
+                format_compact_currency(
+                  abs(
+                    budget_variance
+                  )
+                ),
+                " below budget."
+              )
+
+            } else {
+
+              sentence <- paste0(
+                context_name,
+                " recorded a Net Result of ",
+                format_compact_currency(
+                  net_result
+                ),
+                ", in line with budget."
+              )
+            }
+
+          } else {
+
+            sentence <- paste0(
+              context_name,
+              " recorded a Net Result of ",
+              format_compact_currency(
+                net_result
+              ),
+              "."
+            )
+          }
+
+          insights <-
+            c(
+              insights,
+              list(
+                tags$li(
+                  sentence
+                )
+              )
+            )
+        }
+
+
+        # -----------------------------------------------------------------
+        # 2. Strongest site by Net Result
+        # -----------------------------------------------------------------
+
+        site_finance <-
+          executive_site_snapshot_finance()
+
+        if (
+          !is.null(site_finance) &&
+            is.data.frame(site_finance) &&
+            nrow(site_finance) > 0L &&
+            "net_actual" %in%
+              names(site_finance)
+        ) {
+
+          valid <-
+            is.finite(
+              site_finance$net_actual
+            )
+
+          if (any(valid)) {
+
+            candidates <-
+              site_finance[
+                valid,
+                ,
+                drop = FALSE
+              ]
+
+            best_index <-
+              which.max(
+                candidates$net_actual
+              )
+
+            insights <-
+              c(
+                insights,
+                list(
+                  tags$li(
+                    paste0(
+                      candidates$site[[best_index]],
+                      " has the strongest site Net Result at ",
+                      format_compact_currency(
+                        candidates$net_actual[[best_index]]
+                      ),
+                      "."
+                    )
+                  )
+                )
+              )
+          }
+        }
+
+
+        # -----------------------------------------------------------------
+        # 3. Largest theoretical discount opportunity
+        # -----------------------------------------------------------------
+
+        site_revenue <-
+          executive_site_snapshot_revenue()
+
+        if (
+          !is.null(site_revenue) &&
+            is.data.frame(site_revenue) &&
+            nrow(site_revenue) > 0L &&
+            "discount_opportunity" %in%
+              names(site_revenue)
+        ) {
+
+          valid <-
+            is.finite(
+              site_revenue$discount_opportunity
+            )
+
+          if (any(valid)) {
+
+            candidates <-
+              site_revenue[
+                valid,
+                ,
+                drop = FALSE
+              ]
+
+            opportunity_index <-
+              which.max(
+                candidates$discount_opportunity
+              )
+
+            insights <-
+              c(
+                insights,
+                list(
+                  tags$li(
+                    paste0(
+                      candidates$site[[opportunity_index]],
+                      " has the largest theoretical discount opportunity at ",
+                      format_compact_currency(
+                        candidates$discount_opportunity[[opportunity_index]]
+                      ),
+                      "."
+                    )
+                  )
+                )
+              )
+          }
+        }
+
+
+        # -----------------------------------------------------------------
+        # No usable data
+        # -----------------------------------------------------------------
+
+        if (length(insights) == 0L) {
+
+          return(
+            div(
+              class = "text-secondary",
+              "No insights are available for the selected dashboard context."
+            )
+          )
+        }
+
+
+        tagList(
+          tags$ul(
+            class = "executive-insights-list",
+            insights
+          )
+        )
+      })
 
       # -------------------------------------------------------------------
       # Dynamic Finance visual grid
