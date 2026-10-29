@@ -1434,9 +1434,9 @@ mod_site_detail_ui <- function(id) {
           "Participation Analysis"
         ),
 
-        p(
-          class = "text-secondary mb-2",
-          "Choose the participation dataset to explore."
+        # Shown only when there is more than one dataset to choose from.
+        uiOutput(
+          ns("area_help")
         )
       ),
 
@@ -1903,6 +1903,30 @@ mod_site_detail_server <- function(
       # Available participation views
       # -------------------------------------------------------------------
 
+      output$area_help <- renderUI({
+
+        reports <- site_reports()
+
+        if (is.null(reports)) {
+          return(NULL)
+        }
+
+        areas <- site_detail_available_areas(
+          reports,
+          year = input$year,
+          site = input$site
+        )
+
+        if (length(areas) < 2L) {
+          return(NULL)
+        }
+
+        p(
+          class = "text-secondary mb-2",
+          "Choose the participation dataset to explore."
+        )
+      })
+
       output$area_tabs <- renderUI({
 
         reports <- site_reports()
@@ -1948,14 +1972,23 @@ mod_site_detail_server <- function(
           }
         )
 
-        do.call(
-          navset_pill,
-          c(
-            list(
-              id = ns("area"),
-              selected = selected_area
-            ),
-            tabs
+        # With one dataset the switcher is hidden (it still sets input$area);
+        # a lone pill reads like an unfinished control.
+        div(
+          class = if (length(areas) == 1L) {
+            "site-detail-area-switcher single-area"
+          } else {
+            "site-detail-area-switcher"
+          },
+          do.call(
+            navset_pill,
+            c(
+              list(
+                id = ns("area"),
+                selected = selected_area
+              ),
+              tabs
+            )
           )
         )
       })
@@ -2228,10 +2261,7 @@ mod_site_detail_server <- function(
           return(NULL)
         }
 
-        make_value_box_row(
-          boxes,
-          width = 1 / 3
-        )
+        make_value_box_row(boxes)
       })
 
       # Centralises chart titles/placeholders so UI text stays consistent

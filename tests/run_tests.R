@@ -28,6 +28,11 @@ source(file.path("R", "mod_overview.R"))
 source(file.path("R", "mod_site_comparison.R"))
 source(file.path("R", "mod_forecasting.R"))
 source(file.path("R", "mod_executive_dashboard.R"))
+source(file.path("R", "mod_site_detail.R"))
+source(file.path("R", "mod_venues_operations.R"))
+
+# Shared fixtures for the Site Detail / Venues tests and plot smoke tests.
+source(file.path("tests", "fixtures_site_venues.R"))
 
 
 source(file.path("tests", "test_data_pipeline_regressions.R"))
@@ -44,6 +49,12 @@ source(file.path("tests", "test_forecasting_manual.R"))
 source(file.path("tests", "test_forecasting_layout.R"))
 source(file.path("tests", "test_forecasting_options.R"))
 source(file.path("tests", "test_executive_dashboard.R"))
+source(file.path("tests", "test_chart_and_ui_helpers.R"))
+source(file.path("tests", "test_site_detail.R"))
+source(file.path("tests", "test_venues_operations.R"))
+source(file.path("tests", "test_plot_smoke.R"))
+# Real workbooks: skipped unless MONASH_SPORT_REAL_DATA_ROOT is set
+# (tests/run_full_tests.R sets it to data/raw).
 source(file.path("tests", "test_real_upload_parsers.R"))
 
 cat("ALL TESTS PASSED\n")

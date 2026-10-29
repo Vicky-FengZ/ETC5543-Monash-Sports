@@ -107,6 +107,19 @@ invalid <- try(calculate_finance_scenario(baseline, volume_pct = -100), silent =
 stopifnot(inherits(missing_share, "try-error"), inherits(invalid, "try-error"))
 cat("PASS wage scenarios, partial-year timing, demand and exact break-even pricing\n")
 
+holt_plan <- calculate_finance_scenario(holt, wage_amount = 1200, price_pct = 5,
+                                        price_share = 50, volume_pct = -5)
+for (metric in c("income", "expenses")) {
+  plan_band <- forecast_scenario_band(holt_plan$table, metric)
+  values <- holt_plan$table[[paste0("scenario_", metric)]]
+  stopifnot(plan_band$available,
+            all(plan_band$lower95 <= plan_band$lower80 + 1e-8), all(plan_band$lower80 <= values + 1e-8),
+            all(values <= plan_band$upper80 + 1e-8), all(plan_band$upper80 <= plan_band$upper95 + 1e-8))
+}
+stopifnot(!forecast_scenario_band(zero$table, "income")$available,
+          all(is.na(zero$table$scenario_income_lower95)))
+cat("PASS scenario prediction intervals follow the scenario line\n")
+
 suppressPackageStartupMessages({ library(shiny); library(bslib); library(bsicons) })
 ui_text <- as.character(mod_forecasting_ui("forecast_test"))
 stopifnot(!grepl("Net Result|Forecast Prototype|Forecast vs Budget", ui_text),

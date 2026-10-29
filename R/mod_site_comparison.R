@@ -256,7 +256,8 @@ mod_site_comparison_ui <- function(id) {
       
       # Facility-level control bar -----------------------------------------
       # Keeping this control outside navset_card_tab makes the interaction
-      # clearer and avoids the dropdown opening inside a scrollable card.
+      # clearer and avoids the dropdown opening inside a scrollable card, so
+      # it can use the same (selectize) dropdown as the other filters.
       div(
         class = "filter-bar",
         
@@ -271,10 +272,26 @@ mod_site_comparison_ui <- function(id) {
             ns("selected_site"),
             label = "Site",
             choices = SITE_NAMES,
-            selected = SITE_NAMES[[1]],
-            selectize = FALSE
+            selected = SITE_NAMES[[1]]
           ),
           
+          # The view switcher lives with the other facility controls; the
+          # analysis below is a hidden navset driven by this choice.
+          div(
+            class = "segmented-control",
+            radioButtons(
+              ns("facility_view_choice"),
+              label = "View",
+              choices = c(
+                "Financial Performance",
+                "Discounts",
+                "Revenue Opportunity"
+              ),
+              selected = "Financial Performance",
+              inline = TRUE
+            )
+          ),
+
           div(
             tags$label(
               class = "form-label",
@@ -286,17 +303,15 @@ mod_site_comparison_ui <- function(id) {
             )
           ),
           
-          col_widths = c(4, 8)
+          col_widths = breakpoints(sm = c(12, 12, 12), lg = c(3, 6, 3))
         )
       ),
       
       # Facility views -----------------------------------------------------
-      # The tabs now contain only analysis content, not input controls.
-      navset_card_tab(
+      # Selected with the "View" control in the Facility focus bar above.
+      navset_hidden(
         id = ns("facility_view"),
         selected = "Financial Performance",
-        title = "Facility Analysis",
-        full_screen = TRUE,
         
         nav_panel(
           "Financial Performance",
@@ -462,6 +477,10 @@ mod_site_comparison_server <- function(
   shiny::moduleServer(
     id,
     function(input, output, session) {
+
+      observeEvent(input$facility_view_choice, {
+        nav_select("facility_view", input$facility_view_choice)
+      }, ignoreInit = TRUE)
 
       # -------------------------------------------------------------------
       # Monthly Site Report data

@@ -140,9 +140,8 @@ mod_overview_ui <- function(id) {
 
       br(),
 
-      # Main analysis row:
-      #   left  = year-by-year trend for a selected metric
-      #   right = Budget vs Actual context across the same period
+      # Main analysis: year-by-year trend for a selected metric, then
+      # Budget vs Actual context across the same period.
       layout_columns(
 
         card(
@@ -202,7 +201,9 @@ mod_overview_ui <- function(id) {
           )
         ),
 
-        col_widths = c(7, 5)
+        # Stacked full width: the monthly Budget vs Actual chart spans many
+        # months and is unreadable at half width.
+        col_widths = c(12, 12)
       ),
 
       # Revenue opportunity keeps the Overview at an organisation-wide level.

@@ -76,6 +76,64 @@ overview_plot_limits <- function(values) {
   limits + c(-padding, padding)
 }
 
+
+# Lines must not bridge missing periods (e.g. a missing year): insert an NA
+# point wherever consecutive x values are further apart than `max_gap`, so
+# lines() breaks there. Points are still drawn from the original data.
+# Monthly dates use the default (45 days); annual years use max_gap = 1.
+break_line_gaps <- function(dates, values, max_gap = 45) {
+  order_index <- order(dates)
+  dates <- dates[order_index]
+  values <- values[order_index]
+  gap_after <- which(diff(as.numeric(dates)) > max_gap)
+
+  if (length(gap_after) == 0L) {
+    return(list(x = dates, y = values))
+  }
+
+  x <- dates[0]
+  y <- numeric()
+  start <- 1L
+
+  for (index in gap_after) {
+    x <- c(x, dates[start:index], dates[index] + 1)
+    y <- c(y, values[start:index], NA_real_)
+    start <- index + 1L
+  }
+
+  list(
+    x = c(x, dates[start:length(dates)]),
+    y = c(y, values[start:length(values)])
+  )
+}
+
+# Horizontal legends size every entry from strwidth(), which can be slightly
+# narrower than the text the PNG device draws, so entries overlapped on narrow
+# charts. All chart legends go through this wrapper, which adds 25% headroom.
+chart_legend <- function(x, y = NULL, legend, ..., horiz = FALSE, cex = 1,
+                         text.width = NULL) {
+  # Like graphics::legend(), accept the labels as the second argument.
+  if (missing(legend) && !is.null(y) && (is.character(y) || is.expression(y))) {
+    legend <- y
+    y <- NULL
+  }
+
+  if (isTRUE(horiz) && is.null(text.width)) {
+    text.width <- max(
+      graphics::strwidth(legend, units = "user", cex = cex)
+    ) * 1.25
+  }
+
+  graphics::legend(
+    x, y,
+    legend = legend,
+    ...,
+    horiz = horiz,
+    cex = cex,
+    text.width = text.width
+  )
+}
+
 plot_monthly_income_expenses <- function(monthly_finance) {
 
   if (
@@ -185,20 +243,19 @@ plot_monthly_income_expenses <- function(monthly_finance) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
   lines(
-    dates,
-    income,
-    col = "#2563EB",
+    break_line_gaps(dates, income),
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -208,14 +265,13 @@ plot_monthly_income_expenses <- function(monthly_finance) {
     pch = 21,
     cex = 1,
     lwd = 1.8,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
   lines(
-    dates,
-    expenses,
-    col = "#F59E0B",
+    break_line_gaps(dates, expenses),
+    col = CHART_COLOURS[["secondary"]],
     lwd = 2.6
   )
 
@@ -225,7 +281,7 @@ plot_monthly_income_expenses <- function(monthly_finance) {
     pch = 21,
     cex = 1,
     lwd = 1.8,
-    col = "#F59E0B",
+    col = CHART_COLOURS[["secondary"]],
     bg = "white"
   )
 
@@ -240,7 +296,7 @@ plot_monthly_income_expenses <- function(monthly_finance) {
     format = "%b\n%Y",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -251,19 +307,19 @@ plot_monthly_income_expenses <- function(monthly_finance) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Income",
       "Expenses"
     ),
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     lty = 1,
     lwd = 2.6,
@@ -272,7 +328,7 @@ plot_monthly_income_expenses <- function(monthly_finance) {
     bty = "n",
     horiz = TRUE,
     cex = 0.82,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.02),
     xpd = NA
   )
@@ -448,13 +504,13 @@ plot_annual_performance_trend <- function(
 
   abline(
     h = ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -462,14 +518,11 @@ plot_annual_performance_trend <- function(
     length(metrics) == 1L
   ) {
 
-    "#2563EB"
+    CHART_COLOURS[["primary"]]
 
   } else {
 
-    grDevices::hcl.colors(
-      length(metrics),
-      palette = "Dark 3"
-    )
+    chart_metric_colours(metrics)
   }
 
   if (
@@ -479,25 +532,38 @@ plot_annual_performance_trend <- function(
 
     values <- series[[1L]]
 
-    polygon(
-      c(
-        years,
-        rev(years)
-      ),
-      c(
-        values,
-        rep(
-          0,
-          length(values)
-        )
-      ),
-      border = NA,
-      col =
-        grDevices::adjustcolor(
-          colours[[1L]],
-          alpha.f = 0.08
-        )
+    # Shade each run of consecutive years separately so the area does not
+    # bridge a missing year.
+    runs <- split(
+      seq_along(years),
+      cumsum(c(TRUE, diff(years) > 1))
     )
+
+    for (run in runs) {
+      if (length(run) < 2L) {
+        next
+      }
+
+      polygon(
+        c(
+          years[run],
+          rev(years[run])
+        ),
+        c(
+          values[run],
+          rep(
+            0,
+            length(run)
+          )
+        ),
+        border = NA,
+        col =
+          grDevices::adjustcolor(
+            colours[[1L]],
+            alpha.f = 0.08
+          )
+      )
+    }
   }
 
   for (
@@ -513,8 +579,7 @@ plot_annual_performance_trend <- function(
     ) {
 
       lines(
-        years,
-        values,
+        break_line_gaps(years, values, max_gap = 1),
         col = colours[[index]],
         lwd = 2.6
       )
@@ -537,7 +602,7 @@ plot_annual_performance_trend <- function(
     labels = years,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -551,7 +616,7 @@ plot_annual_performance_trend <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -585,13 +650,13 @@ plot_annual_performance_trend <- function(
         ),
       offset = 0.15,
       cex = 0.8,
-      col = "#334155",
+      col = CHART_COLOURS[["text_strong"]],
       xpd = NA
     )
 
   } else {
 
-    legend(
+    chart_legend(
       "top",
       legend = metrics,
       col = colours,
@@ -602,7 +667,7 @@ plot_annual_performance_trend <- function(
       bty = "n",
       horiz = TRUE,
       cex = 0.76,
-      text.col = "#475569",
+      text.col = CHART_COLOURS[["text"]],
       inset = c(
         0,
         -0.03
@@ -657,12 +722,12 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
     type = "n"
   )
 
-  abline(h = ticks, col = "#E2E8F0", lwd = 1)
-  abline(h = 0, col = "#94A3B8", lwd = 1.1)
+  abline(h = ticks, col = CHART_COLOURS[["grid"]], lwd = 1)
+  abline(h = 0, col = CHART_COLOURS[["subtle"]], lwd = 1.1)
   barplot(
     values,
     beside = TRUE,
-    col = c("#CBD5E1", "#2563EB"),
+    col = c(CHART_COLOURS[["light"]], CHART_COLOURS[["primary"]]),
     border = NA,
     axes = FALSE,
     axisnames = FALSE,
@@ -675,7 +740,7 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
     labels = years,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
   axis(
@@ -685,7 +750,7 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -699,19 +764,19 @@ plot_budget_vs_actual_net_result <- function(annual_finance) {
     pos = ifelse(values >= 0, 3, 1),
     offset = 0.1,
     cex = 0.66,
-    col = "#334155",
+    col = CHART_COLOURS[["text_strong"]],
     xpd = NA
   )
 
-  legend(
+  chart_legend(
     "topright",
     legend = rownames(values),
-    fill = c("#CBD5E1", "#2563EB"),
+    fill = c(CHART_COLOURS[["light"]], CHART_COLOURS[["primary"]]),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.78,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, 0),
     xpd = FALSE
   )
@@ -829,21 +894,20 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
   # Budget is deliberately muted so Actual remains the main focus.
   lines(
-    dates,
-    budget,
-    col = "#94A3B8",
+    break_line_gaps(dates, budget),
+    col = CHART_COLOURS[["subtle"]],
     lwd = 2.4,
     lty = 2
   )
@@ -854,14 +918,13 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
     pch = 21,
     cex = 0.95,
     lwd = 1.6,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     bg = "white"
   )
 
   lines(
-    dates,
-    actual,
-    col = "#2563EB",
+    break_line_gaps(dates, actual),
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.8
   )
 
@@ -871,7 +934,7 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
     pch = 21,
     cex = 1,
     lwd = 1.8,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -886,7 +949,7 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
     format = "%b\n%Y",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -897,19 +960,19 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Budget",
       "Actual"
     ),
     col = c(
-      "#94A3B8",
-      "#2563EB"
+      CHART_COLOURS[["subtle"]],
+      CHART_COLOURS[["primary"]]
     ),
     lty = c(2, 1),
     lwd = c(2.4, 2.8),
@@ -918,7 +981,7 @@ plot_monthly_budget_vs_actual_net_result <- function(monthly_finance) {
     bty = "n",
     horiz = TRUE,
     cex = 0.82,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.02),
     xpd = NA
   )
@@ -970,11 +1033,11 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     ylab = "",
     type = "n"
   )
-  abline(h = ticks, col = "#E2E8F0", lwd = 1)
-  abline(h = 0, col = "#94A3B8", lwd = 1.1)
+  abline(h = ticks, col = CHART_COLOURS[["grid"]], lwd = 1)
+  abline(h = 0, col = CHART_COLOURS[["subtle"]], lwd = 1.1)
   barplot(
     values,
-    col = c("#2563EB", "#F59E0B"),
+    col = c(CHART_COLOURS[["primary"]], CHART_COLOURS[["secondary"]]),
     border = NA,
     axes = FALSE,
     axisnames = FALSE,
@@ -987,7 +1050,7 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     labels = years,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.9
   )
   axis(
@@ -997,7 +1060,7 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -1008,7 +1071,7 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     potential + label_offset,
     labels = format_compact_currency(potential),
     cex = 0.76,
-    col = "#334155",
+    col = CHART_COLOURS[["text_strong"]],
     xpd = NA
   )
 
@@ -1020,7 +1083,7 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     pch = 21,
     lwd = 2.4,
     cex = 1.15,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     bg = "white",
     xlim = x_limits,
     ylim = rate_limits,
@@ -1039,7 +1102,7 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#0F766E",
+    col.axis = CHART_COLOURS[["tertiary"]],
     cex.axis = 0.82
   )
   text(
@@ -1049,24 +1112,24 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
     pos = 1,
     offset = 0.8,
     cex = 0.72,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     xpd = NA
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c("Actual Income", "Discount Opportunity", "Capture Rate"),
-    fill = c("#2563EB", "#F59E0B", NA),
+    fill = c(CHART_COLOURS[["primary"]], CHART_COLOURS[["secondary"]], NA),
     border = NA,
     lty = c(NA, NA, 1),
     lwd = c(NA, NA, 2.4),
     pch = c(15, 15, 21),
-    pt.bg = c("#2563EB", "#F59E0B", "white"),
-    col = c("#2563EB", "#F59E0B", "#0F766E"),
+    pt.bg = c(CHART_COLOURS[["primary"]], CHART_COLOURS[["secondary"]], "white"),
+    col = c(CHART_COLOURS[["primary"]], CHART_COLOURS[["secondary"]], CHART_COLOURS[["tertiary"]]),
     bty = "n",
     horiz = TRUE,
     cex = 0.78,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.03),
     xpd = NA
   )
@@ -1177,10 +1240,7 @@ plot_site_performance_over_time <- function(
     x_limits <- x_limits + c(-0.25, 0.25)
   }
 
-  colours <- grDevices::hcl.colors(
-    length(site_names),
-    palette = "Dark 3"
-  )
+  colours <- chart_categorical_colours(length(site_names))
 
   old_par <- par(
     mar = c(4.2, 5.8, 5.5, 1.2),
@@ -1216,13 +1276,13 @@ plot_site_performance_over_time <- function(
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -1244,8 +1304,7 @@ plot_site_performance_over_time <- function(
 
     if (nrow(site_rows) > 1L) {
       lines(
-        site_rows$report_year,
-        site_rows$value,
+        break_line_gaps(site_rows$report_year, site_rows$value, max_gap = 1),
         col = colours[[index]],
         lwd = 2.4
       )
@@ -1268,7 +1327,7 @@ plot_site_performance_over_time <- function(
     labels = year_values,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -1279,11 +1338,11 @@ plot_site_performance_over_time <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = site_names,
     col = colours,
@@ -1294,7 +1353,7 @@ plot_site_performance_over_time <- function(
     bty = "n",
     ncol = min(3L, length(site_names)),
     cex = 0.76,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.03),
     xpd = NA
   )
@@ -1429,7 +1488,7 @@ plot_site_ranking <- function(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = x_limits,
     axes = FALSE,
     xlab = ""
@@ -1442,13 +1501,13 @@ plot_site_ranking <- function(
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     v = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -1459,7 +1518,7 @@ plot_site_ranking <- function(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = x_limits,
     axes = FALSE,
     xlab = "",
@@ -1473,7 +1532,7 @@ plot_site_ranking <- function(
       x_ticks
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -1493,7 +1552,7 @@ plot_site_ranking <- function(
         ),
         pos = 4,
         cex = 0.78,
-        col = "#475569",
+        col = CHART_COLOURS[["text"]],
         xpd = NA
       )
 
@@ -1507,7 +1566,7 @@ plot_site_ranking <- function(
         ),
         pos = 2,
         cex = 0.78,
-        col = "#475569",
+        col = CHART_COLOURS[["text"]],
         xpd = NA
       )
     }
@@ -1661,8 +1720,8 @@ plot_site_budget_performance <- function(
     las = 1,
     border = NA,
     col = c(
-      "#94A3B8",
-      "#2563EB"
+      CHART_COLOURS[["subtle"]],
+      CHART_COLOURS[["primary"]]
     ),
     axes = FALSE,
     xlim = x_limits,
@@ -1681,31 +1740,31 @@ plot_site_budget_performance <- function(
       x_ticks
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = 0,
-    col = "#64748B",
+    col = CHART_COLOURS[["muted"]],
     lwd = 1
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Budget",
       "Actual"
     ),
     fill = c(
-      "#94A3B8",
-      "#2563EB"
+      CHART_COLOURS[["subtle"]],
+      CHART_COLOURS[["primary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.82,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.08),
     xpd = NA
   )
@@ -1736,7 +1795,7 @@ plot_site_budget_performance <- function(
           ),
           pos = 4,
           cex = 0.72,
-          col = "#475569",
+          col = CHART_COLOURS[["text"]],
           xpd = NA
         )
 
@@ -1750,7 +1809,7 @@ plot_site_budget_performance <- function(
           ),
           pos = 2,
           cex = 0.72,
-          col = "#475569",
+          col = CHART_COLOURS[["text"]],
           xpd = NA
         )
       }
@@ -1958,8 +2017,8 @@ old_par <- par(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -1984,13 +2043,13 @@ old_par <- par(
       x_ticks
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -2003,8 +2062,8 @@ old_par <- par(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -2014,21 +2073,21 @@ old_par <- par(
     add = TRUE
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Actual Income",
       "Discount Opportunity"
     ),
     fill = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.82,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.08
@@ -2069,7 +2128,7 @@ old_par <- par(
       ),
       pos = 4,
       cex = 0.72,
-      col = "#475569",
+      col = CHART_COLOURS[["text"]],
       xpd = NA
     )
   }
@@ -2217,9 +2276,9 @@ plot_site_discount_mix <- function(
     las = 1,
     border = NA,
     col = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -2244,13 +2303,13 @@ plot_site_discount_mix <- function(
       "%"
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -2262,9 +2321,9 @@ plot_site_discount_mix <- function(
     las = 1,
     border = NA,
     col = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -2274,7 +2333,7 @@ plot_site_discount_mix <- function(
     add = TRUE
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Student",
@@ -2282,15 +2341,15 @@ plot_site_discount_mix <- function(
       "Other"
     ),
     fill = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.08
@@ -2514,7 +2573,7 @@ plot_facility_ranking <- function(
     las = 1,
     cex.names = 0.78,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     axes = FALSE,
     xlim = limits
   )
@@ -2536,19 +2595,19 @@ plot_facility_ranking <- function(
       ticks
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     v = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -2560,7 +2619,7 @@ plot_facility_ranking <- function(
     las = 1,
     cex.names = 0.78,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     axes = FALSE,
     xlim = limits,
     add = TRUE
@@ -2587,7 +2646,7 @@ plot_facility_ranking <- function(
       2
     ),
     cex = 0.72,
-    col = "#334155",
+    col = CHART_COLOURS[["text_strong"]],
     xpd = NA
   )
 
@@ -2775,9 +2834,9 @@ plot_facility_discount_mix <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -2802,13 +2861,13 @@ plot_facility_discount_mix <- function(
       "%"
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -2822,9 +2881,9 @@ plot_facility_discount_mix <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -2834,7 +2893,7 @@ plot_facility_discount_mix <- function(
     add = TRUE
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Student",
@@ -2842,15 +2901,15 @@ plot_facility_discount_mix <- function(
       "Other"
     ),
     fill = c(
-      "#2563EB",
-      "#0F766E",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.08
@@ -3054,10 +3113,7 @@ plot_facility_discount_trend <- function(
       )
   }
 
-  colours <- grDevices::hcl.colors(
-    length(facility_names),
-    palette = "Dark 3"
-  )
+  colours <- chart_categorical_colours(length(facility_names))
 
   # Allow additional space above the chart for the facility legend.
   legend_rows <- ceiling(
@@ -3108,13 +3164,13 @@ plot_facility_discount_trend <- function(
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -3139,8 +3195,7 @@ plot_facility_discount_trend <- function(
 
     if (nrow(facility_rows) > 1L) {
       lines(
-        facility_rows$date,
-        facility_rows$value,
+        break_line_gaps(facility_rows$date, facility_rows$value),
         col = colours[[index]],
         lwd = 2.2
       )
@@ -3164,7 +3219,7 @@ plot_facility_discount_trend <- function(
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -3177,11 +3232,11 @@ plot_facility_discount_trend <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = facility_names,
     col = colours,
@@ -3195,7 +3250,7 @@ plot_facility_discount_trend <- function(
       length(facility_names)
     ),
     cex = 0.68,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.04
@@ -3411,8 +3466,8 @@ plot_facility_revenue_opportunity <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -3437,13 +3492,13 @@ plot_facility_revenue_opportunity <- function(
       x_ticks
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -3457,8 +3512,8 @@ plot_facility_revenue_opportunity <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -3468,21 +3523,21 @@ plot_facility_revenue_opportunity <- function(
     add = TRUE
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Actual Income",
       "Discount Opportunity"
     ),
     fill = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.78,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.08
@@ -3515,7 +3570,7 @@ plot_facility_revenue_opportunity <- function(
       ),
       pos = 4,
       cex = 0.68,
-      col = "#475569",
+      col = CHART_COLOURS[["text"]],
       xpd = NA
     )
   }
@@ -3696,8 +3751,8 @@ plot_facility_capture_rate <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -3722,13 +3777,13 @@ plot_facility_capture_rate <- function(
       "%"
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
   abline(
     v = ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -3742,8 +3797,8 @@ plot_facility_capture_rate <- function(
     cex.names = 0.78,
     border = NA,
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     axes = FALSE,
     xlim = c(
@@ -3753,21 +3808,21 @@ plot_facility_capture_rate <- function(
     add = TRUE
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Captured Revenue",
       "Opportunity Gap"
     ),
     fill = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     border = NA,
     bty = "n",
     horiz = TRUE,
     cex = 0.78,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.08
@@ -3803,7 +3858,7 @@ plot_facility_capture_rate <- function(
         ),
         pos = 4,
         cex = 0.72,
-        col = "#334155",
+        col = CHART_COLOURS[["text_strong"]],
         xpd = NA
       )
     }
@@ -3927,10 +3982,7 @@ plot_facility_performance_over_time <- function(
     0.25
   )
 
-  colours <- grDevices::hcl.colors(
-    length(facility_names),
-    palette = "Dark 3"
-  )
+  colours <- chart_categorical_colours(length(facility_names))
 
   legend_rows <- ceiling(
     length(facility_names) / 2
@@ -3980,13 +4032,13 @@ plot_facility_performance_over_time <- function(
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -4011,8 +4063,7 @@ plot_facility_performance_over_time <- function(
 
     if (nrow(facility_rows) > 1L) {
       lines(
-        facility_rows$report_year,
-        facility_rows$value,
+        break_line_gaps(facility_rows$report_year, facility_rows$value, max_gap = 1),
         col = colours[[index]],
         lwd = 2.4
       )
@@ -4035,7 +4086,7 @@ plot_facility_performance_over_time <- function(
     labels = year_values,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -4048,11 +4099,11 @@ plot_facility_performance_over_time <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = facility_names,
     col = colours,
@@ -4066,7 +4117,7 @@ plot_facility_performance_over_time <- function(
       length(facility_names)
     ),
     cex = 0.68,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(
       0,
       -0.04
@@ -4172,14 +4223,14 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     direct,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -4189,14 +4240,14 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
   lines(
     dates,
     indirect,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     lwd = 2.6
   )
 
@@ -4206,7 +4257,7 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     bg = "white"
   )
 
@@ -4216,7 +4267,7 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -4232,19 +4283,19 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Direct Visits",
       "Indirect Visits"
     ),
     col = c(
-      "#2563EB",
-      "#0F766E"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]]
     ),
     lty = 1,
     lwd = 2.6,
@@ -4253,7 +4304,7 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
     bty = "n",
     horiz = TRUE,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.04),
     xpd = NA
   )
@@ -4293,8 +4344,8 @@ plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
 
   colours <- ifelse(
     labels == "Direct",
-    "#2563EB",
-    "#0F766E"
+    CHART_COLOURS[["primary"]],
+    CHART_COLOURS[["tertiary"]]
   )
 
   y_max <- max(values, na.rm = TRUE)
@@ -4335,7 +4386,7 @@ plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -4361,7 +4412,7 @@ plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -4386,7 +4437,7 @@ plot_site_detail_visit_type_breakdown <- function(visit_breakdown) {
     pos = 3,
     offset = 0.4,
     cex = 0.78,
-    col = "#475569",
+    col = CHART_COLOURS[["text"]],
     xpd = NA
   )
 
@@ -4459,9 +4510,9 @@ plot_site_detail_audience_mix <- function(audience_mix) {
   shares <- shares[order_index]
 
   colours <- c(
-    Student = "#2563EB",
-    Staff = "#0F766E",
-    Community = "#F59E0B"
+    Student = CHART_COLOURS[["primary"]],
+    Staff = CHART_COLOURS[["tertiary"]],
+    Community = CHART_COLOURS[["secondary"]]
   )
 
   bar_colours <- colours[labels]
@@ -4528,7 +4579,7 @@ plot_site_detail_audience_mix <- function(audience_mix) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -4548,7 +4599,7 @@ plot_site_detail_audience_mix <- function(audience_mix) {
     labels = labels,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#475569",
+    col.axis = CHART_COLOURS[["text"]],
     cex.axis = 0.82
   )
 
@@ -4564,7 +4615,7 @@ plot_site_detail_audience_mix <- function(audience_mix) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.78
   )
 
@@ -4595,7 +4646,7 @@ plot_site_detail_audience_mix <- function(audience_mix) {
     pos = 3,
     offset = 0.15,
     cex = 0.72,
-    col = "#475569",
+    col = CHART_COLOURS[["text"]],
     xpd = NA
   )
 
@@ -4704,7 +4755,7 @@ plot_site_detail_activity_breakdown <- function(activity_data) {
     las = 1,
     cex.names = 0.76,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     axes = FALSE,
     xlim = c(0, x_limit)
   )
@@ -4716,7 +4767,7 @@ plot_site_detail_activity_breakdown <- function(activity_data) {
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -4727,7 +4778,7 @@ plot_site_detail_activity_breakdown <- function(activity_data) {
     las = 1,
     cex.names = 0.76,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     axes = FALSE,
     xlim = c(0, x_limit),
     add = TRUE
@@ -4743,7 +4794,7 @@ plot_site_detail_activity_breakdown <- function(activity_data) {
       trim = TRUE
     ),
     tick = FALSE,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -4760,7 +4811,7 @@ plot_site_detail_activity_breakdown <- function(activity_data) {
     ),
     pos = 4,
     cex = 0.72,
-    col = "#475569",
+    col = CHART_COLOURS[["text"]],
     xpd = NA
   )
 
@@ -4868,14 +4919,14 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     values,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.8
   )
 
@@ -4885,7 +4936,7 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
     pch = 21,
     cex = 1,
     lwd = 1.8,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -4895,7 +4946,7 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -4911,7 +4962,7 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -5052,14 +5103,14 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     total_active,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -5069,14 +5120,14 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
   lines(
     dates,
     target,
-    col = "#F59E0B",
+    col = CHART_COLOURS[["secondary"]],
     lwd = 2.6
   )
 
@@ -5086,7 +5137,7 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#F59E0B",
+    col = CHART_COLOURS[["secondary"]],
     bg = "white"
   )
 
@@ -5099,7 +5150,7 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
     ),
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -5115,19 +5166,19 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Total Active",
       "Target"
     ),
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     lty = 1,
     lwd = 2.6,
@@ -5136,7 +5187,7 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
     bty = "n",
     ncol = 2,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.04),
     xpd = NA
   )
@@ -5283,14 +5334,14 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     total_active,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -5300,14 +5351,14 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
   lines(
     dates,
     active_students,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     lwd = 2.6
   )
 
@@ -5317,7 +5368,7 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#0F766E",
+    col = CHART_COLOURS[["tertiary"]],
     bg = "white"
   )
 
@@ -5330,7 +5381,7 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
     ),
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -5346,19 +5397,19 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "Total Active",
       "Active Students"
     ),
     col = c(
-      "#2563EB",
-      "#0F766E"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["tertiary"]]
     ),
     lty = 1,
     lwd = 2.6,
@@ -5367,7 +5418,7 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
     bty = "n",
     ncol = 2,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.04),
     xpd = NA
   )
@@ -5505,7 +5556,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -5513,7 +5564,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
     lines(
       dates,
       percentages,
-      col = "#2563EB",
+      col = CHART_COLOURS[["primary"]],
       lwd = 2.6
     )
   }
@@ -5524,7 +5575,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
     pch = 21,
     cex = 1.1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -5538,7 +5589,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
     pos = 3,
     offset = 0.5,
     cex = 0.78,
-    col = "#475569",
+    col = CHART_COLOURS[["text"]],
     xpd = NA
   )
 
@@ -5551,7 +5602,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
     ),
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.88
   )
 
@@ -5569,7 +5620,7 @@ plot_site_detail_enrolment_student_share <- function(share_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -5696,14 +5747,14 @@ plot_site_detail_membership_movement <- function(movement_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     new_members,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -5713,14 +5764,14 @@ plot_site_detail_membership_movement <- function(movement_data) {
     pch = 21,
     cex = 0.95,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
   lines(
     dates,
     expired,
-    col = "#F59E0B",
+    col = CHART_COLOURS[["secondary"]],
     lwd = 2.6
   )
 
@@ -5730,7 +5781,7 @@ plot_site_detail_membership_movement <- function(movement_data) {
     pch = 21,
     cex = 0.95,
     lwd = 1.7,
-    col = "#F59E0B",
+    col = CHART_COLOURS[["secondary"]],
     bg = "white"
   )
 
@@ -5740,7 +5791,7 @@ plot_site_detail_membership_movement <- function(movement_data) {
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -5756,19 +5807,19 @@ plot_site_detail_membership_movement <- function(movement_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "top",
     legend = c(
       "New Members",
       "Expired / Cancelled"
     ),
     col = c(
-      "#2563EB",
-      "#F59E0B"
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
     ),
     lty = 1,
     lwd = 2.6,
@@ -5777,7 +5828,7 @@ plot_site_detail_membership_movement <- function(movement_data) {
     bty = "n",
     horiz = TRUE,
     cex = 0.8,
-    text.col = "#475569",
+    text.col = CHART_COLOURS[["text"]],
     inset = c(0, -0.04),
     xpd = NA
   )
@@ -5909,14 +5960,14 @@ plot_venues_attendance_over_time <- function(attendance_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     values,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -5926,7 +5977,7 @@ plot_venues_attendance_over_time <- function(attendance_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -5936,7 +5987,7 @@ plot_venues_attendance_over_time <- function(attendance_data) {
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.86
   )
 
@@ -5952,7 +6003,7 @@ plot_venues_attendance_over_time <- function(attendance_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -6061,14 +6112,14 @@ plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     values,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
 
@@ -6078,7 +6129,7 @@ plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -6088,7 +6139,7 @@ plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.86
   )
 
@@ -6107,7 +6158,7 @@ plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -6214,7 +6265,7 @@ plot_venues_facility_hire_by_facility <- function(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = c(0, x_max),
     axes = FALSE,
     cex.names = 0.72
@@ -6232,7 +6283,7 @@ plot_venues_facility_hire_by_facility <- function(
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -6242,7 +6293,7 @@ plot_venues_facility_hire_by_facility <- function(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = c(0, x_max),
     axes = FALSE,
     cex.names = 0.72,
@@ -6269,7 +6320,7 @@ plot_venues_facility_hire_by_facility <- function(
     labels = axis_labels,
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.78
   )
 
@@ -6294,7 +6345,7 @@ plot_venues_facility_hire_by_facility <- function(
     pos = 4,
     offset = 0.35,
     cex = 0.7,
-    col = "#475569"
+    col = CHART_COLOURS[["text"]]
   )
 
   invisible(NULL)
@@ -6441,7 +6492,7 @@ left_margin <- max(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = c(0, x_max),
     axes = FALSE,
     cex.names = 0.76
@@ -6459,7 +6510,7 @@ left_margin <- max(
 
   abline(
     v = x_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -6469,7 +6520,7 @@ left_margin <- max(
     horiz = TRUE,
     las = 1,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     xlim = c(0, x_max),
     axes = FALSE,
     cex.names = 0.76,
@@ -6487,7 +6538,7 @@ left_margin <- max(
     ),
     tick = FALSE,
     line = -0.3,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -6503,7 +6554,7 @@ left_margin <- max(
     pos = 4,
     offset = 0.4,
     cex = 0.78,
-    col = "#475569"
+    col = CHART_COLOURS[["text"]]
   )
 
   invisible(NULL)
@@ -6612,7 +6663,7 @@ plot_venues_attendance_by_area <- function(area_data) {
     values,
     names.arg = areas,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     ylim = c(0, y_max),
     axes = FALSE,
     cex.names = 0.86
@@ -6630,7 +6681,7 @@ plot_venues_attendance_by_area <- function(area_data) {
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
@@ -6638,7 +6689,7 @@ plot_venues_attendance_by_area <- function(area_data) {
     values,
     names.arg = areas,
     border = NA,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     ylim = c(0, y_max),
     axes = FALSE,
     cex.names = 0.86,
@@ -6657,7 +6708,7 @@ plot_venues_attendance_by_area <- function(area_data) {
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
@@ -6673,7 +6724,7 @@ plot_venues_attendance_by_area <- function(area_data) {
     pos = 3,
     offset = 0.4,
     cex = 0.8,
-    col = "#475569"
+    col = CHART_COLOURS[["text"]]
   )
 
   invisible(NULL)
@@ -6835,14 +6886,14 @@ plot_workforce_hours_over_time <- function(
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   lines(
     dates,
     budget,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 2.4,
     lty = 2
   )
@@ -6853,14 +6904,14 @@ plot_workforce_hours_over_time <- function(
     pch = 21,
     cex = 0.95,
     lwd = 1.5,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     bg = "white"
   )
 
   lines(
     dates,
     paid,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     lwd = 2.8
   )
 
@@ -6870,7 +6921,7 @@ plot_workforce_hours_over_time <- function(
     pch = 21,
     cex = 1,
     lwd = 1.7,
-    col = "#2563EB",
+    col = CHART_COLOURS[["primary"]],
     bg = "white"
   )
 
@@ -6880,7 +6931,7 @@ plot_workforce_hours_over_time <- function(
     format = "%b",
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.86
   )
 
@@ -6896,26 +6947,26 @@ plot_workforce_hours_over_time <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 
-  legend(
+  chart_legend(
     "topright",
     legend = c(
       "Budgeted Hours",
       "Paid Hours"
     ),
     col = c(
-      "#94A3B8",
-      "#2563EB"
+      CHART_COLOURS[["subtle"]],
+      CHART_COLOURS[["primary"]]
     ),
     lty = c(2, 1),
     lwd = c(2.4, 2.8),
     bty = "n",
     horiz = TRUE,
     cex = 0.8,
-    text.col = "#475569"
+    text.col = CHART_COLOURS[["text"]]
   )
 
   invisible(NULL)
@@ -7057,13 +7108,13 @@ plot_workforce_hours_variance <- function(
 
   abline(
     h = y_ticks,
-    col = "#E2E8F0",
+    col = CHART_COLOURS[["grid"]],
     lwd = 1
   )
 
   abline(
     h = 0,
-    col = "#94A3B8",
+    col = CHART_COLOURS[["subtle"]],
     lwd = 1.1
   )
 
@@ -7072,7 +7123,7 @@ plot_workforce_hours_variance <- function(
     add = TRUE,
     axes = FALSE,
     border = NA,
-    col = "#2563EB"
+    col = CHART_COLOURS[["primary"]]
   )
 
   axis(
@@ -7084,7 +7135,7 @@ plot_workforce_hours_variance <- function(
     ),
     tick = FALSE,
     line = -0.2,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.86
   )
 
@@ -7100,7 +7151,7 @@ plot_workforce_hours_variance <- function(
     las = 1,
     tick = FALSE,
     line = -0.5,
-    col.axis = "#64748B",
+    col.axis = CHART_COLOURS[["muted"]],
     cex.axis = 0.82
   )
 

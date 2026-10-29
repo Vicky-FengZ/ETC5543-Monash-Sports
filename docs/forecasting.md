@@ -115,10 +115,13 @@ the table also shows predicted and scenario casual payroll. Manual adjustment
 does not provide a full payroll total.
 
 Charts show the latest 36 historical months where available, with breaks in
-the Actual line for missing months. Shaded 80% and 95% ranges appear when the
-financial model has enough residual history. These ranges describe uncertainty
-in the financial forecast; they do not account for uncertainty in your payroll,
-price or demand assumptions.
+the Actual line for missing months. Shaded 80% and 95% prediction intervals
+surround the Your scenario line when the financial model has enough residual
+history, fanning out from the last actual month. They are the baseline model
+intervals moved by the same price, demand and cost adjustments as the scenario,
+so they describe uncertainty in the financial forecast only; they do not
+account for uncertainty in your payroll, price or demand assumptions. The note
+below the charts says when intervals are unavailable for Income or Expenses.
 
 The price-sensitivity chart compares Income at different price increases with
 total scenario Expenses, keeping demand and the repriceable Income share fixed.

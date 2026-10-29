@@ -77,7 +77,7 @@ mod_forecasting_ui <- function(id) {
              plotOutput(ns("expenses_plot"), height = "400px")),
         col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))
       ),
-      p(class = "forecast-help forecast-interval-note", "Shading shows financial forecast uncertainty; it excludes uncertainty in your payroll and pricing assumptions."),
+      uiOutput(ns("interval_note")),
       card(
         full_screen = TRUE,
         card_header(div(class = "forecast-card-heading", bs_icon("bullseye"), "Income needed to cover costs")),
@@ -330,6 +330,22 @@ mod_forecasting_server <- function(id, data = NULL) {
       result <- scenario()
       if (is.null(result$error) || !is.null(baseline()$error)) return(NULL)
       div(class = "forecast-status forecast-status-warning", bs_icon("exclamation-triangle"), result$error)
+    })
+    output$interval_note <- renderUI({
+      result <- scenario()
+      if (!is.null(baseline()$error) || !is.null(result$error)) return(NULL)
+      available <- vapply(c(Income = "income", Expenses = "expenses"),
+                          function(metric) forecast_scenario_band(result$table, metric)$available,
+                          logical(1))
+      text <- if (all(available)) {
+        "Shading shows 80% and 95% prediction intervals around your scenario. They reflect historical forecast uncertainty only, not uncertainty in your payroll, pricing or demand assumptions."
+      } else if (!any(available)) {
+        "Prediction intervals are not shown: the continuous history is too short to estimate forecast uncertainty."
+      } else {
+        paste0("Shading on the ", names(available)[available], " chart shows 80% and 95% prediction intervals around your scenario (historical forecast uncertainty only). ",
+               names(available)[!available], " intervals are not shown because its model has too little history to estimate uncertainty.")
+      }
+      p(class = "forecast-help forecast-interval-note", text)
     })
     output$period_label <- renderUI({
       b <- baseline()

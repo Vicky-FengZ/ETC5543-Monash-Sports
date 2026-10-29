@@ -6453,10 +6453,7 @@ mod_venues_operations_server <- function(
       })
 
       output$kpis <- renderUI({
-        make_value_box_row(
-          kpi_specs(),
-          width = 1 / 3
-        )
+        make_value_box_row(kpi_specs())
       })
 
       output$main_title <- renderUI({

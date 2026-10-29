@@ -495,6 +495,13 @@ calculate_finance_scenario <- function(
   min_income_growth <- if (sum(scenario_expenses) <= baseline_total) 0 else if (baseline_total > 0) {
     sum(scenario_expenses) / baseline_total - 1
   } else Inf
+  # Interval bounds move with the scenario exactly as the baseline does, so the
+  # shaded ranges keep financial-model uncertainty only, not assumption risk.
+  band <- function(frame, name) if (name %in% names(frame)) frame[[name]] else rep(NA_real_, nrow(frame))
+  scenario_income_band <- function(values) values * demand_factor * price_factor
+  scenario_expenses_band <- function(values) pmax(0, if (wage_mode == "percentage") {
+    values * (1 + active * (salary_share * wage_pct + (1 - salary_share) * other_cost_pct) / 100)
+  } else values * (1 + active * (1 - salary_share) * other_cost_pct / 100) + wage_addition)
   table <- data.frame(
     date = income$date, baseline_income = income$baseline, scenario_income = scenario_income,
     baseline_expenses = expenses$baseline, scenario_expenses = scenario_expenses,
@@ -502,19 +509,19 @@ calculate_finance_scenario <- function(
     baseline_casual_wages = casual_values,
     scenario_casual_wages = casual_values + wage_addition,
     required_income_to_break_even = scenario_expenses,
-    income_lower80 = income$lower80, income_upper80 = income$upper80,
-    expenses_lower80 = expenses$lower80, expenses_upper80 = expenses$upper80,
-    scenario_income_lower80 = income$lower80 * demand_factor * price_factor,
-    scenario_income_upper80 = income$upper80 * demand_factor * price_factor,
-    scenario_expenses_lower80 = if (wage_mode == "percentage") {
-      expenses$lower80 * (1 + active * (salary_share * wage_pct + (1 - salary_share) * other_cost_pct) / 100)
-    } else expenses$lower80 * (1 + active * (1 - salary_share) * other_cost_pct / 100) + wage_addition,
-    scenario_expenses_upper80 = if (wage_mode == "percentage") {
-      expenses$upper80 * (1 + active * (salary_share * wage_pct + (1 - salary_share) * other_cost_pct) / 100)
-    } else expenses$upper80 * (1 + active * (1 - salary_share) * other_cost_pct / 100) + wage_addition
+    income_lower80 = band(income, "lower80"), income_upper80 = band(income, "upper80"),
+    income_lower95 = band(income, "lower95"), income_upper95 = band(income, "upper95"),
+    expenses_lower80 = band(expenses, "lower80"), expenses_upper80 = band(expenses, "upper80"),
+    expenses_lower95 = band(expenses, "lower95"), expenses_upper95 = band(expenses, "upper95"),
+    scenario_income_lower80 = scenario_income_band(band(income, "lower80")),
+    scenario_income_upper80 = scenario_income_band(band(income, "upper80")),
+    scenario_income_lower95 = scenario_income_band(band(income, "lower95")),
+    scenario_income_upper95 = scenario_income_band(band(income, "upper95")),
+    scenario_expenses_lower80 = scenario_expenses_band(band(expenses, "lower80")),
+    scenario_expenses_upper80 = scenario_expenses_band(band(expenses, "upper80")),
+    scenario_expenses_lower95 = scenario_expenses_band(band(expenses, "lower95")),
+    scenario_expenses_upper95 = scenario_expenses_band(band(expenses, "upper95"))
   )
-  table$scenario_expenses_lower80 <- pmax(0, table$scenario_expenses_lower80)
-  table$scenario_expenses_upper80 <- pmax(0, table$scenario_expenses_upper80)
   assumptions <- data.frame(
     assumption = c("wage_mode", "price_increase_pct", "repriceable_income_share_pct",
                    "volume_change_pct", "effective_from", "forecast_months"),

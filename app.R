@@ -9,6 +9,8 @@ if (!requireNamespace("writexl", quietly = TRUE)) {
   )
 }
 
+options(shiny.port = 7198)
+
 options(shiny.maxRequestSize = 100 * 1024^2)
 
 # -------------------------------------------------------------------------
@@ -39,20 +41,38 @@ source("R/mod_data_upload.R")
 # -------------------------------------------------------------------------
 
 ui <- page_navbar(
+  # Official Monash reversed (white) logo for dark backgrounds, followed by
+  # a plain-text unit label. Use the supplied artwork only; do not redraw it.
   title = div(
     class = "brand-title",
-    "Monash Sport",
-    span("Performance Dashboard")
+    tags$img(
+      src = "brand/monash-logo-reversed-white.png",
+      alt = "Monash University",
+      class = "brand-logo"
+    ),
+    span(class = "brand-unit", "Sport")
   ),
 
   theme = app_theme,
   window_title = "Monash Sport Performance Dashboard",
 
-  header = tags$head(
-    tags$link(
-      rel = "stylesheet",
-      type = "text/css",
-      href = "styles.css"
+  header = tagList(
+    tags$head(
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = "styles.css"
+      )
+    ),
+    # Spinners on recalculating outputs, in brand colours.
+    useBusyIndicators(),
+    busyIndicatorOptions(
+      spinner_color = MONASH_COLOURS[["monash_blue"]],
+      pulse_background = paste0(
+        "linear-gradient(45deg, ",
+        MONASH_COLOURS[["monash_blue"]], ", ",
+        MONASH_COLOURS[["heritage_blue"]], ")"
+      )
     )
   ),
 
@@ -64,13 +84,22 @@ ui <- page_navbar(
 
   nav_menu(
     "Detailed Analysis",
+    icon = bs_icon("clipboard-data"),
     mod_site_detail_ui("site_detail"),
     mod_venues_operations_ui("venues_operations")
   ),
 
   mod_forecasting_ui("forecasting"),
 
-  mod_data_upload_ui("data_upload")
+  mod_data_upload_ui("data_upload"),
+
+  # Loaded report years, shown on the right of the navbar.
+  nav_item(
+    div(
+      class = "navbar-data-status-slot",
+      uiOutput("data_status", inline = TRUE)
+    )
+  )
 )
 
 
@@ -83,6 +112,10 @@ server <- function(input, output, session) {
   # Uploaded workbooks are parsed once, then shared with the dashboard and
   # the cleaned-data preview through this session-level reactive source.
   dashboard_data <- mod_data_upload_server("data_upload")
+
+  output$data_status <- renderUI({
+    navbar_data_status(dashboard_data()$uploads)
+  })
 
   mod_executive_dashboard_server(
     "executive_dashboard",

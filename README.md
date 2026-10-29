@@ -404,6 +404,30 @@ Each file has a specific role:
 - `R/forecast_plots.R`: draw the Income, Expenses and price-sensitivity charts.
 - `www/templates/`: blank Excel report templates with input guidance.
 
+## Testing
+
+Run the regression tests from the project root in R or RStudio:
+
+```r
+source("tests/run_tests.R")
+```
+
+They cover data import helpers, uploads and validation, every dashboard
+page's calculations (Overview, Site Comparison, Site Detail, Venues
+Operations, Forecasting, Executive Dashboard), chart helpers, and a smoke
+test that draws every Site Detail and Venues chart. The run ends with
+`ALL TESTS PASSED`.
+
+`test_real_upload_parsers.R` parses the real workbooks and is skipped in the
+normal run, because `data/raw` is not in version control and parsing every
+workbook takes several minutes. Before a submission, or after changing the
+import, cleaning or validation code, run the full suite on a machine that
+has the reports:
+
+```r
+source("tests/run_full_tests.R")
+```
+
 ## Performance and website deployment
 
 The dashboard runs as a Shiny application. The browser displays HTML, while

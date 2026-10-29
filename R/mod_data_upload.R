@@ -1990,9 +1990,7 @@ mod_data_upload_server <- function(
           ))
         }
 
-        tagList(lapply(
-          seq_len(nrow(rows)),
-          function(index) {
+        file_row <- function(index) {
             row <- rows[index, , drop = FALSE]
             percent <- round(100 * row$progress[[1L]])
             error_text <- row$error_message[[1L]]
@@ -2047,6 +2045,66 @@ mod_data_upload_server <- function(
               },
               basic_upload_warning_details_ui(
                 notes[[row$file_id[[1L]]]], row$original_name[[1L]]
+              )
+            )
+        }
+
+        # One collapsible group per report type keeps a long session (dozens
+        # of workbooks) scannable. A group opens while any of its files is
+        # still queued, parsing or failed.
+        report_types <- intersect(
+          names(BASIC_UPLOAD_REPORT_TYPES),
+          unique(rows$report_type)
+        )
+
+        tagList(lapply(
+          report_types,
+          function(report_type) {
+            indexes <- which(rows$report_type == report_type)
+            statuses <- rows$status[indexes]
+            n_ready <- sum(statuses == "ready")
+            n_failed <- sum(statuses == "failed")
+            n_pending <- length(indexes) - n_ready - n_failed
+            n_warnings <- if ("warning_count" %in% names(rows)) {
+              sum(rows$warning_count[indexes], na.rm = TRUE)
+            } else {
+              0L
+            }
+
+            summary_parts <- c(
+              paste(length(indexes), if (length(indexes) == 1L) "file" else "files"),
+              if (n_ready > 0L) paste(n_ready, "ready"),
+              if (n_pending > 0L) paste(n_pending, "in progress"),
+              if (n_failed > 0L) paste(n_failed, "failed"),
+              if (n_warnings > 0L) {
+                paste(n_warnings, if (n_warnings == 1L) "warning" else "warnings")
+              }
+            )
+
+            tags$details(
+              class = "basic-upload-group",
+              open = if (n_pending > 0L || n_failed > 0L) NA else NULL,
+              tags$summary(
+                class = "basic-upload-group-summary",
+                span(
+                  class = "basic-upload-group-title",
+                  unname(BASIC_UPLOAD_REPORT_TYPES[[report_type]])
+                ),
+                span(
+                  class = "basic-upload-group-meta",
+                  paste(summary_parts, collapse = " \u00b7 ")
+                ),
+                if (n_failed > 0L) {
+                  span(class = "basic-status-badge failed", "failed")
+                } else if (n_pending > 0L) {
+                  span(class = "basic-status-badge parsing", "parsing")
+                } else {
+                  span(class = "basic-status-badge ready", "ready")
+                }
+              ),
+              div(
+                class = "basic-upload-group-body",
+                lapply(indexes, file_row)
               )
             )
           }
