@@ -951,4 +951,183 @@ shiny::testServer(
   }
 )
 
+# Saved data: year labels, file name, save/load round trip and refusals.
+stopifnot(
+  identical(format_basic_year_span(c(2021L, 2022L, 2023L, 2025L)), "2021–2023, 2025"),
+  identical(format_basic_year_span(c(2025L, 2025L)), "2025"),
+  identical(format_basic_year_span(integer()), ""),
+  identical(format_basic_year_span(c(2021L, 2022L), dash = "-", join = "+"), "2021-2022"),
+  identical(
+    basic_saved_result_years(list(), "Monthly Site Report 2024 -June.xlsx"),
+    2024L
+  ),
+  basic_saved_data_days_old(as.POSIXct("2026-01-01 10:00:00"), as.Date("2026-01-31")) == 30L,
+  # 30 Oct 22:00 UTC is already 31 Oct in Melbourne (offset -660 minutes).
+  identical(
+    basic_saved_local_date(as.POSIXct("2026-10-30 22:00:00", tz = "UTC"), -660),
+    as.Date("2026-10-31")
+  ),
+  identical(
+    basic_saved_local_date(as.POSIXct("2026-10-30 22:00:00", tz = "UTC"), 0),
+    as.Date("2026-10-30")
+  )
+)
+
+saved_state <- new.env()
+saved_state$path <- tempfile(fileext = ".rds")
+
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    stopifnot(grepl(
+      "Upload or load reports first",
+      paste(as.character(output$saved_data_actions), collapse = ""),
+      fixed = TRUE
+    ))
+
+    paths <- replicate(2L, tempfile(fileext = ".xlsx"))
+    for (path in paths) writeBin(charToRaw("synthetic upload"), path)
+    session$setInputs(
+      all_reports = data.frame(
+        name = c("Monthly Site Report 2099.xlsx", "2099 Venues Tracking Report.xlsx"),
+        size = file.info(paths)$size,
+        type = "application/octet-stream",
+        datapath = paths,
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+
+    payload <- saved_data_payload()
+    actions <- paste(as.character(output$saved_data_actions), collapse = "")
+    stopifnot(
+      identical(payload$format, BASIC_SAVED_DATA_FORMAT),
+      nrow(payload$files) == 2L,
+      length(payload$results) == 2L,
+      identical(payload$files$years[payload$files$report_type == "monthly_site"], "2098, 2099"),
+      identical(
+        basic_saved_data_filename(payload$files, as.POSIXct("2026-10-31 12:00:00")),
+        "monash-sport-saved-data_2098-2099_2-files_saved-2026-10-31.rds"
+      ),
+      grepl("Will save 2 ready files", actions, fixed = TRUE),
+      grepl("Monthly Site Reports: 1 file (2098–2099)", actions, fixed = TRUE),
+      grepl("download_saved_data", actions, fixed = TRUE)
+    )
+
+    saveRDS(payload, saved_state$path)
+    saved_state$monthly_finance <- session$returned()$monthly_reports$finance
+    unlink(paths)
+  }
+)
+
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    load_file <- function(path, name = "saved.rds") {
+      session$setInputs(saved_data = data.frame(
+        name = name,
+        size = file.info(path)$size,
+        type = "application/octet-stream",
+        datapath = path,
+        stringsAsFactors = FALSE
+      ))
+      session$flushReact()
+      paste(as.character(output$saved_data_notice), collapse = "")
+    }
+
+    notice <- load_file(saved_state$path)
+    loaded <- session$returned()
+    stopifnot(
+      nrow(loaded$uploads) == 2L,
+      all(loaded$uploads$status == "ready"),
+      all(is.na(loaded$uploads$stored_path)),
+      all(grepl("Loaded from saved data", loaded$uploads$detail, fixed = TRUE)),
+      identical(loaded$monthly_reports$finance, saved_state$monthly_finance),
+      inherits(loaded$venues_reports, "venues_tracking_report_data"),
+      loaded$uploads$warning_count[loaded$uploads$report_type == "monthly_site"] == 1L,
+      grepl("Saved data loaded", notice, fixed = TRUE),
+      grepl("(today)", notice, fixed = TRUE),
+      grepl("Venues Tracking Reports: 1 file (2098)", notice, fixed = TRUE),
+      grepl("2099 Venues Tracking Report.xlsx", notice, fixed = TRUE),
+      grepl("Synthetic warning", paste(as.character(output$file_status), collapse = ""), fixed = TRUE)
+    )
+
+    # A newer upload of the same report replaces the saved copy.
+    path <- tempfile(fileext = ".xlsx")
+    writeBin(charToRaw("synthetic upload"), path)
+    session$setInputs(monthly_reports = data.frame(
+      name = "Monthly Site Report 2099.xlsx",
+      size = file.info(path)$size,
+      type = "application/octet-stream",
+      datapath = path,
+      stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    stopifnot(
+      nrow(uploads) == 2L,
+      !is.na(uploads$stored_path[uploads$report_type == "monthly_site"])
+    )
+
+    # Loading the same saved file again replaces the session copies.
+    notice <- load_file(saved_state$path)
+    stopifnot(
+      nrow(session$returned()$uploads) == 2L,
+      grepl("2 files already in this session", notice, fixed = TRUE)
+    )
+
+    # Loaded files can be removed like uploads.
+    venues_id <- session$returned()$uploads$file_id[
+      session$returned()$uploads$report_type == "venues_tracking"
+    ]
+    session$setInputs(remove_file = venues_id)
+    session$flushReact()
+    stopifnot(
+      nrow(session$returned()$uploads) == 1L,
+      is.null(session$returned()$venues_reports)
+    )
+
+    # Old saves are flagged; wrong, newer, older or damaged files are refused.
+    saved <- readRDS(saved_state$path)
+    variant <- function(change) {
+      path <- tempfile(fileext = ".rds")
+      saveRDS(change(saved), path)
+      path
+    }
+    stale <- load_file(variant(function(x) {
+      x$saved_at <- Sys.time() - 40 * 24 * 60 * 60
+      x
+    }))
+    stopifnot(
+      grepl("40 days ago", stale, fixed = TRUE),
+      grepl("more than 30 days old", stale, fixed = TRUE)
+    )
+
+    before <- session$returned()$uploads
+    not_rds <- tempfile(fileext = ".rds")
+    writeBin(charToRaw("not an rds file"), not_rds)
+    refusals <- list(
+      list(not_rds, "is not saved dashboard data"),
+      list(variant(function(x) list(a = 1)), "is not saved dashboard data"),
+      list(variant(function(x) { x$version <- BASIC_SAVED_DATA_VERSION + 1L; x }), "newer version"),
+      list(variant(function(x) { x$version <- BASIC_SAVED_DATA_VERSION - 1L; x }), "older version"),
+      list(variant(function(x) { x$results <- x$results[1L]; x }), "incomplete or damaged")
+    )
+    for (refusal in refusals) {
+      notice <- load_file(refusal[[1L]], "bad.rds")
+      stopifnot(
+        grepl("bad.rds was not loaded", notice, fixed = TRUE),
+        grepl(refusal[[2L]], notice, fixed = TRUE),
+        identical(session$returned()$uploads, before)
+      )
+    }
+    unlink(c(path, not_rds))
+  }
+)
+unlink(saved_state$path)
+
 cat("PASS test_basic_upload.R\n")

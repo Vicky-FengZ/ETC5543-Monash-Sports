@@ -386,6 +386,57 @@ body {
   color: #92400E;
 }
 
+.basic-upload-notice.is-error {
+  border-color: #FECACA;
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.basic-saved-data-card {
+  margin-bottom: 18px;
+}
+
+.basic-saved-data-card .basic-upload-all-header small {
+  font-weight: 400;
+}
+
+.basic-saved-data-column > strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.basic-saved-data-column .shiny-input-container {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.basic-saved-data-summary,
+.basic-saved-data-manifest ul {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+}
+
+.basic-saved-data-manifest {
+  margin-top: 8px;
+}
+
+.basic-saved-data-manifest details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.basic-saved-data-files {
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.basic-saved-data-caution {
+  display: block;
+  margin-top: 8px;
+  color: var(--ms-text-secondary);
+}
+
 .basic-session-note {
   display: flex;
   align-items: center;

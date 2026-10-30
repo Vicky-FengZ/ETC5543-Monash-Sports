@@ -33,3 +33,6 @@ _site/
 
 # Shinylive build logs
 deploy/*_log.txt
+
+# Saved dashboard data holds confidential figures
+monash-sport-saved-data*.rds
