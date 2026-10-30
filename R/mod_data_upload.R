@@ -1,9 +1,9 @@
 # -------------------------------------------------------------------------
 # Basic Data Upload module
 # -------------------------------------------------------------------------
-# This deliberately provides session-only upload, parsing progress and file
-# deletion. Persistent storage, user accounts, RDS caching and background
-# workers belong to the later advanced-upload branch.
+# Session-only upload, parsing progress and file deletion. Parsed data can be
+# saved to a file on the user's own computer and loaded again later (see
+# "Saved data" below); nothing is stored on a server.
 
 BASIC_UPLOAD_REPORT_TYPES <- c(
   monthly_site = "Monthly Site Reports",
@@ -90,6 +90,11 @@ basic_upload_script <- function() {
     var area = areaOf(input);
     area.querySelectorAll('.progress-bar').forEach(function (bar) { delete bar.dataset.uploadFailed; });
     setLocked(area, true);
+    if (input.closest('.basic-saved-data-card')) {
+      showBanner(area, 'busy', 'Loading saved data\u2026',
+        'Keep this page open. Other uploads are paused until this finishes.');
+      return;
+    }
     showBanner(area, 'busy',
       'Uploading and parsing ' + count + (count === 1 ? ' file' : ' files') + '\u2026',
       'Keep this page open. Other uploads are paused until this finishes; ' +
@@ -124,6 +129,13 @@ basic_upload_script <- function() {
     document.addEventListener('DOMContentLoaded', watchAreas);
   } else {
     watchAreas();
+  }
+
+  // The browser's UTC offset, so saved-data dates follow the user's clock.
+  if (window.jQuery) {
+    jQuery(document).on('shiny:connected', function () {
+      Shiny.setInputValue('monash_client_utc_offset', new Date().getTimezoneOffset());
+    });
   }
 
   if (window.Shiny && Shiny.addCustomMessageHandler) {
@@ -200,6 +212,257 @@ basic_upload_parsers <- function() {
       attach_basic_upload_sheet_order(result, path)
     }
   )
+}
+
+
+# Saved data --------------------------------------------------------------
+# "Save current data" writes the cleaned results of every ready file to one
+# .rds file on the user's computer; "Load saved data" restores them without
+# reading the Excel workbooks again. The file carries a manifest (source
+# files, report years, save date) so its contents can be checked on load.
+
+BASIC_SAVED_DATA_FORMAT <- "monash-sport-saved-data"
+
+# Increase this when the cleaned tables produced by the importers change
+# shape. Files saved by another version are then refused with a clear
+# message instead of breaking the dashboard pages.
+BASIC_SAVED_DATA_VERSION <- 1L
+
+# Saved data older than this is flagged as possibly out of date.
+BASIC_SAVED_DATA_STALE_DAYS <- 30L
+
+BASIC_UPLOAD_RESULT_CLASSES <- c(
+  monthly_site = "monthly_site_report_data",
+  site_detail = "business_unit_template_report_data",
+  venues_tracking = "venues_tracking_report_data"
+)
+
+
+# Reporting years in a parsed result, from its report_year columns, or from
+# a four-digit year in the file name when the tables do not carry one.
+basic_saved_result_years <- function(result, file_name = NA_character_) {
+  tables <- Filter(is.data.frame, unclass(result))
+  years <- unlist(lapply(tables, function(table) {
+    if ("report_year" %in% names(table)) {
+      suppressWarnings(as.integer(as.character(table$report_year)))
+    }
+  }), use.names = FALSE)
+  years <- sort(unique(years[!is.na(years)]))
+
+  if (length(years) == 0L && !is.na(file_name)) {
+    match <- regmatches(file_name, regexpr("(19|20)[0-9]{2}", file_name))
+    years <- suppressWarnings(as.integer(match))
+  }
+
+  years
+}
+
+
+# Compact year list: 2021-2025, or 2021-2022, 2025 when years are missing.
+format_basic_year_span <- function(years, dash = "–", join = ", ") {
+  years <- sort(unique(suppressWarnings(as.integer(unlist(years)))))
+  years <- years[!is.na(years)]
+
+  if (length(years) == 0L) {
+    return("")
+  }
+
+  ends <- c(which(diff(years) != 1L), length(years))
+  starts <- c(1L, utils::head(ends, -1L) + 1L)
+  paste(
+    ifelse(
+      starts == ends,
+      years[starts],
+      paste0(years[starts], dash, years[ends])
+    ),
+    collapse = join
+  )
+}
+
+
+basic_saved_data_file_table <- function(rows, results) {
+  data.frame(
+    original_name = as.character(rows$original_name),
+    report_type = as.character(rows$report_type),
+    years = vapply(
+      seq_len(nrow(rows)),
+      function(index) {
+        paste(
+          basic_saved_result_years(results[[index]], rows$original_name[[index]]),
+          collapse = ", "
+        )
+      },
+      character(1)
+    ),
+    size = as.numeric(rows$size),
+    warning_count = as.integer(rows$warning_count),
+    detail = as.character(rows$detail),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+# Files and years per report type, in the dashboard's report-type order.
+basic_saved_data_summary <- function(files) {
+  types <- intersect(names(BASIC_UPLOAD_REPORT_TYPES), unique(files$report_type))
+
+  data.frame(
+    report_type = types,
+    label = unname(BASIC_UPLOAD_REPORT_TYPES[types]),
+    files = vapply(types, function(type) sum(files$report_type == type), integer(1)),
+    years = vapply(
+      types,
+      function(type) {
+        format_basic_year_span(strsplit(
+          files$years[files$report_type == type],
+          ",[[:space:]]*"
+        ))
+      },
+      character(1)
+    ),
+    stringsAsFactors = FALSE,
+    row.names = NULL
+  )
+}
+
+
+basic_saved_data_summary_text <- function(files) {
+  summary <- basic_saved_data_summary(files)
+  paste0(
+    summary$label, ": ", summary$files,
+    ifelse(summary$files == 1L, " file", " files"),
+    ifelse(nzchar(summary$years), paste0(" (", summary$years, ")"), "")
+  )
+}
+
+
+# e.g. monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds
+basic_saved_data_filename <- function(files, saved_at = Sys.time(), utc_offset = NULL) {
+  years <- format_basic_year_span(
+    strsplit(files$years, ",[[:space:]]*"),
+    dash = "-",
+    join = "+"
+  )
+  count <- nrow(files)
+
+  paste0(
+    "monash-sport-saved-data_",
+    if (nzchar(years)) paste0(years, "_"),
+    count, if (count == 1L) "-file" else "-files",
+    "_saved-", format(basic_saved_local_date(saved_at, utc_offset), "%Y-%m-%d"),
+    ".rds"
+  )
+}
+
+
+# Everything needed to restore the ready files: cleaned results, warning
+# notes and a manifest. Raw workbooks are never included.
+build_basic_saved_data <- function(rows, results, warnings, saved_at = Sys.time()) {
+  ready <- rows$status == "ready" & rows$file_id %in% names(results)
+  rows <- rows[ready, , drop = FALSE]
+  ordered_results <- unname(results[rows$file_id])
+
+  list(
+    format = BASIC_SAVED_DATA_FORMAT,
+    version = BASIC_SAVED_DATA_VERSION,
+    saved_at = saved_at,
+    files = basic_saved_data_file_table(rows, ordered_results),
+    results = ordered_results,
+    warnings = lapply(rows$file_id, function(file_id) warnings[[file_id]])
+  )
+}
+
+
+# Calendar date of a time on the user's clock. The browser version of R runs
+# in UTC, so the browser's UTC offset (minutes, as from JavaScript's
+# getTimezoneOffset()) is applied when it is known.
+basic_saved_local_date <- function(time, utc_offset = NULL) {
+  if (inherits(time, "Date")) {
+    return(time)
+  }
+  offset <- suppressWarnings(as.numeric(utc_offset))
+  if (length(offset) == 1L && !is.na(offset)) {
+    return(as.Date(format(time - offset * 60, "%Y-%m-%d", tz = "UTC")))
+  }
+  as.Date(format(time, "%Y-%m-%d"))
+}
+
+
+basic_saved_data_days_old <- function(saved_at, today = Sys.time(), utc_offset = NULL) {
+  as.integer(
+    basic_saved_local_date(today, utc_offset) -
+      basic_saved_local_date(saved_at, utc_offset)
+  )
+}
+
+
+# Reads and checks a saved-data file. Stops with a message written for the
+# person who chose the file.
+read_basic_saved_data <- function(path) {
+  not_saved_data <- paste(
+    "This file is not saved dashboard data. Choose a .rds file created",
+    "with \"Save current data\"."
+  )
+  saved <- tryCatch(readRDS(path), error = function(error) NULL)
+
+  if (!is.list(saved) || !identical(saved$format, BASIC_SAVED_DATA_FORMAT)) {
+    stop(not_saved_data, call. = FALSE)
+  }
+
+  version <- suppressWarnings(as.integer(saved$version))
+  saved_on <- tryCatch(
+    format(basic_saved_local_date(saved$saved_at), "%d %b %Y"),
+    error = function(error) "an unknown date"
+  )
+
+  if (length(version) != 1L || is.na(version)) {
+    stop(not_saved_data, call. = FALSE)
+  }
+  if (version > BASIC_SAVED_DATA_VERSION) {
+    stop(
+      "This file was saved by a newer version of the dashboard. Reload the ",
+      "page to get the latest version, then load the file again.",
+      call. = FALSE
+    )
+  }
+  if (version < BASIC_SAVED_DATA_VERSION) {
+    stop(
+      "This file was saved on ", saved_on, " by an older version of the ",
+      "dashboard, and its cleaned tables no longer match this version. ",
+      "Upload the original Excel reports again, then save a new copy.",
+      call. = FALSE
+    )
+  }
+
+  files <- saved$files
+  required <- c("original_name", "report_type", "years", "size", "warning_count")
+  complete <- is.data.frame(files) &&
+    all(required %in% names(files)) &&
+    all(files$report_type %in% names(BASIC_UPLOAD_RESULT_CLASSES)) &&
+    is.list(saved$results) &&
+    length(saved$results) == nrow(files) &&
+    length(saved$warnings) == nrow(files) &&
+    inherits(saved$saved_at, c("POSIXct", "Date")) &&
+    all(vapply(
+      seq_len(nrow(files)),
+      function(index) {
+        inherits(
+          saved$results[[index]],
+          BASIC_UPLOAD_RESULT_CLASSES[[files$report_type[[index]]]]
+        )
+      },
+      logical(1)
+    ))
+
+  if (!isTRUE(complete)) {
+    stop(
+      "This saved file is incomplete or damaged, so nothing was loaded. ",
+      "Upload the original Excel reports instead.",
+      call. = FALSE
+    )
+  }
+
+  saved
 }
 
 
@@ -1573,7 +1836,8 @@ mod_data_upload_ui <- function(id) {
                 tags$small(
                   paste(
                     "Refreshing or closing the dashboard clears these uploads.",
-                    "Your original Excel files are never modified."
+                    "Use Save current data to keep the cleaned data on your",
+                    "computer. Your original Excel files are never modified."
                   )
                 )
               )
@@ -1587,6 +1851,50 @@ mod_data_upload_ui <- function(id) {
                 role = "status",
                 `aria-live` = "polite",
                 hidden = NA
+              ),
+              card(
+                class = "basic-saved-data-card",
+                card_header(
+                  div(
+                    class = "basic-upload-all-header",
+                    tags$strong("Saved data"),
+                    tags$small(
+                      class = "text-secondary",
+                      "Skip re-reading the Excel reports next time"
+                    )
+                  )
+                ),
+                card_body(
+                  layout_columns(
+                    div(
+                      class = "basic-saved-data-column",
+                      tags$strong("Load saved data"),
+                      p(
+                        class = "basic-upload-description",
+                        paste(
+                          "Open a file made with Save current data. Its reports",
+                          "appear below in seconds, and you can still add newer",
+                          "reports on top."
+                        )
+                      ),
+                      fileInput(
+                        ns("saved_data"),
+                        label = NULL,
+                        multiple = FALSE,
+                        accept = ".rds",
+                        buttonLabel = "Choose saved file",
+                        placeholder = "No file selected"
+                      ),
+                      uiOutput(ns("saved_data_notice"))
+                    ),
+                    div(
+                      class = "basic-saved-data-column",
+                      tags$strong("Save current data"),
+                      uiOutput(ns("saved_data_actions"))
+                    ),
+                    col_widths = breakpoints(sm = c(12, 12), lg = c(6, 6))
+                  )
+                )
               ),
               card(
                 class = "basic-upload-all-card",
@@ -2234,6 +2542,255 @@ mod_data_upload_server <- function(
         input$all_reports_folder,
         process_all_reports(input$all_reports_folder),
         ignoreInit = TRUE
+      )
+
+      # Saved data ------------------------------------------------------
+
+      saved_data_notice <- reactiveVal(NULL)
+
+      client_utc_offset <- function() {
+        root <- tryCatch(session$rootScope(), error = function(error) NULL)
+        if (is.null(root)) NULL else root$input$monash_client_utc_offset
+      }
+
+      load_saved_data <- function(upload_info) {
+        on.exit(finish_upload(), add = TRUE)
+        upload_notice(NULL)
+
+        if (!is.data.frame(upload_info) || nrow(upload_info) == 0L) {
+          return(invisible(NULL))
+        }
+
+        saved <- tryCatch(
+          read_basic_saved_data(upload_info$datapath[[1L]]),
+          error = identity
+        )
+        if (inherits(saved, "error")) {
+          saved_data_notice(list(
+            error = conditionMessage(saved),
+            file_name = as.character(upload_info$name[[1L]])
+          ))
+          return(invisible(NULL))
+        }
+
+        files <- saved$files
+        now_key <- format(Sys.time(), "%Y%m%d%H%M%OS6")
+        file_ids <- paste(
+          "saved",
+          now_key,
+          seq_len(nrow(files)),
+          sample.int(999999L, nrow(files), replace = TRUE),
+          sep = "-"
+        )
+
+        # A saved file replaces a file of the same name and type that is
+        # already in the session, as a fresh upload would.
+        current <- registry()
+        current_keys <- paste(
+          current$report_type,
+          tolower(trimws(current$original_name))
+        )
+        saved_keys <- paste(files$report_type, tolower(trimws(files$original_name)))
+        replaced_ids <- current$file_id[current_keys %in% saved_keys]
+        remove_session_files(replaced_ids)
+
+        saved_on <- format(
+          basic_saved_local_date(saved$saved_at, client_utc_offset()),
+          "%d %b %Y"
+        )
+        new_rows <- data.frame(
+          file_id = file_ids,
+          report_type = files$report_type,
+          original_name = files$original_name,
+          stored_path = NA_character_,
+          size = as.numeric(files$size),
+          status = "ready",
+          progress = 1,
+          detail = paste("Loaded from saved data (saved", paste0(saved_on, ")")),
+          warning_count = as.integer(files$warning_count),
+          error_message = NA_character_,
+          stringsAsFactors = FALSE
+        )
+        registry(rbind(registry(), new_rows))
+
+        results <- parsed_results()
+        results[file_ids] <- saved$results
+        parsed_results(results)
+
+        notes <- warning_details()
+        for (index in seq_along(file_ids)) {
+          if (!is.null(saved$warnings[[index]])) {
+            notes[[file_ids[[index]]]] <- saved$warnings[[index]]
+          }
+        }
+        warning_details(notes)
+
+        saved_data_notice(list(
+          file_name = as.character(upload_info$name[[1L]]),
+          saved_at = saved$saved_at,
+          files = files,
+          replaced = length(replaced_ids)
+        ))
+        invisible(NULL)
+      }
+
+      observeEvent(
+        input$saved_data,
+        load_saved_data(input$saved_data),
+        ignoreInit = TRUE
+      )
+
+      saved_data_payload <- reactive({
+        build_basic_saved_data(registry(), parsed_results(), warning_details())
+      })
+
+      output$saved_data_notice <- renderUI({
+        notice <- saved_data_notice()
+
+        if (is.null(notice)) {
+          return(NULL)
+        }
+
+        if (!is.null(notice$error)) {
+          return(div(
+            class = "basic-upload-notice is-error",
+            role = "alert",
+            bs_icon("x-circle"),
+            div(
+              tags$strong(paste(notice$file_name, "was not loaded.")),
+              p(notice$error)
+            )
+          ))
+        }
+
+        offset <- client_utc_offset()
+        days_old <- basic_saved_data_days_old(notice$saved_at, utc_offset = offset)
+        age <- if (days_old <= 0L) {
+          "today"
+        } else if (days_old == 1L) {
+          "1 day ago"
+        } else {
+          paste(days_old, "days ago")
+        }
+        stale <- days_old > BASIC_SAVED_DATA_STALE_DAYS
+        files <- notice$files
+
+        div(
+          class = paste(
+            "basic-upload-notice basic-saved-data-manifest",
+            if (stale) "is-warning" else "is-success"
+          ),
+          role = "status",
+          bs_icon(if (stale) "exclamation-triangle" else "check2-circle"),
+          div(
+            tags$strong(paste0(
+              "Saved data loaded · saved on ",
+              format(basic_saved_local_date(notice$saved_at, offset), "%d %b %Y"),
+              " (", age, ")"
+            )),
+            tags$ul(lapply(basic_saved_data_summary_text(files), tags$li)),
+            if (stale) {
+              p(paste0(
+                "This data is more than ", BASIC_SAVED_DATA_STALE_DAYS,
+                " days old. Reports updated since then are not included; ",
+                "upload the newer reports to replace them, then save again."
+              ))
+            },
+            if (notice$replaced > 0L) {
+              p(paste0(
+                notice$replaced,
+                if (notice$replaced == 1L) " file" else " files",
+                " already in this session had the same name and",
+                " were replaced by the saved copy."
+              ))
+            },
+            tags$details(
+              tags$summary(paste0(
+                "Show the ", nrow(files), " source ",
+                if (nrow(files) == 1L) "file" else "files"
+              )),
+              tags$ul(
+                class = "basic-saved-data-files",
+                lapply(order(files$report_type, files$original_name), function(index) {
+                  tags$li(files$original_name[[index]])
+                })
+              )
+            ),
+            tags$small(class = "text-secondary", paste("From", notice$file_name))
+          )
+        )
+      })
+
+      output$saved_data_actions <- renderUI({
+        files <- saved_data_payload()$files
+        pending <- sum(registry()$status %in% c("queued", "parsing"))
+
+        if (nrow(files) == 0L) {
+          return(tagList(
+            p(
+              class = "basic-upload-description",
+              paste(
+                "Upload or load reports first. Saving keeps the cleaned data",
+                "of every ready file in one small file on your computer."
+              )
+            ),
+            tags$button(
+              type = "button",
+              class = "btn btn-outline-secondary",
+              disabled = "disabled",
+              bs_icon("download"),
+              "Save current data"
+            )
+          ))
+        }
+
+        tagList(
+          p(
+            class = "basic-upload-description",
+            paste0(
+              "Will save ", nrow(files),
+              if (nrow(files) == 1L) " ready file" else " ready files",
+              ". The file name shows the years, file count and save date."
+            )
+          ),
+          tags$ul(
+            class = "basic-saved-data-summary",
+            lapply(basic_saved_data_summary_text(files), tags$li)
+          ),
+          if (pending > 0L) {
+            p(class = "basic-upload-description", "Files still parsing are not included.")
+          },
+          downloadButton(
+            session$ns("download_saved_data"),
+            "Save current data",
+            icon = bs_icon("download"),
+            class = "btn btn-primary"
+          ),
+          tags$small(
+            class = "basic-saved-data-caution",
+            paste(
+              "The saved file holds the same confidential figures as the",
+              "reports. Keep it where the original reports are stored and do",
+              "not email or share it outside the team."
+            )
+          )
+        )
+      })
+
+      output$download_saved_data <- downloadHandler(
+        filename = function() {
+          basic_saved_data_filename(
+            saved_data_payload()$files,
+            utc_offset = client_utc_offset()
+          )
+        },
+        content = function(file) {
+          payload <- saved_data_payload()
+          shiny::req(nrow(payload$files) > 0L)
+          payload$saved_at <- Sys.time()
+          saveRDS(payload, file)
+        },
+        contentType = "application/octet-stream"
       )
 
       output$upload_notice <- renderUI({

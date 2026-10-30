@@ -104,6 +104,31 @@ Close the workbooks in Excel before uploading. Uploads last only for the
 current session: closing or refreshing the dashboard clears them, and your
 original files are never changed.
 
+### Save the parsed data for next time
+
+Parsing all the reports takes a few minutes in the browser. To skip it next
+time:
+
+1. After the files show `ready`, select **Save current data** in the
+   **Saved data** card. The card first lists what will be saved (files and
+   years per report type).
+2. Keep the downloaded file in the shared report folder, next to the reports.
+   Its name says what it holds, for example
+   `monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds`
+   (years, number of files, save date). Do not rename it to something vague.
+3. Next time, select **Choose saved file** under **Load saved data** and pick
+   that file. The dashboard is ready in a few seconds, and a summary shows the
+   save date, the files and years for each report type, and the full list of
+   source files.
+4. If a report has changed since, upload the new version as usual; it replaces
+   the saved copy of the same file name. Then save again and delete the older
+   saved file, so the folder holds one up-to-date copy.
+
+The summary turns amber when the saved data is more than 30 days old, as a
+reminder to check for newer reports. If the dashboard has been updated in a
+way that changes its cleaned tables, an older saved file is refused with a
+message; upload the reports again and save a new copy.
+
 ## 4. Add a new month or year
 
 - **New month:** save the updated Monthly Site Report over the year's existing
@@ -125,6 +150,9 @@ report must keep.
   to a server, including GitHub.
 - Uploads last only while the page is open. Closing or refreshing the page
   removes them.
+- A saved data file (`.rds`) contains the same confidential figures as the
+  reports. Store it only in the restricted report folder; do not email it,
+  share it outside the team or add it to Git.
 - When the dashboard runs from RStudio, uploaded files are copied only to a
   temporary folder on that computer and removed when the session ends.
 

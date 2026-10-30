@@ -187,6 +187,32 @@ fails, the previous ready file and its dashboard data stay available.
 Use the remove button beside a status row to delete the temporary upload and
 its parsed result. Your original Excel file stays unchanged.
 
+### Saving and loading parsed data
+
+Parsing every workbook takes several minutes in the browser version, so the
+**Saved data** card at the top of Upload & Manage can keep the result:
+
+- **Save current data** downloads one `.rds` file with the cleaned tables,
+  warning notes and a manifest for every `ready` file. Raw workbooks are not
+  included. Before saving, the card lists what will be saved, and the file
+  name records the years, file count and save date, for example
+  `monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds`.
+- **Load saved data** restores those files in a few seconds without reading
+  the workbooks again. A summary then shows when the data was saved, the
+  files and years per report family, and the list of source files; data saved
+  more than 30 days ago is flagged as possibly out of date.
+- Loaded files behave like uploads: newer workbooks with the same name
+  replace them, they can be removed, and the session can be saved again.
+
+Files that are not saved dashboard data, are damaged, or were saved by a
+different version of the cleaned tables are refused with a message, and the
+current session is left unchanged. When the importers change the shape of
+their output, increase `BASIC_SAVED_DATA_VERSION` in `R/mod_data_upload.R`
+so older saved files ask for the workbooks to be uploaded again.
+
+The saved file contains the same confidential figures as the reports. Store
+it where the reports are kept and never commit it to this repository.
+
 ### Viewing cleaned data
 
 Open **View Cleaned Data** and select the report family. The preview supports:
@@ -277,9 +303,8 @@ the specific extension boundaries for each worksheet.
 ### Session scope
 
 Uploads last only for the current session. Refreshing or closing the dashboard
-clears the temporary files and parsed results. Persistent per-user storage,
-cached RDS files and background import workers are planned for a later
-deployment stage.
+clears the temporary files and parsed results; use **Save current data** to
+keep the cleaned data on your own computer. Nothing is stored on a server.
 
 ## Data architecture
 
@@ -574,10 +599,17 @@ them; see section 6 of the [user guide](docs/user_guide.md).
 
 ## Performance and website deployment
 
-The dashboard runs as a Shiny application. The browser displays HTML, while
-an R process on the server handles data import, validation, uploads and
-predictions. A static HTML export could include precalculated results. On its
-own, it would not support the server-side upload and forecasting workflow.
+The live dashboard is a [Shinylive](https://posit-dev.github.io/r-shinylive/)
+export: R runs inside the browser through WebAssembly, so GitHub Pages only
+serves the code and uploaded reports never leave the user's computer. The
+first visit downloads R and the packages (about 30 seconds); later visits use
+the browser cache.
+
+Browser R runs on a single thread and is several times slower than desktop
+R, so parsing a full set of reports takes a few minutes. The importers cache
+each worksheet's cell values and build tables in one step to keep this short,
+and **Save current data** lets users skip parsing on later visits. Run the
+app from RStudio for the fastest parsing.
 
 ## Licence
 
