@@ -11,15 +11,6 @@ format:
     embed-resources: true
 ---
 
-```{r}
-#| label: load-packages
-#| include: false
-library(knitr)
-library(ggplot2)
-library(dplyr)
-options(width = 70)
-```
-
 ## About Monash Sport
 
 <!-- Presenter: Ayush -->
