@@ -97,7 +97,9 @@ prepare_forecast_history <- function(
         rows <- rows[organisation, , drop = FALSE]
       } else {
         rows <- rows[!organisation & !is.na(rows$site), , drop = FALSE]
-        notes <- c(notes, paste(year, "uses the sum of available site summaries; confirm site coverage."))
+        notes <- c(notes, paste(
+          year, "uses the sum of available site summaries; confirm site coverage."
+        ))
       }
     } else {
       rows <- rows[rows$site %in% site, , drop = FALSE]
@@ -130,7 +132,10 @@ prepare_forecast_history <- function(
   if (!any(complete)) return(fail("Income and Expenses must both be present for a month."))
   last_complete <- max(which(complete))
   if (last_complete < nrow(history)) {
-    notes <- c(notes, "Incomplete final months were excluded. The forecast starts after the last complete month.")
+    notes <- c(notes, paste(
+      "Incomplete final months were excluded.",
+      "The forecast starts after the last complete month."
+    ))
     history <- history[seq_len(last_complete), , drop = FALSE]
     complete <- complete[seq_len(last_complete)]
   }
@@ -140,29 +145,47 @@ prepare_forecast_history <- function(
   if (trailing_zeros > 0L) {
     if (!isTRUE(include_trailing_zeros)) {
       if (!length(last_nonzero)) {
-        return(fail("All reported months are zero. Check the final zero months in More options before forecasting."))
+        return(fail(paste(
+          "All reported months are zero.",
+          "Check the final zero months in More options before forecasting."
+        )))
       }
       history <- history[seq_len(max(last_nonzero)), , drop = FALSE]
       complete <- complete[seq_len(max(last_nonzero))]
-      notes <- c(notes, paste(trailing_zeros, "final all-zero month(s) excluded until confirmed as actuals."))
+      notes <- c(notes, paste(
+        trailing_zeros, "final all-zero month(s) excluded until confirmed as actuals."
+      ))
     } else {
-      notes <- c(notes, paste(trailing_zeros, "final all-zero month(s) included as confirmed actuals."))
+      notes <- c(notes, paste(
+        trailing_zeros, "final all-zero month(s) included as confirmed actuals."
+      ))
     }
   }
   last_missing <- if (any(!complete)) max(which(!complete)) else 0L
   training <- history[seq.int(last_missing + 1L, nrow(history)), , drop = FALSE]
   if (last_missing > 0L) {
-    notes <- c(notes, paste("A gap or missing value was found. Only the latest",
-                           nrow(training), "continuous months are used for modelling; no gap is filled."))
+    notes <- c(notes, paste(
+      "A gap or missing value was found. Only the latest", nrow(training),
+      "continuous months are used for modelling; no gap is filled."
+    ))
   }
   if (any(training$income < 0 | training$expenses < 0)) {
-    return(fail("Negative monthly totals were found. Review refunds or accounting adjustments before using this planning model."))
+    return(fail(paste(
+      "Negative monthly totals were found.",
+      "Review refunds or accounting adjustments before using this planning model."
+    )))
   }
   if (nrow(training) < 24L) {
-    notes <- c(notes, "Less than two continuous years: use the baseline as a provisional planning reference.")
+    notes <- c(notes, paste(
+      "Less than two continuous years:",
+      "use the baseline as a provisional planning reference."
+    ))
   }
   if (is.data.frame(reports$validation) && any(reports$validation$level %in% "warning")) {
-    notes <- c(notes, "Uploaded reports have validation warnings. Review them in Data before making planning decisions.")
+    notes <- c(notes, paste(
+      "Uploaded reports have validation warnings.",
+      "Review them in Data before making planning decisions."
+    ))
   }
   list(history = history, training = training, notes = unique(notes), error = NULL,
        excluded_months = if (include_trailing_zeros) 0L else trailing_zeros,
@@ -173,7 +196,9 @@ prepare_forecast_history <- function(
 # Intervals are monthly model intervals, conditional on historical dynamics.
 forecast_model_predict <- function(y, horizon, method, intervals = TRUE) {
   n <- length(y)
-  if (n < 12L || any(!is.finite(y))) stop("At least 12 continuous months are required.", call. = FALSE)
+  if (n < 12L || any(!is.finite(y))) {
+    stop("At least 12 continuous months are required.", call. = FALSE)
+  }
   step <- seq_len(horizon)
   lower80 <- upper80 <- lower95 <- upper95 <- rep(NA_real_, horizon)
   if (method == "holt_winters") {
@@ -223,8 +248,10 @@ backtest_forecast_models <- function(y, horizon) {
   origins <- tail(seq.int(initial, n - test_horizon), 12L)
   results <- lapply(models, function(method) {
     errors <- lapply(origins, function(origin) {
-      prediction <- tryCatch(forecast_model_predict(y[seq_len(origin)], test_horizon, method, FALSE),
-                             error = function(e) NULL)
+      prediction <- tryCatch(
+        forecast_model_predict(y[seq_len(origin)], test_horizon, method, FALSE),
+        error = function(e) NULL
+      )
       if (is.null(prediction)) return(NULL)
       y[origin + seq_len(test_horizon)] - prediction$baseline
     })
@@ -247,8 +274,12 @@ fit_finance_forecasts <- function(prepared, horizon = 12L, method = "auto") {
   if (!is.null(prepared$error)) return(fail(prepared$error))
   if (!horizon %in% c(3L, 6L, 12L)) return(fail("Choose a 3, 6 or 12 month forecast horizon."))
   training <- prepared$training
-  if (nrow(training) < 12L) return(fail("At least 12 continuous months of Income and Expenses are required."))
-  if (!method %in% c("auto", names(FORECAST_MODEL_NAMES))) return(fail("Choose a supported forecast model."))
+  if (nrow(training) < 12L) {
+    return(fail("At least 12 continuous months of Income and Expenses are required."))
+  }
+  if (!method %in% c("auto", names(FORECAST_MODEL_NAMES))) {
+    return(fail("Choose a supported forecast model."))
+  }
   dates <- forecast_future_dates(tail(training$date, 1L), horizon)
   scores <- list()
   tables <- list()
@@ -269,10 +300,16 @@ fit_finance_forecasts <- function(prepared, horizon = 12L, method = "auto") {
       validation$selected <- validation$method == chosen
       scores[[metric]] <- validation
     } else {
-      notes <- c(notes, "Too little continuous history for rolling-origin testing; no accuracy claim is made.")
+      notes <- c(notes, paste(
+        "Too little continuous history for rolling-origin testing;",
+        "no accuracy claim is made."
+      ))
     }
     if (all(is.na(prediction$lower80))) {
-      notes <- c(notes, "Prediction intervals are unavailable for a measure with insufficient residual history.")
+      notes <- c(notes, paste(
+        "Prediction intervals are unavailable for a measure",
+        "with insufficient residual history."
+      ))
     }
   }
   list(error = NULL, forecast = do.call(rbind, tables),
@@ -281,7 +318,8 @@ fit_finance_forecasts <- function(prepared, horizon = 12L, method = "auto") {
 }
 
 forecast_check_number <- function(value, name, minimum = -Inf, maximum = Inf) {
-  if (!is.numeric(value) || length(value) != 1L || !is.finite(value) || value < minimum || value > maximum) {
+  if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
+      value < minimum || value > maximum) {
     stop(paste(name, "must be a number between", minimum, "and", maximum), call. = FALSE)
   }
   as.numeric(value)
@@ -292,12 +330,18 @@ prepare_casual_wage_history <- function(
 ) {
   empty <- data.frame(date = as.Date(character()), value = double())
   zero_months <- as.Date(character())
-  fail <- function(message) list(error = message, history = empty, training = empty,
-                                notes = character(), sources = character(), zero_months = zero_months)
+  fail <- function(message) {
+    list(error = message, history = empty, training = empty, notes = character(),
+         sources = character(), zero_months = zero_months)
+  }
   x <- reports$casual_wages
   required <- c("date", "report_year", "period_type", "metric", "value", "is_reported")
   if (!is.data.frame(x) || !nrow(x) || !all(required %in% names(x))) {
-    return(fail("Upload Venues Tracking Reports for the quick pay-rise estimate, or switch to Manual adjustment. Price-only planning still works with a zero quick pay rise."))
+    return(fail(paste(
+      "Upload Venues Tracking Reports for the quick pay-rise estimate,",
+      "or switch to Manual adjustment.",
+      "Price-only planning still works with a zero quick pay rise."
+    )))
   }
   x <- x[x$period_type %in% "Month" & x$metric %in% "Actual" & !is.na(x$date), , drop = FALSE]
   x$date <- as.Date(x$date)
@@ -310,8 +354,15 @@ prepare_casual_wage_history <- function(
   if (!is.null(from_year) && length(from_year) == 1L && is.finite(from_year)) {
     x <- x[x$report_year >= from_year, , drop = FALSE]
   }
-  if (!nrow(x)) return(fail("No casual wage actuals are available before this forecast period."))
-  if (anyDuplicated(x$date)) return(fail("Overlapping casual wage months were found. Remove the duplicate Venues upload."))
+  if (!nrow(x)) {
+    return(fail("No casual wage actuals are available before this forecast period."))
+  }
+  if (anyDuplicated(x$date)) {
+    return(fail(paste(
+      "Overlapping casual wage months were found.",
+      "Remove the duplicate Venues upload."
+    )))
+  }
   x$value <- suppressWarnings(as.numeric(x$value))
   x$value[!x$is_reported %in% TRUE | !is.finite(x$value)] <- NA_real_
   history <- merge(data.frame(date = seq(min(x$date), max(x$date), by = "month")),
@@ -321,26 +372,58 @@ prepare_casual_wage_history <- function(
   notes <- character()
   last <- max(which(complete))
   if (last < nrow(history)) {
-    notes <- c(notes, "Unreported final wage months are excluded, not treated as zero or as a complete annual total.")
+    notes <- c(notes, paste(
+      "Unreported final wage months are excluded,",
+      "not treated as zero or as a complete annual total."
+    ))
     history <- history[seq_len(last), , drop = FALSE]
     complete <- complete[seq_len(last)]
   }
   zero_months <- forecast_final_zero_months(history, "value")
   if (!include_trailing_zeros && length(zero_months)) {
     nonzero <- which(complete & history$value != 0)
-    if (!length(nonzero)) return(fail("All reported casual wages are zero. Confirm the final zero months in More options first."))
+    if (!length(nonzero)) {
+      return(fail(paste(
+        "All reported casual wages are zero.",
+        "Confirm the final zero months in More options first."
+      )))
+    }
     last <- max(nonzero)
-    notes <- c(notes, "Final zero wage months are excluded until confirmed as actuals in More options.")
+    notes <- c(notes, paste(
+      "Final zero wage months are excluded",
+      "until confirmed as actuals in More options."
+    ))
     history <- history[seq_len(last), , drop = FALSE]
     complete <- complete[seq_len(last)]
   }
   last_missing <- if (any(!complete)) max(which(!complete)) else 0L
   training <- history[seq.int(last_missing + 1L, nrow(history)), , drop = FALSE]
-  if (any(training$value < 0)) return(fail("Negative casual wages need review before they can be used as a cost baseline."))
-  if (nrow(training) < 12L) return(fail("At least 12 continuous months of reported casual wages are needed for an automatic wage baseline."))
-  if (last_missing > 0L) notes <- c(notes, "Only the latest continuous wage history is modelled; missing months are not filled.")
-  if (nrow(training) < 24L) notes <- c(notes, "The casual wage baseline has less than two continuous years and is provisional.")
-  sources <- if ("source_file" %in% names(x)) unique(as.character(x$source_file[x$date %in% training$date])) else character()
+  if (any(training$value < 0)) {
+    return(fail("Negative casual wages need review before they can be used as a cost baseline."))
+  }
+  if (nrow(training) < 12L) {
+    return(fail(paste(
+      "At least 12 continuous months of reported casual wages are needed",
+      "for an automatic wage baseline."
+    )))
+  }
+  if (last_missing > 0L) {
+    notes <- c(notes, paste(
+      "Only the latest continuous wage history is modelled;",
+      "missing months are not filled."
+    ))
+  }
+  if (nrow(training) < 24L) {
+    notes <- c(notes, paste(
+      "The casual wage baseline has less than two continuous years",
+      "and is provisional."
+    ))
+  }
+  sources <- if ("source_file" %in% names(x)) {
+    unique(as.character(x$source_file[x$date %in% training$date]))
+  } else {
+    character()
+  }
   list(error = NULL, history = history, training = training, notes = notes,
        sources = sources, zero_months = zero_months)
 }
@@ -365,26 +448,47 @@ prepare_casual_wage_baseline <- function(
     return(fail("Casual wage actuals must stop before the forecast period."))
   }
   prepared <- prepare_casual_wage_history(reports, cutoff, from_year, include_trailing_zeros)
-  if (!is.null(prepared$error)) return(c(prepared, list(forecast = data.frame(), scores = data.frame(), model = character())))
+  if (!is.null(prepared$error)) {
+    return(c(prepared, list(forecast = data.frame(), scores = data.frame(), model = character())))
+  }
   history <- prepared$history
   training <- prepared$training
   notes <- prepared$notes
   prediction_dates <- seq(tail(training$date, 1L), max(dates), by = "month")[-1L]
-  if (!length(prediction_dates) || length(prediction_dates) > 24L || !all(dates %in% prediction_dates)) {
-    return(fail("Casual wage actuals are too old for this planning period. Upload more recent Venues reports or switch to Manual adjustment."))
+  if (!length(prediction_dates) || length(prediction_dates) > 24L ||
+      !all(dates %in% prediction_dates)) {
+    return(fail(paste(
+      "Casual wage actuals are too old for this planning period.",
+      "Upload more recent Venues reports or switch to Manual adjustment."
+    )))
   }
-  if (!method %in% c("auto", names(FORECAST_MODEL_NAMES))) return(fail("Choose a supported casual wage model."))
+  if (!method %in% c("auto", names(FORECAST_MODEL_NAMES))) {
+    return(fail("Choose a supported casual wage model."))
+  }
   scores <- backtest_forecast_models(training$value, length(dates))
   chosen <- if (method == "auto") {
     if (nrow(scores)) scores$method[[1L]] else "seasonal_naive"
   } else method
-  prediction <- tryCatch(forecast_model_predict(training$value, length(prediction_dates), chosen), error = function(e) e)
+  prediction <- tryCatch(
+    forecast_model_predict(training$value, length(prediction_dates), chosen),
+    error = function(e) e
+  )
   if (inherits(prediction, "error")) return(fail(conditionMessage(prediction)))
   forecast <- data.frame(date = prediction_dates, prediction)
   forecast <- forecast[match(dates, forecast$date), , drop = FALSE]
   bridge <- sum(prediction_dates < min(dates))
-  if (bridge > 0L) notes <- c(notes, paste(bridge, "month(s) between the last wage actual and this plan are modelled for date alignment, never relabelled as actuals."))
-  if (!nrow(scores)) notes <- c(notes, "Too little wage history for rolling-origin testing; no wage accuracy claim is made.")
+  if (bridge > 0L) {
+    notes <- c(notes, paste(
+      bridge, "month(s) between the last wage actual and this plan",
+      "are modelled for date alignment, never relabelled as actuals."
+    ))
+  }
+  if (!nrow(scores)) {
+    notes <- c(notes, paste(
+      "Too little wage history for rolling-origin testing;",
+      "no wage accuracy claim is made."
+    ))
+  }
   if (is.data.frame(reports$validation) && any(reports$validation$level %in% "warning")) {
     notes <- c(notes, "The Venues import has validation warnings. Review them in Data.")
   }
@@ -406,36 +510,53 @@ calculate_finance_scenario <- function(
   if (!is.data.frame(x) || !nrow(x)) stop("No baseline forecast is available.", call. = FALSE)
   # Keep legacy calculation modes for existing R callers; the UI exposes only
   # a quick reported-payroll estimate and a signed monthly adjustment.
-  wage_mode <- match.arg(wage_mode, c("annual_amount", "per_employee", "percentage", "casual_baseline", "monthly_amount"))
+  wage_mode <- match.arg(
+    wage_mode,
+    c("annual_amount", "per_employee", "percentage", "casual_baseline", "monthly_amount")
+  )
   wage_amount <- if (wage_mode == "monthly_amount") {
     if (!is.numeric(wage_amount) || length(wage_amount) != 1L || !is.finite(wage_amount)) {
-      stop("Enter a finite number for Monthly payroll adjustment (AUD). Use 0 for no change.", call. = FALSE)
+      stop(paste(
+        "Enter a finite number for Monthly payroll adjustment (AUD).",
+        "Use 0 for no change."
+      ), call. = FALSE)
     }
     as.numeric(wage_amount)
   } else if (wage_mode %in% c("annual_amount", "per_employee")) {
     forecast_check_number(wage_amount, "Annual wage increase", 0)
   } else 0
-  wage_pct <- if (wage_mode %in% c("percentage", "casual_baseline")) forecast_check_number(wage_pct, "Wage increase (%)", 0, 100) else 0
+  wage_pct <- if (wage_mode %in% c("percentage", "casual_baseline")) {
+    forecast_check_number(wage_pct, "Wage increase (%)", 0, 100)
+  } else 0
   casual_hours_pct <- if (wage_mode == "casual_baseline") {
     forecast_check_number(casual_hours_pct, "Casual paid-hours change (%)", -100, 200)
   } else 0
   casual_changed <- wage_mode == "casual_baseline" && (wage_pct != 0 || casual_hours_pct != 0)
-  employee_count <- if (wage_mode == "per_employee") forecast_check_number(employee_count, "Employee/FTE count", 0) else 1
+  employee_count <- if (wage_mode == "per_employee") {
+    forecast_check_number(employee_count, "Employee/FTE count", 0)
+  } else 1
   other_cost_pct <- forecast_check_number(other_cost_pct, "Other cost change (%)", -100, 200)
   price_pct <- forecast_check_number(price_pct, "Price increase (%)", 0, 500)
   price_share <- forecast_check_number(price_share, "Repriceable income share (%)", 0, 100)
   volume_pct <- forecast_check_number(volume_pct, "Demand/volume change (%)", -99, 200)
   income <- x[x$metric == "income", , drop = FALSE]
   expenses <- x[x$metric == "expenses", , drop = FALSE]
-  if (!identical(income$date, expenses$date)) stop("Income and Expenses dates do not match.", call. = FALSE)
+  if (!identical(income$date, expenses$date)) {
+    stop("Income and Expenses dates do not match.", call. = FALSE)
+  }
   h <- nrow(income)
   effective_month <- forecast_check_number(effective_month, "Effective month", 1, h)
-  if (effective_month != as.integer(effective_month)) stop("Effective month must be a whole month.", call. = FALSE)
+  if (effective_month != as.integer(effective_month)) {
+    stop("Effective month must be a whole month.", call. = FALSE)
+  }
   needs_share <- (wage_mode == "percentage" && wage_pct > 0) || other_cost_pct != 0
   if (needs_share) {
     wage_share <- forecast_check_number(wage_share, "Payroll share of Expenses (%)", 0, 100)
     if (wage_mode == "percentage" && wage_pct > 0 && wage_share == 0) {
-      stop("Enter a positive payroll share before applying a percentage wage increase.", call. = FALSE)
+      stop(paste(
+        "Enter a positive payroll share",
+        "before applying a percentage wage increase."
+      ), call. = FALSE)
     }
   } else if (!is.finite(wage_share)) {
     wage_share <- 0
@@ -455,11 +576,21 @@ calculate_finance_scenario <- function(
       }
       casual_values <- cf$baseline
     } else if (casual_changed) {
-      message <- if (is.list(casual_baseline) && !is.null(casual_baseline$error)) casual_baseline$error else "Upload Venues Tracking Reports for the quick estimate, or switch to Manual adjustment."
+      message <- if (is.list(casual_baseline) && !is.null(casual_baseline$error)) {
+        casual_baseline$error
+      } else {
+        paste(
+          "Upload Venues Tracking Reports for the quick estimate,",
+          "or switch to Manual adjustment."
+        )
+      }
       stop(message, call. = FALSE)
     }
     if (casual_changed && any(casual_values > expenses$baseline)) {
-      stop("Casual wages exceed the total Expenses baseline in a month. Review scope and forecast consistency before applying pay or paid-hours changes.", call. = FALSE)
+      stop(paste(
+        "Casual wages exceed the total Expenses baseline in a month.",
+        "Review scope and forecast consistency before applying pay or paid-hours changes."
+      ), call. = FALSE)
     }
   }
   wage_addition <- if (wage_mode == "casual_baseline") {
@@ -482,22 +613,40 @@ calculate_finance_scenario <- function(
   scenario_expenses <- expenses$baseline + wage_addition + other_addition
   if (any(!is.finite(scenario_income)) || any(!is.finite(scenario_expenses)) ||
       !is.finite(sum(scenario_income)) || !is.finite(sum(scenario_expenses))) {
-    stop("The scenario amounts are too large to calculate safely. Review your assumptions.", call. = FALSE)
+    stop(paste(
+      "The scenario amounts are too large to calculate safely.",
+      "Review your assumptions."
+    ), call. = FALSE)
   }
   if (any(scenario_expenses < 0)) {
-    stop("Cost changes would make monthly Expenses negative. Review your assumptions.", call. = FALSE)
+    stop(paste(
+      "Cost changes would make monthly Expenses negative.",
+      "Review your assumptions."
+    ), call. = FALSE)
   }
   before_price <- income$baseline * demand_factor
   exposed_income <- sum(before_price[active]) * price_share / 100
   additional_income <- max(0, sum(scenario_expenses) - sum(before_price))
-  min_price <- if (additional_income == 0) 0 else if (exposed_income > 0) additional_income / exposed_income else Inf
+  min_price <- if (additional_income == 0) {
+    0
+  } else if (exposed_income > 0) {
+    additional_income / exposed_income
+  } else {
+    Inf
+  }
   baseline_total <- sum(income$baseline)
-  min_income_growth <- if (sum(scenario_expenses) <= baseline_total) 0 else if (baseline_total > 0) {
+  min_income_growth <- if (sum(scenario_expenses) <= baseline_total) {
+    0
+  } else if (baseline_total > 0) {
     sum(scenario_expenses) / baseline_total - 1
-  } else Inf
+  } else {
+    Inf
+  }
   # Interval bounds move with the scenario exactly as the baseline does, so the
   # shaded ranges keep financial-model uncertainty only, not assumption risk.
-  band <- function(frame, name) if (name %in% names(frame)) frame[[name]] else rep(NA_real_, nrow(frame))
+  band <- function(frame, name) {
+    if (name %in% names(frame)) frame[[name]] else rep(NA_real_, nrow(frame))
+  }
   scenario_income_band <- function(values) values * demand_factor * price_factor
   scenario_expenses_band <- function(values) pmax(0, if (wage_mode == "percentage") {
     values * (1 + active * (salary_share * wage_pct + (1 - salary_share) * other_cost_pct) / 100)
@@ -529,12 +678,18 @@ calculate_finance_scenario <- function(
                            format(income$date[effective_month], "%Y-%m"), h))
   )
   payroll_assumptions <- switch(wage_mode,
-    casual_baseline = c(wage_increase_pct = wage_pct, casual_paid_hours_change_pct = casual_hours_pct),
+    casual_baseline = c(
+      wage_increase_pct = wage_pct,
+      casual_paid_hours_change_pct = casual_hours_pct
+    ),
     monthly_amount = c(monthly_payroll_adjustment = wage_amount),
     annual_amount = c(annual_wage_increase = wage_amount),
     per_employee = c(annual_wage_increase = wage_amount, employee_fte_count = employee_count),
     percentage = c(wage_increase_pct = wage_pct, payroll_share_pct = wage_share))
-  assumptions <- rbind(assumptions, data.frame(assumption = names(payroll_assumptions), value = as.character(payroll_assumptions)))
+  assumptions <- rbind(assumptions, data.frame(
+    assumption = names(payroll_assumptions),
+    value = as.character(payroll_assumptions)
+  ))
   if (other_cost_pct != 0) {
     assumptions <- rbind(assumptions, data.frame(
       assumption = c("other_cost_change_pct", "payroll_share_pct"),
@@ -544,8 +699,18 @@ calculate_finance_scenario <- function(
   if (wage_mode == "monthly_amount") {
     assumptions <- rbind(assumptions, data.frame(
       assumption = c("payroll_reference", "payroll_adjustment_timing"),
-      value = c("User-entered net adjustment to Overall forecast Expenses; positive adds costs, negative reduces them; only changes not already reflected in the forecast",
-                "Same monthly amount from the effective month; no compounding; no automatic payroll decomposition")))
+      value = c(
+        paste(
+          "User-entered net adjustment to Overall forecast Expenses;",
+          "positive adds costs, negative reduces them;",
+          "only changes not already reflected in the forecast"
+        ),
+        paste(
+          "Same monthly amount from the effective month; no compounding;",
+          "no automatic payroll decomposition"
+        )
+      )
+    ))
   }
   list(table = table, income = sum(scenario_income), expenses = sum(scenario_expenses),
        baseline_income = baseline_total, baseline_expenses = sum(expenses$baseline),
@@ -554,6 +719,10 @@ calculate_finance_scenario <- function(
        price_exposure = exposed_income, chosen_price_pct = price_pct,
        covers_costs = sum(scenario_income) + 1e-8 >= sum(scenario_expenses),
        baseline_casual_wages = if (all(is.finite(casual_values))) sum(casual_values) else NA_real_,
-       scenario_casual_wages = if (all(is.finite(casual_values))) sum(casual_values + wage_addition) else NA_real_,
+       scenario_casual_wages = if (all(is.finite(casual_values))) {
+         sum(casual_values + wage_addition)
+       } else {
+         NA_real_
+       },
        assumptions = assumptions)
 }

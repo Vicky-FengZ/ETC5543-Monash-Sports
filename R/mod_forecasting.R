@@ -6,97 +6,215 @@ mod_forecasting_ui <- function(id) {
     "Forecasting", icon = bs_icon("graph-up-arrow"),
     div(
       class = "p-4 forecasting-page",
-      div(class = "page-heading", h2("Forecasting & Planning"),
-          p("Plan pay and prices for Monash Sport overall, then see the income needed to cover your costs.")),
+      div(
+        class = "page-heading",
+        h2("Forecasting & Planning"),
+        p(paste(
+          "Plan pay and prices for Monash Sport overall,",
+          "then see the income needed to cover your costs."
+        ))
+      ),
       card(
         class = "forecast-controls",
         card_header("Your plan"),
         layout_columns(
-          selectInput(ns("horizon"), "Forecast horizon", setNames(c(3, 6, 12), FORECAST_HORIZONS), selected = 12),
-          div(class = "forecast-payroll-controls",
-            conditionalPanel("input.payroll_mode == 'quick'", ns = ns,
-              numericInput(ns("casual_wage_pct"), "Casual pay increase (%)", value = 0, min = 0, max = 100, step = 0.5),
-              p(class = "forecast-help", "Quick estimate using Venues payroll.")),
-            conditionalPanel("input.payroll_mode == 'manual'", ns = ns,
-              numericInput(ns("monthly_payroll_adjustment"), "Monthly payroll adjustment (AUD)",
-                value = 0, step = 100),
-              p(class = "forecast-help", "Positive adds costs; negative reduces them. Include only changes not already reflected in the forecast."))
+          selectInput(
+            ns("horizon"),
+            "Forecast horizon",
+            setNames(c(3, 6, 12), FORECAST_HORIZONS),
+            selected = 12
           ),
-          div(numericInput(ns("price_pct"), "Price increase (%)", value = 0, min = 0, max = 500, step = 0.5),
-              p(class = "forecast-help", "Default: reprice all income, with demand unchanged.")),
+          div(
+            class = "forecast-payroll-controls",
+            conditionalPanel(
+              "input.payroll_mode == 'quick'",
+              ns = ns,
+              numericInput(
+                ns("casual_wage_pct"),
+                "Casual pay increase (%)",
+                value = 0, min = 0, max = 100, step = 0.5
+              ),
+              p(class = "forecast-help", "Quick estimate using Venues payroll.")
+            ),
+            conditionalPanel(
+              "input.payroll_mode == 'manual'",
+              ns = ns,
+              numericInput(
+                ns("monthly_payroll_adjustment"),
+                "Monthly payroll adjustment (AUD)",
+                value = 0, step = 100
+              ),
+              p(class = "forecast-help", paste(
+                "Positive adds costs; negative reduces them.",
+                "Include only changes not already reflected in the forecast."
+              ))
+            )
+          ),
+          div(
+            numericInput(
+              ns("price_pct"),
+              "Price increase (%)",
+              value = 0, min = 0, max = 500, step = 0.5
+            ),
+            p(class = "forecast-help", "Default: reprice all income, with demand unchanged.")
+          ),
           col_widths = breakpoints(xs = c(12, 12, 12), lg = c(4, 4, 4))
         ),
-        div(class = "forecast-control-footer",
-          p(class = "forecast-help", "Choose a payroll method and other assumptions in More options."),
-          actionButton(ns("reset_plan"), "Reset plan", icon = bs_icon("arrow-counterclockwise"), class = "btn-outline-secondary"))
+        div(
+          class = "forecast-control-footer",
+          p(
+            class = "forecast-help",
+            "Choose a payroll method and other assumptions in More options."
+          ),
+          actionButton(
+            ns("reset_plan"),
+            "Reset plan",
+            icon = bs_icon("arrow-counterclockwise"),
+            class = "btn-outline-secondary"
+          )
+        )
       ),
-      tags$details(id = ns("more_options"), class = "forecast-advanced",
-        tags$summary("More options",
+      tags$details(
+        id = ns("more_options"),
+        class = "forecast-advanced",
+        tags$summary(
+          "More options",
           span(class = "forecast-options-description", "Payroll, history, pricing and timing"),
-          uiOutput(ns("options_state"), inline = TRUE)),
-        div(class = "forecast-options-section",
-          h5("Payroll"),
-          div(class = "forecast-mode-selector",
-            radioButtons(ns("payroll_mode"), "Casual payroll planning",
-              choices = c("Quick estimate" = "quick", "Manual adjustment" = "manual"),
-              selected = "quick", inline = TRUE)),
-          p(class = "forecast-help", "Enter the selected payroll adjustment in Your plan. Only one method applies.")
+          uiOutput(ns("options_state"), inline = TRUE)
         ),
-        div(class = "forecast-options-section",
+        div(
+          class = "forecast-options-section",
+          h5("Payroll"),
+          div(
+            class = "forecast-mode-selector",
+            radioButtons(
+              ns("payroll_mode"),
+              "Casual payroll planning",
+              choices = c("Quick estimate" = "quick", "Manual adjustment" = "manual"),
+              selected = "quick",
+              inline = TRUE
+            )
+          ),
+          p(
+            class = "forecast-help",
+            "Enter the selected payroll adjustment in Your plan. Only one method applies."
+          )
+        ),
+        div(
+          class = "forecast-options-section",
           h5("History"),
           layout_columns(
             selectInput(ns("from_year"), "Use history from", choices = character()),
             selectInput(ns("cutoff"), "Last actual month", choices = character()),
-            col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))),
-          div(class = "forecast-zero-reviews",
-            uiOutput(ns("finance_zero_review")), uiOutput(ns("wage_zero_review")))
+            col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))
+          ),
+          div(
+            class = "forecast-zero-reviews",
+            uiOutput(ns("finance_zero_review")),
+            uiOutput(ns("wage_zero_review"))
+          )
         ),
-        div(class = "forecast-options-section",
+        div(
+          class = "forecast-options-section",
           h5("Pricing and timing"),
           layout_columns(
-            numericInput(ns("price_share"), "Income that can be repriced (%)", value = 100, min = 0, max = 100, step = 5),
-            numericInput(ns("volume_pct"), "Demand / volume change (%)", value = 0, min = -99, max = 200, step = 1),
-            selectInput(ns("effective_month"), "Changes take effect from", choices = c("First forecast month" = 1), selected = 1),
-            col_widths = breakpoints(xs = c(12, 12, 12), lg = c(4, 4, 4))),
-          p(class = "forecast-help", "Lower the repriceable share for fixed-price income. Demand is your planning assumption.")
+            numericInput(
+              ns("price_share"),
+              "Income that can be repriced (%)",
+              value = 100, min = 0, max = 100, step = 5
+            ),
+            numericInput(
+              ns("volume_pct"),
+              "Demand / volume change (%)",
+              value = 0, min = -99, max = 200, step = 1
+            ),
+            selectInput(
+              ns("effective_month"),
+              "Changes take effect from",
+              choices = c("First forecast month" = 1),
+              selected = 1
+            ),
+            col_widths = breakpoints(xs = c(12, 12, 12), lg = c(4, 4, 4))
+          ),
+          p(class = "forecast-help", paste(
+            "Lower the repriceable share for fixed-price income.",
+            "Demand is your planning assumption."
+          ))
         )
       ),
       uiOutput(ns("data_health")),
       uiOutput(ns("scenario_notice")),
-      div(class = "section-heading-custom", h4("Your results"),
-          uiOutput(ns("period_label"))),
+      div(
+        class = "section-heading-custom",
+        h4("Your results"),
+        uiOutput(ns("period_label"))
+      ),
       uiOutput(ns("kpis")),
       layout_columns(
-        card(full_screen = TRUE,
-             card_header(div(div(class = "chart-header-title", "Income: actuals, baseline & scenario"),
-                             uiOutput(ns("income_model")))),
-             plotOutput(ns("income_plot"), height = "400px")),
-        card(full_screen = TRUE,
-             card_header(div(div(class = "chart-header-title", "Expenses: actuals, baseline & scenario"),
-                             uiOutput(ns("expenses_model")))),
-             plotOutput(ns("expenses_plot"), height = "400px")),
+        card(
+          full_screen = TRUE,
+          card_header(div(
+            div(class = "chart-header-title", "Income: actuals, baseline & scenario"),
+            uiOutput(ns("income_model"))
+          )),
+          plotOutput(ns("income_plot"), height = "400px")
+        ),
+        card(
+          full_screen = TRUE,
+          card_header(div(
+            div(class = "chart-header-title", "Expenses: actuals, baseline & scenario"),
+            uiOutput(ns("expenses_model"))
+          )),
+          plotOutput(ns("expenses_plot"), height = "400px")
+        ),
         col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))
       ),
       uiOutput(ns("interval_note")),
       card(
         full_screen = TRUE,
-        card_header(div(class = "forecast-card-heading", bs_icon("bullseye"), "Income needed to cover costs")),
+        card_header(div(
+          class = "forecast-card-heading",
+          bs_icon("bullseye"),
+          "Income needed to cover costs"
+        )),
         layout_columns(
           div(class = "forecast-break-even-panel", uiOutput(ns("break_even_explanation"))),
-          div(class = "forecast-price-panel",
+          div(
+            class = "forecast-price-panel",
             h5("Price sensitivity"),
-            p(class = "forecast-help", "Compare income at different prices using your current plan."),
-            plotOutput(ns("price_plot"), height = "400px")),
-          col_widths = breakpoints(xs = c(12, 12), lg = c(4, 8)))
+            p(
+              class = "forecast-help",
+              "Compare income at different prices using your current plan."
+            ),
+            plotOutput(ns("price_plot"), height = "400px")
+          ),
+          col_widths = breakpoints(xs = c(12, 12), lg = c(4, 8))
+        )
       ),
       card(
-        class = "forecast-monthly-plan", full_screen = TRUE,
-        card_header(div(class = "forecast-monthly-plan-header",
+        class = "forecast-monthly-plan",
+        full_screen = TRUE,
+        card_header(div(
+          class = "forecast-monthly-plan-header",
           div(class = "forecast-card-heading", bs_icon("table"), "Monthly plan"),
-          div(class = "forecast-table-actions",
-            downloadButton(ns("download_plan"), "Download plan (CSV)", class = "btn-outline-primary"),
-            downloadButton(ns("download_assumptions"), "Download assumptions (CSV)", class = "btn-outline-secondary")))),
-        p(class = "forecast-help", "Income Needed shows each month's costs. The minimum price increase covers the whole plan."),
+          div(
+            class = "forecast-table-actions",
+            downloadButton(
+              ns("download_plan"),
+              "Download plan (CSV)",
+              class = "btn-outline-primary"
+            ),
+            downloadButton(
+              ns("download_assumptions"),
+              "Download assumptions (CSV)",
+              class = "btn-outline-secondary"
+            )
+          )
+        )),
+        p(class = "forecast-help", paste(
+          "Income Needed shows each month's costs.",
+          "The minimum price increase covers the whole plan."
+        )),
         div(class = "forecast-table-scroll", tableOutput(ns("monthly_table")))
       )
     )
@@ -124,17 +242,32 @@ mod_forecasting_server <- function(id, data = NULL) {
         previous_cutoff(NULL)
         return()
       }
-      dates <- sort(unique(as.Date(finance$date[finance$is_summary %in% TRUE &
-                               finance$value_type %in% "Actual" & !is.na(finance$date)])))
+      dates <- sort(unique(as.Date(finance$date[
+        finance$is_summary %in% TRUE &
+          finance$value_type %in% "Actual" &
+          !is.na(finance$date)
+      ])))
       if (!length(dates)) return()
       years <- sort(unique(as.integer(format(dates, "%Y"))))
       current_year <- suppressWarnings(as.integer(isolate(input$from_year)))
-      selected_year <- if (length(current_year) == 1L && current_year %in% years) current_year else min(years)
+      selected_year <- if (length(current_year) == 1L && current_year %in% years) {
+        current_year
+      } else {
+        min(years)
+      }
       updateSelectInput(session, "from_year", choices = years, selected = selected_year)
       current <- isolate(input$cutoff)
       selected <- if (length(current) == 1L && current %in% as.character(dates) &&
-                      !identical(current, previous_cutoff())) current else as.character(max(dates))
-      updateSelectInput(session, "cutoff", choices = setNames(as.character(dates), forecast_month_label(dates)), selected = selected)
+                      !identical(current, previous_cutoff())) {
+        current
+      } else {
+        as.character(max(dates))
+      }
+      updateSelectInput(
+        session, "cutoff",
+        choices = setNames(as.character(dates), forecast_month_label(dates)),
+        selected = selected
+      )
       previous_cutoff(as.character(max(dates)))
     }, ignoreNULL = FALSE)
 
@@ -156,7 +289,9 @@ mod_forecasting_server <- function(id, data = NULL) {
     }
     finance_zero_context <- reactive({
       settings <- history_settings()
-      p <- prepare_forecast_history(reports(), selected_scope(), settings$cutoff, settings$year, TRUE)
+      p <- prepare_forecast_history(
+        reports(), selected_scope(), settings$cutoff, settings$year, TRUE
+      )
       list(months = p$zero_months, scope = selected_scope(), settings = settings, data = reports())
     })
     finance_zero_state <- zero_review_state(finance_zero_context)
@@ -195,21 +330,38 @@ mod_forecasting_server <- function(id, data = NULL) {
       labels <- vapply(ranges, function(dates) {
         paste(unique(forecast_month_label(range(dates))), collapse = " to ")
       }, character(1))
-      div(class = "forecast-zero-review",
+      div(
+        class = "forecast-zero-review",
         tags$strong(title),
         p(class = "forecast-help", paste0(paste(labels, collapse = ", "), ": ", description)),
-        radioButtons(session$ns(id), "Were these months fully reported?",
-          choices = setNames(paste0(review$version, c(":unreported", ":confirmed")),
-                             c("Not yet reported", "Confirmed zero actuals")),
-          selected = paste0(review$version, ":unreported"), inline = TRUE, width = "100%"))
+        radioButtons(
+          session$ns(id),
+          "Were these months fully reported?",
+          choices = setNames(
+            paste0(review$version, c(":unreported", ":confirmed")),
+            c("Not yet reported", "Confirmed zero actuals")
+          ),
+          selected = paste0(review$version, ":unreported"),
+          inline = TRUE,
+          width = "100%"
+        )
+      )
     }
     output$finance_zero_review <- renderUI({
-      zero_review_control(finance_zero_state, "finance_zero_status", "Final zero months · Income & Expenses",
-                          "both Income and Expenses are zero.")
+      zero_review_control(
+        finance_zero_state,
+        "finance_zero_status",
+        "Final zero months · Income & Expenses",
+        "both Income and Expenses are zero."
+      )
     })
     output$wage_zero_review <- renderUI({
-      zero_review_control(wage_zero_state, "wage_zero_status", "Final zero months · Casual payroll",
-                          "reported casual wages are zero.")
+      zero_review_control(
+        wage_zero_state,
+        "wage_zero_status",
+        "Final zero months · Casual payroll",
+        "reported casual wages are zero."
+      )
     })
     # Empty conditional outputs must still wake up when new data need review,
     # even while More options is collapsed or the previous render was NULL.
@@ -221,7 +373,9 @@ mod_forecasting_server <- function(id, data = NULL) {
     })
     casual_baseline <- reactive({
       b <- baseline()
-      if (!is.null(b$error)) return(list(error = "Upload Monthly Site Reports to choose the planning period."))
+      if (!is.null(b$error)) {
+        return(list(error = "Upload Monthly Site Reports to choose the planning period."))
+      }
       p <- prepared()
       year <- history_settings()$year
       prepare_casual_wage_baseline(
@@ -237,29 +391,44 @@ mod_forecasting_server <- function(id, data = NULL) {
       dates <- x$date[x$metric == "income"]
       selected <- suppressWarnings(as.integer(isolate(input$effective_month)))
       if (length(selected) != 1L || !selected %in% seq_along(dates)) selected <- 1L
-      updateSelectInput(session, "effective_month", choices = setNames(seq_along(dates), forecast_month_label(dates)), selected = selected)
+      updateSelectInput(
+        session, "effective_month",
+        choices = setNames(seq_along(dates), forecast_month_label(dates)),
+        selected = selected
+      )
     })
     scenario <- reactive({
       tryCatch({
         selected_mode <- payroll_mode()
-        if (!selected_mode %in% c("quick", "manual")) stop("Choose Quick estimate or Manual adjustment.", call. = FALSE)
+        if (!selected_mode %in% c("quick", "manual")) {
+          stop("Choose Quick estimate or Manual adjustment.", call. = FALSE)
+        }
         mode <- if (selected_mode == "manual") "monthly_amount" else "casual_baseline"
         rise <- if (selected_mode == "manual") 0 else forecast_check_number(
           default(input$casual_wage_pct, 0), "Casual pay increase (%)", 0, 100)
         casual_change <- mode == "casual_baseline" && rise != 0
-        if (casual_change &&
-            any(grepl("uses the sum of available site summaries", prepared()$notes, fixed = TRUE))) {
-          stop("Overall is based on a partial set of site summaries. Upload the organisation summary before applying a Quick payroll change.", call. = FALSE)
+        partial_overall <- "uses the sum of available site summaries"
+        if (casual_change && any(grepl(partial_overall, prepared()$notes, fixed = TRUE))) {
+          stop(paste(
+            "Overall is based on a partial set of site summaries.",
+            "Upload the organisation summary before applying a Quick payroll change."
+          ), call. = FALSE)
         }
         calculate_finance_scenario(
-        baseline(), wage_mode = mode,
-        wage_pct = rise, casual_hours_pct = 0,
-        wage_amount = if (mode == "monthly_amount") default(input$monthly_payroll_adjustment, NA_real_) else 0,
-        price_pct = default(input$price_pct, 0),
-        price_share = default(input$price_share, 100),
-        volume_pct = default(input$volume_pct, 0),
-        effective_month = as.integer(default(input$effective_month, 1)),
-        casual_baseline = if (mode == "casual_baseline") casual_baseline() else NULL
+          baseline(),
+          wage_mode = mode,
+          wage_pct = rise,
+          casual_hours_pct = 0,
+          wage_amount = if (mode == "monthly_amount") {
+            default(input$monthly_payroll_adjustment, NA_real_)
+          } else {
+            0
+          },
+          price_pct = default(input$price_pct, 0),
+          price_share = default(input$price_share, 100),
+          volume_pct = default(input$volume_pct, 0),
+          effective_month = as.integer(default(input$effective_month, 1)),
+          casual_baseline = if (mode == "casual_baseline") casual_baseline() else NULL
         )
       }, error = function(e) list(error = conditionMessage(e)))
     })
@@ -278,7 +447,11 @@ mod_forecasting_server <- function(id, data = NULL) {
       updateNumericInput(session, "volume_pct", value = 0)
       finance <- reports()$finance
       if (is.data.frame(finance) && nrow(finance)) {
-        dates <- as.Date(finance$date[finance$is_summary %in% TRUE & finance$value_type %in% "Actual" & !is.na(finance$date)])
+        dates <- as.Date(finance$date[
+          finance$is_summary %in% TRUE &
+            finance$value_type %in% "Actual" &
+            !is.na(finance$date)
+        ])
         if (length(dates)) {
           updateSelectInput(session, "from_year", selected = min(as.integer(format(dates, "%Y"))))
           updateSelectInput(session, "cutoff", selected = as.character(max(dates)))
@@ -304,55 +477,122 @@ mod_forecasting_server <- function(id, data = NULL) {
       p <- prepared()
       b <- baseline()
       if (!is.null(p$error)) {
-        return(div(class = "forecast-status forecast-status-empty", bs_icon("info-circle"), p$error))
+        return(div(
+          class = "forecast-status forecast-status-empty",
+          bs_icon("info-circle"),
+          p$error
+        ))
       }
       training <- p$training
       w <- if (payroll_mode() == "quick") casual_baseline() else NULL
-      div(class = "forecast-status",
+      payroll_details <- if (payroll_mode() == "manual") {
+        p(class = "forecast-help", paste(
+          "Your monthly amount adjusts Overall Expenses",
+          "from the selected effective month."
+        ))
+      } else if (is.null(w)) {
+        p(class = "forecast-help", "Choose a payroll reference in More options.")
+      } else if (!is.null(w$error)) {
+        p(class = "forecast-help", w$error)
+      } else {
+        tagList(
+          p(paste(
+            format_compact_currency(sum(w$forecast$baseline), digits = 2L), "for",
+            forecast_month_label(min(w$forecast$date)), "to",
+            forecast_month_label(max(w$forecast$date))
+          )),
+          p(class = "forecast-help", paste0(
+            "Venues casual wages only · Last actual: ",
+            forecast_month_label(w$last_actual),
+            ". History-based reference, not a staff roster."
+          ))
+        )
+      }
+      div(
+        class = "forecast-status",
         layout_columns(
-          div(div(class = "forecast-status-title", "Forecast starting point"),
-              p(paste(selected_scope(), "·", nrow(training), "months through", forecast_month_label(max(training$date)))),
-              if (nrow(training) < 24L) p(class = "forecast-warning", "Limited history: use these results as planning estimates.")),
-          div(div(class = "forecast-status-title",
-                  if (payroll_mode() == "manual") "Manual payroll adjustment" else "Predicted casual payroll"),
-              if (payroll_mode() == "manual") p(class = "forecast-help", "Your monthly amount adjusts Overall Expenses from the selected effective month.") else
-              if (is.null(w)) p(class = "forecast-help", "Choose a payroll reference in More options.") else
-              if (!is.null(w$error)) p(class = "forecast-help", w$error) else tagList(
-                p(paste(format_compact_currency(sum(w$forecast$baseline), digits = 2L), "for",
-                        forecast_month_label(min(w$forecast$date)), "to", forecast_month_label(max(w$forecast$date)))),
-                p(class = "forecast-help", paste0("Venues casual wages only · Last actual: ",
-                  forecast_month_label(w$last_actual), ". History-based reference, not a staff roster.")))),
-          col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))),
+          div(
+            div(class = "forecast-status-title", "Forecast starting point"),
+            p(paste(
+              selected_scope(), "·", nrow(training), "months through",
+              forecast_month_label(max(training$date))
+            )),
+            if (nrow(training) < 24L) {
+              p(
+                class = "forecast-warning",
+                "Limited history: use these results as planning estimates."
+              )
+            }
+          ),
+          div(
+            div(
+              class = "forecast-status-title",
+              if (payroll_mode() == "manual") {
+                "Manual payroll adjustment"
+              } else {
+                "Predicted casual payroll"
+              }
+            ),
+            payroll_details
+          ),
+          col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))
+        ),
         if (!is.null(b$error)) p(class = "forecast-warning", b$error)
       )
     })
     output$scenario_notice <- renderUI({
       result <- scenario()
       if (is.null(result$error) || !is.null(baseline()$error)) return(NULL)
-      div(class = "forecast-status forecast-status-warning", bs_icon("exclamation-triangle"), result$error)
+      div(
+        class = "forecast-status forecast-status-warning",
+        bs_icon("exclamation-triangle"),
+        result$error
+      )
     })
     output$interval_note <- renderUI({
       result <- scenario()
       if (!is.null(baseline()$error) || !is.null(result$error)) return(NULL)
-      available <- vapply(c(Income = "income", Expenses = "expenses"),
-                          function(metric) forecast_scenario_band(result$table, metric)$available,
-                          logical(1))
+      available <- vapply(
+        c(Income = "income", Expenses = "expenses"),
+        function(metric) forecast_scenario_band(result$table, metric)$available,
+        logical(1)
+      )
       text <- if (all(available)) {
-        "Shading shows 80% and 95% prediction intervals around your scenario. They reflect historical forecast uncertainty only, not uncertainty in your payroll, pricing or demand assumptions."
+        paste(
+          "Shading shows 80% and 95% prediction intervals around your scenario.",
+          "They reflect historical forecast uncertainty only, not uncertainty in your payroll,",
+          "pricing or demand assumptions."
+        )
       } else if (!any(available)) {
-        "Prediction intervals are not shown: the continuous history is too short to estimate forecast uncertainty."
+        paste(
+          "Prediction intervals are not shown:",
+          "the continuous history is too short to estimate forecast uncertainty."
+        )
       } else {
-        paste0("Shading on the ", names(available)[available], " chart shows 80% and 95% prediction intervals around your scenario (historical forecast uncertainty only). ",
-               names(available)[!available], " intervals are not shown because its model has too little history to estimate uncertainty.")
+        paste0(
+          "Shading on the ", names(available)[available],
+          " chart shows 80% and 95% prediction intervals around your scenario",
+          " (historical forecast uncertainty only). ",
+          names(available)[!available],
+          " intervals are not shown because its model has too little history",
+          " to estimate uncertainty."
+        )
       }
       p(class = "forecast-help forecast-interval-note", text)
     })
     output$period_label <- renderUI({
       b <- baseline()
-      if (!is.null(b$error)) return(p(class = "text-secondary", "Results appear after enough monthly data are uploaded."))
+      if (!is.null(b$error)) {
+        return(p(
+          class = "text-secondary",
+          "Results appear after enough monthly data are uploaded."
+        ))
+      }
       dates <- b$forecast$date
-      p(class = "text-secondary", paste(forecast_month_label(min(dates)), "to", forecast_month_label(max(dates)),
-                                        "|", selected_scope(), "| All values in AUD"))
+      p(class = "text-secondary", paste(
+        forecast_month_label(min(dates)), "to", forecast_month_label(max(dates)),
+        "|", selected_scope(), "| All values in AUD"
+      ))
     })
     output$kpis <- renderUI({
       result <- scenario()
@@ -363,12 +603,23 @@ mod_forecasting_server <- function(id, data = NULL) {
         if (!is.finite(v)) return("Not achievable")
         if (percentage) forecast_required_rate(v) else format_compact_currency(v, digits = 2L)
       }
+      income_subtitle <- if (available) {
+        paste("Baseline:", format_compact_currency(result$baseline_income, digits = 2L))
+      } else if (is.null(baseline()$error)) {
+        "Complete your plan to see results"
+      } else {
+        "Upload data to start"
+      }
+      expenses_subtitle <- if (available) {
+        paste("Payroll change:", format_compact_currency(result$extra_wage_cost))
+      } else {
+        "Enter your cost assumptions"
+      }
       boxes <- list(
         list(title = "Scenario Income", value = value("income"),
-             subtitle = if (available) paste("Baseline:", format_compact_currency(result$baseline_income, digits = 2L)) else
-               if (is.null(baseline()$error)) "Complete your plan to see results" else "Upload data to start", icon = "cash-stack"),
+             subtitle = income_subtitle, icon = "cash-stack"),
         list(title = "Scenario Expenses", value = value("expenses"),
-             subtitle = if (available) paste("Payroll change:", format_compact_currency(result$extra_wage_cost)) else "Enter your cost assumptions", icon = "receipt"),
+             subtitle = expenses_subtitle, icon = "receipt"),
         list(title = "Minimum Price Increase", value = value("min_price_increase", TRUE),
              subtitle = "Needed to cover costs over the whole plan", icon = "tags")
       )
@@ -385,37 +636,72 @@ mod_forecasting_server <- function(id, data = NULL) {
         current_metric <- metric
         output[[paste0(current_metric, "_model")]] <- renderUI({
           b <- baseline()
-          chart_subtitle(if (is.null(b$error)) "Monthly planning estimate" else "Upload monthly actuals to start")
+          chart_subtitle(
+            if (is.null(b$error)) "Monthly planning estimate" else "Upload monthly actuals to start"
+          )
         })
         output[[paste0(current_metric, "_plot")]] <- renderPlot({
           plot_finance_forecast(prepared(), baseline(), valid_scenario(), current_metric)
         }, res = 110)
       })
     }
-    output$price_plot <- renderPlot({ plot_forecast_price_sensitivity(valid_scenario()) }, res = 110)
+    output$price_plot <- renderPlot({
+      plot_forecast_price_sensitivity(valid_scenario())
+    }, res = 110)
     output$break_even_explanation <- renderUI({
       x <- scenario()
-      if (!is.null(x$error)) return(p(class = "forecast-help", "Choose valid data and assumptions to calculate the requirement."))
-      minimum <- if (is.finite(x$min_price_increase)) forecast_required_rate(x$min_price_increase) else "Not achievable with the current repriceable income"
-      div(class = "forecast-break-even-copy",
-        span(class = if (x$covers_costs) "forecast-result-positive" else "forecast-result-action",
-             if (x$covers_costs) "Your scenario covers costs" else "Your scenario needs more income"),
+      if (!is.null(x$error)) {
+        return(p(
+          class = "forecast-help",
+          "Choose valid data and assumptions to calculate the requirement."
+        ))
+      }
+      minimum <- if (is.finite(x$min_price_increase)) {
+        forecast_required_rate(x$min_price_increase)
+      } else {
+        "Not achievable with the current repriceable income"
+      }
+      div(
+        class = "forecast-break-even-copy",
+        span(
+          class = if (x$covers_costs) "forecast-result-positive" else "forecast-result-action",
+          if (x$covers_costs) "Your scenario covers costs" else "Your scenario needs more income"
+        ),
         p("Income needed to cover this plan's total Expenses:"),
-        div(class = "forecast-required-income", paste0("$", formatC(x$expenses, format = "f", digits = 0, big.mark = ","))),
+        div(
+          class = "forecast-required-income",
+          paste0("$", formatC(x$expenses, format = "f", digits = 0, big.mark = ","))
+        ),
         p(tags$strong("Minimum price increase: "), minimum,
           " | Minimum Income growth: ", forecast_required_rate(x$min_income_growth)),
         if (is.finite(x$min_price_increase) && x$min_price_increase <= 5) {
-          actionButton(session$ns("use_minimum_price"), "Use this minimum price", icon = bs_icon("check2"), class = "btn-outline-primary")
+          actionButton(
+            session$ns("use_minimum_price"),
+            "Use this minimum price",
+            icon = bs_icon("check2"),
+            class = "btn-outline-primary"
+          )
         },
-        p(class = "forecast-help", "Includes any existing shortfall. Minimum rates round up to 0.1 percentage points. This covers the whole plan, not necessarily every month.")
+        p(class = "forecast-help", paste(
+          "Includes any existing shortfall.",
+          "Minimum rates round up to 0.1 percentage points.",
+          "This covers the whole plan, not necessarily every month."
+        ))
       )
     })
     output$monthly_table <- renderTable({
       x <- valid_scenario()$table
-      columns <- c("baseline_income", "scenario_income", "baseline_expenses", "scenario_expenses", "extra_wage_cost")
+      columns <- c(
+        "baseline_income", "scenario_income",
+        "baseline_expenses", "scenario_expenses",
+        "extra_wage_cost"
+      )
       result <- data.frame(Month = forecast_month_label(x$date), x[columns], check.names = FALSE)
       result$income_needed <- x$required_income_to_break_even
-      names(result) <- c("Month", "Baseline Income", "Scenario Income", "Baseline Expenses", "Scenario Expenses", "Payroll Change", "Income Needed")
+      names(result) <- c(
+        "Month", "Baseline Income", "Scenario Income", "Baseline Expenses",
+        "Scenario Expenses", "Payroll Change", "Income Needed"
+      )
       if (all(is.finite(x$baseline_casual_wages))) {
         result[["Predicted Casual Payroll"]] <- x$baseline_casual_wages
         result[["Scenario Casual Payroll"]] <- x$scenario_casual_wages
@@ -429,25 +715,51 @@ mod_forecasting_server <- function(id, data = NULL) {
     }, striped = TRUE, bordered = FALSE, spacing = "m", rownames = FALSE)
     output$download_plan <- downloadHandler(
       filename = function() "monthly_finance_scenario.csv",
-      content = function(file) utils::write.csv(valid_scenario()$table, file, row.names = FALSE, na = "")
+      content = function(file) {
+        utils::write.csv(valid_scenario()$table, file, row.names = FALSE, na = "")
+      }
     )
     output$download_assumptions <- downloadHandler(
       filename = function() "forecast_scenario_assumptions.csv",
       content = function(file) {
         x <- valid_scenario()
         p <- prepared()
-        extra <- data.frame(assumption = c("scope", "training_from", "training_to", "income_model", "expenses_model", "model_selection", "payroll_mode",
-                                          "finance_final_zeros_confirmed", "casual_wage_final_zeros_confirmed"),
-                            value = c(selected_scope(), format(min(p$training$date)),
-                                      format(max(p$training$date)), unname(baseline()$models), "automatic", payroll_mode(),
-                                      finance_zeros_confirmed(), if (payroll_mode() == "quick") wage_zeros_confirmed() else FALSE))
+        extra <- data.frame(
+          assumption = c(
+            "scope", "training_from", "training_to", "income_model", "expenses_model",
+            "model_selection", "payroll_mode",
+            "finance_final_zeros_confirmed", "casual_wage_final_zeros_confirmed"
+          ),
+          value = c(
+            selected_scope(),
+            format(min(p$training$date)),
+            format(max(p$training$date)),
+            unname(baseline()$models),
+            "automatic",
+            payroll_mode(),
+            finance_zeros_confirmed(),
+            if (payroll_mode() == "quick") wage_zeros_confirmed() else FALSE
+          )
+        )
         w <- if (payroll_mode() == "quick") casual_baseline() else NULL
         if (!is.null(w) && is.null(w$error)) {
           extra <- rbind(extra, data.frame(
-            assumption = c("casual_wage_scope", "casual_wage_model", "casual_wage_training_from", "casual_wage_last_actual", "casual_wage_sources", "casual_hours_assumption"),
-            value = c("Venues-reported payroll component only; applied to Overall", w$model,
-                      format(min(w$training$date)), format(w$last_actual), paste(w$sources, collapse = "; "),
-                      "Quick estimate applies pay increases only; no extra paid-hours change; staffing trends may be present in the historical reference")))
+            assumption = c(
+              "casual_wage_scope", "casual_wage_model", "casual_wage_training_from",
+              "casual_wage_last_actual", "casual_wage_sources", "casual_hours_assumption"
+            ),
+            value = c(
+              "Venues-reported payroll component only; applied to Overall",
+              w$model,
+              format(min(w$training$date)),
+              format(w$last_actual),
+              paste(w$sources, collapse = "; "),
+              paste(
+                "Quick estimate applies pay increases only; no extra paid-hours change;",
+                "staffing trends may be present in the historical reference"
+              )
+            )
+          ))
         }
         utils::write.csv(rbind(x$assumptions, extra), file, row.names = FALSE)
       }
