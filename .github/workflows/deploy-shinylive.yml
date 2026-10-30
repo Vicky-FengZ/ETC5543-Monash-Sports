@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       RENV_CONFIG_AUTOLOADER_ENABLED: "false"
     steps:
@@ -38,10 +38,20 @@ jobs:
       - name: Install system libraries
         run: sudo apt-get update && sudo apt-get install -y libarchive-dev libcurl4-openssl-dev
 
+      # Run outside the project so its renv .Rprofile is not loaded, while
+      # keeping the package repository that setup-r configures.
       - name: Install R packages
-        run: >
-          Rscript --vanilla -e 'install.packages(c("shinylive", "shiny", "bslib",
-          "bsicons", "readxl", "writexl"), lib = Sys.getenv("R_LIBS_USER"))'
+        working-directory: ${{ runner.temp }}
+        run: |
+          Rscript -e '
+            lib <- Sys.getenv("R_LIBS_USER")
+            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+            install.packages(
+              c("shinylive", "shiny", "bslib", "bsicons", "readxl", "writexl"),
+              lib = lib
+            )
+            stopifnot(requireNamespace("shinylive", lib.loc = lib, quietly = TRUE))
+          '
 
       - name: Build the Shinylive site
         run: Rscript --vanilla deploy/build_shinylive.R
@@ -58,7 +68,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
