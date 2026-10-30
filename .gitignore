@@ -1,4 +1,25 @@
+# Confidential source workbooks (see "Data availability" in README.md)
 data/raw/
-.Rproj.user
+
+# R and RStudio
+.Rproj.user/
 .Rhistory
 .RData
+.Ruserdata
+.Renviron
+
+# renv keeps its own .gitignore for the package library
+
+# Quarto and R Markdown render artefacts
+.quarto/
+*_files/
+*_cache/
+
+# Shiny deployment
+rsconnect/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*.xlsx
