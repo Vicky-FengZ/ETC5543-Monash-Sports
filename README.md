@@ -127,7 +127,16 @@ The Data page has two tasks:
 
 ### Uploading files
 
-Upload each workbook through the matching report family:
+The quickest way is **Upload all reports**: choose a whole folder (subfolders
+included) or select every workbook at once. Each file is matched to its
+report family from its file name, using the same naming rules as the
+importers, and the files are parsed one after another. A summary then lists
+the files matched to each family and any that were not recognised; other
+files in the folder are ignored. While files are parsing, the upload buttons
+are paused and a progress message is shown, and a failed transfer is
+explained in plain words.
+
+To add or replace files of one family, upload them through the matching card:
 
 | Upload area | Expected workbook |
 |---|---|

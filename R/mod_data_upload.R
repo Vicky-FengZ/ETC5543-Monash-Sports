@@ -11,6 +11,134 @@ BASIC_UPLOAD_REPORT_TYPES <- c(
   venues_tracking = "Venues Tracking Reports"
 )
 
+# Report type of each uploaded file, recognised from its file name with the
+# same rules as the folder importers (see docs/user_guide.md). NA for files
+# that are not Excel workbooks or whose name matches no report.
+classify_report_upload <- function(file_names) {
+
+  # Upload names are plain file names. basename() is avoided: on Windows it
+  # tilde-expands names such as "~$Report.xlsx" (Excel lock files).
+  names <- as.character(file_names)
+  excel <- grepl("\\.(xlsx|xls)$", names, ignore.case = TRUE) &
+    !startsWith(names, "~$")
+  type <- rep(NA_character_, length(names))
+  type[excel & grepl("(Site|Program)[[:space:]_-]*Report", names, ignore.case = TRUE)] <-
+    "site_detail"
+  type[excel & grepl("Venues[[:space:]_-]*Tracking[[:space:]_-]*Report", names,
+    ignore.case = TRUE)] <- "venues_tracking"
+  type[excel & grepl("^Monthly[[:space:]_-]*Site[[:space:]_-]*Report", names,
+    ignore.case = TRUE)] <- "monthly_site"
+  type
+}
+
+
+# Hint added to a failed file when its name suggests another upload area.
+basic_upload_mismatch_hint <- function(file_name, report_type) {
+
+  guessed <- classify_report_upload(file_name)
+
+  if (is.na(guessed) || identical(guessed, report_type)) {
+    return("")
+  }
+
+  paste0(
+    " The file name looks like one of the ",
+    BASIC_UPLOAD_REPORT_TYPES[[guessed]],
+    "; try Upload all reports or the ",
+    BASIC_UPLOAD_REPORT_TYPES[[guessed]],
+    " area."
+  )
+}
+
+
+# Client-side lock and messages for the upload area. Selecting files locks
+# every upload button until the server reports that parsing has finished,
+# because a second upload sent while the first is parsing fails in the
+# browser version (Shinylive). A failed transfer is explained in plain words.
+basic_upload_script <- function() {
+  tags$script(HTML("
+(function () {
+  if (window.monashUploadArea) return;
+  window.monashUploadArea = true;
+
+  function areaOf(node) { return node && node.closest ? node.closest('.basic-upload-area') : null; }
+
+  function setLocked(area, locked) {
+    area.classList.toggle('is-locked', locked);
+    area.querySelectorAll('input[type=file]').forEach(function (input) { input.disabled = locked; });
+  }
+
+  function showBanner(area, kind, title, text) {
+    var banner = area.querySelector('.basic-upload-banner');
+    if (!banner) return;
+    banner.className = 'basic-upload-banner is-' + kind;
+    banner.textContent = '';
+    var strong = document.createElement('strong');
+    strong.textContent = title;
+    var span = document.createElement('span');
+    span.textContent = text;
+    banner.appendChild(strong);
+    banner.appendChild(span);
+    banner.hidden = false;
+  }
+
+  document.addEventListener('change', function (event) {
+    var input = event.target;
+    if (!input.matches || !input.matches('.basic-upload-area input[type=file]')) return;
+    var count = input.files ? input.files.length : 0;
+    if (!count) return;
+    var area = areaOf(input);
+    area.querySelectorAll('.progress-bar').forEach(function (bar) { delete bar.dataset.uploadFailed; });
+    setLocked(area, true);
+    showBanner(area, 'busy',
+      'Uploading and parsing ' + count + (count === 1 ? ' file' : ' files') + '\u2026',
+      'Keep this page open. Other uploads are paused until this finishes; ' +
+      'large batches can take a few minutes.');
+  });
+
+  // Shiny marks a failed transfer with a red progress bar reading 'error'.
+  var watcher = new MutationObserver(function (records) {
+    records.forEach(function (record) {
+      var node = record.target.nodeType === 3 ? record.target.parentElement : record.target;
+      var bar = node && node.closest ? node.closest('.progress-bar') : null;
+      var area = areaOf(bar);
+      if (!bar || !area || bar.dataset.uploadFailed) return;
+      var failed = bar.classList.contains('progress-bar-danger') ||
+        /^\\s*error/i.test(bar.textContent || '');
+      if (!failed) return;
+      bar.dataset.uploadFailed = '1';
+      setLocked(area, false);
+      showBanner(area, 'error', 'The upload did not finish.',
+        'These files did not reach the dashboard and were not parsed. Wait until ' +
+        'any parsing has finished, then select the files again.');
+    });
+  });
+
+  function watchAreas() {
+    document.querySelectorAll('.basic-upload-area').forEach(function (area) {
+      watcher.observe(area, { subtree: true, childList: true, characterData: true,
+        attributes: true, attributeFilter: ['class'] });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', watchAreas);
+  } else {
+    watchAreas();
+  }
+
+  if (window.Shiny && Shiny.addCustomMessageHandler) {
+    Shiny.addCustomMessageHandler('basic-upload-finished', function (message) {
+      var area = document.getElementById(message.area);
+      if (!area) return;
+      setLocked(area, false);
+      var banner = area.querySelector('.basic-upload-banner');
+      if (banner && banner.classList.contains('is-busy')) banner.hidden = true;
+    });
+  }
+})();
+"))
+}
+
 
 attach_basic_upload_sheet_order <- function(result, path) {
   existing_order <- attr(result, "source_sheet_order", exact = TRUE)
@@ -1450,44 +1578,114 @@ mod_data_upload_ui <- function(id) {
                 )
               )
             ),
-            layout_columns(
-              basic_upload_card(
-                ns = ns,
-                title = "Monthly Site Reports",
-                input_id = "monthly_reports",
-                heading = "Overview and site comparison",
-                description = paste(
-                  "Upload one or more annual Monthly Site Report",
-                  "workbooks."
-                ),
-                icon = "cloud-arrow-up",
-                template_filename = "Monthly Site Report 2026.xlsx"
+            div(
+              id = ns("upload_area"),
+              class = "basic-upload-area",
+              basic_upload_script(),
+              div(
+                class = "basic-upload-banner",
+                role = "status",
+                `aria-live` = "polite",
+                hidden = NA
               ),
-              basic_upload_card(
-                ns = ns,
-                title = "Detailed Site Reports",
-                input_id = "site_reports",
-                heading = "Site detail",
-                description = paste(
-                  "Upload Business Unit Template site or program",
-                  "reports."
+              card(
+                class = "basic-upload-all-card",
+                card_header(
+                  div(
+                    class = "basic-upload-all-header",
+                    tags$strong("Upload all reports"),
+                    span(class = "basic-upload-recommended", "Recommended")
+                  )
                 ),
-                icon = "building",
-                template_filename = "New Sport Site Report 2026.xlsx"
+                card_body(
+                  p(
+                    class = "basic-upload-description",
+                    paste(
+                      "Select every report workbook at once, or choose the folder",
+                      "that holds them. Each file is matched to its report type",
+                      "from its file name and parsed one after another."
+                    )
+                  ),
+                  layout_columns(
+                    fileInput(
+                      ns("all_reports"),
+                      label = "Workbooks",
+                      multiple = TRUE,
+                      accept = c(".xlsx", ".xls"),
+                      buttonLabel = "Choose files",
+                      placeholder = "No files selected"
+                    ),
+                    htmltools::tagQuery(
+                      fileInput(
+                        ns("all_reports_folder"),
+                        label = "Or a whole folder (including subfolders)",
+                        multiple = TRUE,
+                        buttonLabel = "Choose folder",
+                        placeholder = "No folder selected"
+                      )
+                    )$find("input")$filter(
+                      function(tag, index) {
+                        identical(htmltools::tagGetAttribute(tag, "type"), "file")
+                      }
+                    )$addAttrs(
+                      webkitdirectory = NA,
+                      directory = NA
+                    )$allTags(),
+                    col_widths = breakpoints(sm = c(12, 12), lg = c(6, 6))
+                  ),
+                  tags$small(
+                    class = "text-secondary",
+                    paste(
+                      "File names must contain the report name and one four-digit",
+                      "year, e.g. Monthly Site Report 2025 -December.xlsx."
+                    )
+                  )
+                )
               ),
-              basic_upload_card(
-                ns = ns,
-                title = "Venues Tracking Reports",
-                input_id = "venues_reports",
-                heading = "Venues operations",
-                description = paste(
-                  "Upload annual Venues Tracking Report workbooks."
+              div(
+                class = "basic-upload-section-label",
+                "Or add files to one report type"
+              ),
+              layout_columns(
+                basic_upload_card(
+                  ns = ns,
+                  title = "Monthly Site Reports",
+                  input_id = "monthly_reports",
+                  heading = "Overview and site comparison",
+                  description = paste(
+                    "Upload one or more annual Monthly Site Report",
+                    "workbooks."
+                  ),
+                  icon = "cloud-arrow-up",
+                  template_filename = "Monthly Site Report 2026.xlsx"
                 ),
-                icon = "activity",
-                template_filename = "2026 Venues Tracking Report.xlsx"
-              ),
-              col_widths = c(4, 4, 4)
+                basic_upload_card(
+                  ns = ns,
+                  title = "Detailed Site Reports",
+                  input_id = "site_reports",
+                  heading = "Site detail",
+                  description = paste(
+                    "Upload Business Unit Template site or program",
+                    "reports."
+                  ),
+                  icon = "building",
+                  template_filename = "New Sport Site Report 2026.xlsx"
+                ),
+                basic_upload_card(
+                  ns = ns,
+                  title = "Venues Tracking Reports",
+                  input_id = "venues_reports",
+                  heading = "Venues operations",
+                  description = paste(
+                    "Upload annual Venues Tracking Report workbooks."
+                  ),
+                  icon = "activity",
+                  template_filename = "2026 Venues Tracking Report.xlsx"
+                ),
+                col_widths = c(4, 4, 4)
+              )
             ),
+            uiOutput(ns("upload_notice")),
             br(),
             card(
               class = "basic-upload-status-card",
@@ -1760,7 +1958,13 @@ mod_data_upload_server <- function(
         invisible(TRUE)
       }
 
-      process_upload_batch <- function(report_type, upload_info) {
+      process_upload_batch <- function(
+        report_type,
+        upload_info,
+        progress = NULL,
+        offset = 0L,
+        total = NULL
+      ) {
         if (!is.data.frame(upload_info) || nrow(upload_info) == 0L) {
           return(invisible(NULL))
         }
@@ -1824,12 +2028,18 @@ mod_data_upload_server <- function(
           do.call(rbind, queued_rows)
         ))
 
-        progress <- Progress$new(
-          session = session,
-          min = 0,
-          max = nrow(upload_info)
-        )
-        on.exit(progress$close(), add = TRUE)
+        # Upload all reports shares one progress bar across report types.
+        if (is.null(total)) {
+          total <- nrow(upload_info)
+        }
+        if (is.null(progress)) {
+          progress <- Progress$new(
+            session = session,
+            min = 0,
+            max = total
+          )
+          on.exit(progress$close(), add = TRUE)
+        }
 
         for (index in seq_len(nrow(upload_info))) {
           file_id <- queued_ids[[index]]
@@ -1841,12 +2051,12 @@ mod_data_upload_server <- function(
           }
 
           progress$set(
-            value = index - 0.85,
+            value = offset + index - 0.85,
             message = paste0(
               "Parsing ",
-              index,
+              offset + index,
               " of ",
-              nrow(upload_info)
+              total
             ),
             detail = row$original_name[[1L]]
           )
@@ -1866,7 +2076,10 @@ mod_data_upload_server <- function(
           )
 
           if (inherits(parsed, "error")) {
-            message <- conditionMessage(parsed)
+            message <- paste0(
+              conditionMessage(parsed),
+              basic_upload_mismatch_hint(row$original_name[[1L]], report_type)
+            )
             update_registry_row(
               file_id,
               status = "failed",
@@ -1890,7 +2103,10 @@ mod_data_upload_server <- function(
                 progress = 1,
                 detail = paste(issues$errors, "validation error(s)"),
                 warning_count = issues$warnings,
-                error_message = issues$first_error
+                error_message = paste0(
+                  issues$first_error,
+                  basic_upload_mismatch_hint(row$original_name[[1L]], report_type)
+                )
               )
             } else {
               # Commit same-name replacement only after the candidate has
@@ -1925,7 +2141,7 @@ mod_data_upload_server <- function(
           }
 
           progress$set(
-            value = index,
+            value = offset + index,
             detail = paste(row$original_name[[1L]], "complete")
           )
         }
@@ -1933,21 +2149,147 @@ mod_data_upload_server <- function(
         invisible(NULL)
       }
 
+      upload_notice <- reactiveVal(NULL)
+
+      # Unlocks the upload buttons in the browser once parsing has finished.
+      finish_upload <- function() {
+        session$sendCustomMessage(
+          "basic-upload-finished",
+          list(area = session$ns("upload_area"))
+        )
+      }
+
+      process_single_type <- function(report_type, upload_info) {
+        on.exit(finish_upload(), add = TRUE)
+        upload_notice(NULL)
+        process_upload_batch(report_type, upload_info)
+      }
+
+      process_all_reports <- function(upload_info) {
+        on.exit(finish_upload(), add = TRUE)
+
+        if (!is.data.frame(upload_info) || nrow(upload_info) == 0L) {
+          return(invisible(NULL))
+        }
+
+        names <- as.character(upload_info$name)
+        types <- classify_report_upload(names)
+        excel <- grepl("\\.(xlsx|xls)$", names, ignore.case = TRUE) &
+          !startsWith(names, "~$")
+        matched <- !is.na(types)
+        order <- names(BASIC_UPLOAD_REPORT_TYPES)
+        counts <- vapply(order, function(type) sum(types %in% type), integer(1))
+
+        upload_notice(list(
+          counts = counts,
+          unrecognised = names[excel & !matched],
+          ignored = sum(!excel)
+        ))
+
+        if (!any(matched)) {
+          return(invisible(NULL))
+        }
+
+        progress <- Progress$new(session = session, min = 0, max = sum(matched))
+        on.exit(progress$close(), add = TRUE)
+        offset <- 0L
+
+        for (type in order) {
+          rows <- which(types %in% type)
+          if (length(rows) == 0L) next
+          process_upload_batch(
+            type,
+            upload_info[rows, , drop = FALSE],
+            progress = progress,
+            offset = offset,
+            total = sum(matched)
+          )
+          offset <- offset + length(rows)
+        }
+
+        invisible(NULL)
+      }
+
       observeEvent(
         input$monthly_reports,
-        process_upload_batch("monthly_site", input$monthly_reports),
+        process_single_type("monthly_site", input$monthly_reports),
         ignoreInit = TRUE
       )
       observeEvent(
         input$site_reports,
-        process_upload_batch("site_detail", input$site_reports),
+        process_single_type("site_detail", input$site_reports),
         ignoreInit = TRUE
       )
       observeEvent(
         input$venues_reports,
-        process_upload_batch("venues_tracking", input$venues_reports),
+        process_single_type("venues_tracking", input$venues_reports),
         ignoreInit = TRUE
       )
+      observeEvent(
+        input$all_reports,
+        process_all_reports(input$all_reports),
+        ignoreInit = TRUE
+      )
+      observeEvent(
+        input$all_reports_folder,
+        process_all_reports(input$all_reports_folder),
+        ignoreInit = TRUE
+      )
+
+      output$upload_notice <- renderUI({
+        notice <- upload_notice()
+
+        if (is.null(notice)) {
+          return(NULL)
+        }
+
+        counts <- notice$counts[notice$counts > 0L]
+        matched_text <- if (length(counts) > 0L) {
+          paste0(
+            "Matched ", sum(counts), if (sum(counts) == 1L) " file: " else " files: ",
+            paste(
+              paste(counts, BASIC_UPLOAD_REPORT_TYPES[names(counts)]),
+              collapse = ", "
+            ),
+            "."
+          )
+        } else {
+          "No report workbooks were recognised in this selection."
+        }
+        problems <- length(notice$unrecognised) > 0L || length(counts) == 0L
+
+        div(
+          class = paste(
+            "basic-upload-notice",
+            if (problems) "is-warning" else "is-success"
+          ),
+          role = "status",
+          bs_icon(if (problems) "exclamation-triangle" else "check2-circle"),
+          div(
+            tags$strong(matched_text),
+            if (length(notice$unrecognised) > 0L) {
+              p(
+                paste0(
+                  "Not recognised, so not uploaded: ",
+                  paste(notice$unrecognised, collapse = ", "),
+                  ". Rename these files to include the report name and one",
+                  " four-digit year (see the user guide), or upload them",
+                  " through the matching report type below."
+                )
+              )
+            },
+            if (notice$ignored > 0L) {
+              p(
+                paste0(
+                  notice$ignored,
+                  if (notice$ignored == 1L) " other file was" else " other files were",
+                  " ignored because they are not Excel workbooks."
+                )
+              )
+            }
+          )
+        )
+      })
 
       observeEvent(
         input$remove_file,

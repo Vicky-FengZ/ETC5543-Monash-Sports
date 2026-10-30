@@ -872,4 +872,83 @@ shiny::testServer(
   }
 )
 
+# Upload all reports: files are routed by name; others are reported.
+stopifnot(
+  identical(
+    classify_report_upload(c(
+      "Monthly Site Report 2025 -December.xlsx",
+      "Aquatics Site Report 2025.xlsx",
+      "Participation Program Report 2025.xlsx",
+      "Venues Site Report 2025.xlsx",
+      "2025 Venues Tracking Report.xlsx",
+      "Budget notes 2025.xlsx",
+      "~$Monthly Site Report 2025.xlsx",
+      "desktop.ini",
+      "Monthly Site Report 2025.csv"
+    )),
+    c("monthly_site", "site_detail", "site_detail", "site_detail",
+      "venues_tracking", NA, NA, NA, NA)
+  ),
+  identical(basic_upload_mismatch_hint("Aquatics Site Report 2025.xlsx", "site_detail"), ""),
+  grepl("Venues Tracking Reports",
+    basic_upload_mismatch_hint("2025 Venues Tracking Report.xlsx", "monthly_site"),
+    fixed = TRUE)
+)
+
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    paths <- replicate(4L, tempfile(fileext = ".xlsx"))
+    for (path in paths) writeBin(charToRaw("synthetic upload"), path)
+
+    session$setInputs(
+      all_reports = data.frame(
+        name = c(
+          "Monthly Site Report 2099.xlsx",
+          "2099 Venues Tracking Report.xlsx",
+          "Unrelated notes 2099.xlsx",
+          "readme.txt"
+        ),
+        size = file.info(paths)$size,
+        type = "application/octet-stream",
+        datapath = paths,
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+
+    uploaded <- session$returned()$uploads
+    notice <- paste(as.character(output$upload_notice), collapse = "")
+    stopifnot(
+      nrow(uploaded) == 2L,
+      setequal(uploaded$report_type, c("monthly_site", "venues_tracking")),
+      all(uploaded$status == "ready"),
+      grepl("Matched 2 files", notice, fixed = TRUE),
+      grepl("Unrelated notes 2099.xlsx", notice, fixed = TRUE),
+      grepl("1 other file was ignored", notice, fixed = TRUE)
+    )
+
+    # A file uploaded to the wrong area fails with a hint to the right one.
+    session$setInputs(
+      site_reports = data.frame(
+        name = "2099 Venues Tracking Report.xlsx",
+        size = file.info(paths[[2L]])$size,
+        type = "application/octet-stream",
+        datapath = paths[[2L]],
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+    failed <- session$returned()$uploads
+    failed <- failed[failed$status == "failed", , drop = FALSE]
+    stopifnot(
+      nrow(failed) == 1L,
+      grepl("try Upload all reports", failed$error_message[[1L]], fixed = TRUE)
+    )
+    unlink(paths)
+  }
+)
+
 cat("PASS test_basic_upload.R\n")

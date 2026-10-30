@@ -69,13 +69,29 @@ templates are available from the Data page and in `www/templates/`; see
 ## 3. Upload the reports
 
 1. Open the **Data** page and stay on **Upload & Manage**.
-2. In each report-family card, select all workbooks from the matching
-   subfolder at once (for example, select every file in `Monthly Site Report/`
-   for the Monthly Site Reports card).
-3. Wait until each file shows `ready`. Select **View details** under a file to
-   read any warnings; a `failed` file is left out of the dashboard.
-4. Use the other pages. **View Cleaned Data** shows and downloads the
+2. Under **Upload all reports**, select **Choose folder** and pick the shared
+   report folder (subfolders are included), or select **Choose files** and
+   select all the workbooks at once. Each file is matched to its report type
+   from its file name, so the naming rules above matter.
+3. Keep the page open while the files are parsed. A blue message shows the
+   progress, and the upload buttons are paused until parsing finishes.
+4. Read the summary that appears below the upload cards. It lists how many
+   files were matched to each report type, and any files that were **not
+   recognised** (rename these to follow the naming rules, or upload them
+   through the matching report-type card). Other files in the folder, such as
+   Word documents, are ignored.
+5. Wait until each file shows `ready`. Select **View details** under a file to
+   read any warnings; a `failed` file is left out of the dashboard. If a file
+   was uploaded through the wrong report-type card, its message says which
+   card to use.
+6. Use the other pages. **View Cleaned Data** shows and downloads the
    standardised tables.
+
+To add or replace a single file later, use the card for its report type under
+**Or add files to one report type**.
+
+If a red message says **The upload did not finish**, the files never reached
+the dashboard. Wait until any parsing has finished, then select them again.
 
 Close the workbooks in Excel before uploading. Uploads last only for the
 current session: closing or refreshing the dashboard clears them, and your
