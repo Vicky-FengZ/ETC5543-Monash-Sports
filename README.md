@@ -9,6 +9,9 @@ Analytics Creative Activity with Monash Sport.
 - **Industry mentors:** Alicia Stack and Darren McLeod (Monash Sport)
 - **Academic mentor:** Minh Huynh (Monash University)
 
+**Live dashboard:** [https://vicky-fengz.github.io/ETC5543-Monash-Sports/](https://vicky-fengz.github.io/ETC5543-Monash-Sports/) (runs in your browser;
+uploaded reports never leave your computer).
+
 **Who this repository is for**
 
 - **Monash Sport staff** using the dashboard with their own reports: start
@@ -57,7 +60,14 @@ The colours and layout follow the Monash brand; see
 
 ## Quick start
 
-Requirements: R 4.4 (the project was built with R 4.4.3) and RStudio or
+The easiest way is to open the **[live dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** and upload
+the synthetic workbooks in `data/sample/` (or your own reports) on the Data
+page. It is a static [Shinylive](https://posit-dev.github.io/r-shinylive/)
+build that runs R in the browser, published to GitHub Pages by
+`.github/workflows/deploy-shinylive.yml` on every push to `main`
+(see `deploy/build_shinylive.R`).
+
+To run it in R instead. Requirements: R 4.4 (the project was built with R 4.4.3) and RStudio or
 another R IDE. From the project root, restore the packages recorded in
 `renv.lock` and start the app:
 
@@ -488,6 +498,12 @@ slides/
   slides.qmd              # project presentation (Quarto, Monash theme)
   slides.html             # rendered presentation
   _extensions/            # quarto-monash presentation theme
+
+deploy/
+  build_shinylive.R       # builds the static browser version into _site/
+
+.github/workflows/
+  deploy-shinylive.yml    # publishes _site/ to GitHub Pages on every push
 
 tests/
   run_tests.R             # regression tests (see Testing)

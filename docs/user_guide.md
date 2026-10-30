@@ -6,10 +6,17 @@ workbooks, how to upload them and how to add a new year. Reviewers without
 access to the reports can use the synthetic workbooks in `data/sample/`
 instead (see the README).
 
-## 1. Run the dashboard
+## 1. Open the dashboard
 
-The dashboard currently runs on your own computer, so the reports never leave
-it.
+Open **[https://vicky-fengz.github.io/ETC5543-Monash-Sports/](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** in Chrome or Edge. Nothing needs to be installed.
+
+The first visit takes about 30 seconds while the dashboard loads into the
+browser; later visits are faster. The whole dashboard runs inside your
+browser, so the reports you upload stay on your computer (see section 5).
+
+### Running it from RStudio instead
+
+Maintainers can also run it locally:
 
 1. Install R 4.4 and RStudio.
 2. Download or clone this repository and open `monash-sport-dashboard.Rproj`
@@ -113,10 +120,13 @@ report must keep.
 
 - The reports are confidential and are **not stored in this repository**.
   Never add them to Git or attach them to issues.
-- When the dashboard runs on your computer, uploaded files are copied only to
-  a temporary folder on that computer and removed when the session ends.
-- If the dashboard is later hosted online, confirm how and where uploads are
-  processed before using confidential reports with it.
+- The website contains only the dashboard's code. When you upload reports,
+  they are read by the dashboard **inside your browser** and are never sent
+  to a server, including GitHub.
+- Uploads last only while the page is open. Closing or refreshing the page
+  removes them.
+- When the dashboard runs from RStudio, uploaded files are copied only to a
+  temporary folder on that computer and removed when the session ends.
 
 ## 6. For maintainers: running the full tests
 
