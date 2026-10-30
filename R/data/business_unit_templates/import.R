@@ -179,7 +179,7 @@ read_business_unit_template_sheet <- function(path, sheet_name) {
     check.names = FALSE
   )
   names(raw_sheet) <- paste0("column_", seq_len(ncol(raw_sheet)))
-  raw_sheet
+  cache_sheet_cells(raw_sheet)
 }
 
 

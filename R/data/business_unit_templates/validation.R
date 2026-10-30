@@ -366,7 +366,8 @@ make_business_unit_check <- function(
     "fail"
   }
 
-  data.frame(
+  # A one-row record; bound with records_to_table().
+  list(
     report_year = as.integer(report_year),
     dataset = dataset,
     check_type = check_type,
@@ -383,8 +384,7 @@ make_business_unit_check <- function(
     source_file = source_file,
     source_sheet = source_sheet,
     source_row = as.integer(source_row),
-    source_column = as.integer(source_column),
-    stringsAsFactors = FALSE
+    source_column = as.integer(source_column)
   )
 }
 
@@ -608,7 +608,7 @@ build_business_unit_finance_checks <- function(
     }
   }
 
-  result <- bind_import_tables(checks, empty_business_unit_check_table())
+  result <- records_to_table(checks, empty_business_unit_check_table())
   result <- result[result$status != "no_data", , drop = FALSE]
   rownames(result) <- NULL
   result
@@ -664,7 +664,7 @@ build_business_unit_discount_checks <- function(
       validation_tolerance
     )
   }
-  result <- bind_import_tables(checks, empty_business_unit_check_table())
+  result <- records_to_table(checks, empty_business_unit_check_table())
   result <- result[result$status != "no_data", , drop = FALSE]
   rownames(result) <- NULL
   result
@@ -674,6 +674,20 @@ build_business_unit_discount_checks <- function(
 business_unit_visit_record <- function(data, audience) {
 
   business_unit_check_record(data, data$audience == audience)
+}
+
+
+# Row indices of each group of `data` defined by `columns`, in the order the
+# groups first appear (the order of unique(data[columns])). NA values form
+# their own group. Faster than filtering the whole table once per group.
+business_unit_group_rows <- function(data, columns) {
+
+  key_parts <- lapply(
+    data[columns],
+    function(values) ifelse(is.na(values), "\001NA", as.character(values))
+  )
+  key <- do.call(paste, c(key_parts, sep = "\r"))
+  unname(split(seq_len(nrow(data)), factor(key, levels = unique(key))))
 }
 
 
@@ -698,18 +712,8 @@ build_business_unit_visit_checks <- function(
     ]
   )
 
-  for (index in seq_len(nrow(period_keys))) {
-    key <- period_keys[index, , drop = FALSE]
-    group_data <- visits[
-      visits$source_file == key$source_file[[1]] &
-        visits$source_sheet == key$source_sheet[[1]] &
-        visits$source_row == key$source_row[[1]] &
-        visits$period_type == key$period_type[[1]] &
-        (is.na(visits$month) == is.na(key$month[[1]])) &
-        (is.na(key$month[[1]]) | visits$month == key$month[[1]]),
-      ,
-      drop = FALSE
-    ]
+  for (rows in business_unit_group_rows(visits, names(period_keys))) {
+    group_data <- visits[rows, , drop = FALSE]
     component_values <- group_data$value[
       group_data$audience != "Total"
     ]
@@ -745,18 +749,8 @@ build_business_unit_visit_checks <- function(
       )
     ]
   )
-  for (index in seq_len(nrow(activity_keys))) {
-    key <- activity_keys[index, , drop = FALSE]
-    group_data <- visits[
-      visits$source_file == key$source_file[[1]] &
-        visits$source_sheet == key$source_sheet[[1]] &
-        visits$period_type == key$period_type[[1]] &
-        visits$audience == key$audience[[1]] &
-        (is.na(visits$month) == is.na(key$month[[1]])) &
-        (is.na(key$month[[1]]) | visits$month == key$month[[1]]),
-      ,
-      drop = FALSE
-    ]
+  for (rows in business_unit_group_rows(visits, names(activity_keys))) {
+    group_data <- visits[rows, , drop = FALSE]
     component_values <- group_data$value[group_data$row_type == "Activity"]
     reported <- business_unit_check_record(
       group_data,
@@ -787,16 +781,8 @@ build_business_unit_visit_checks <- function(
       c("source_file", "source_sheet", "source_row", "audience")
     ]
   )
-  for (index in seq_len(nrow(ytd_keys))) {
-    key <- ytd_keys[index, , drop = FALSE]
-    group_data <- visits[
-      visits$source_file == key$source_file[[1]] &
-        visits$source_sheet == key$source_sheet[[1]] &
-        visits$source_row == key$source_row[[1]] &
-        visits$audience == key$audience[[1]],
-      ,
-      drop = FALSE
-    ]
+  for (rows in business_unit_group_rows(visits, names(ytd_keys))) {
+    group_data <- visits[rows, , drop = FALSE]
     monthly_values <- group_data$value[group_data$period_type == "Month"]
     reported <- business_unit_check_record(
       group_data,
@@ -822,7 +808,7 @@ build_business_unit_visit_checks <- function(
     )
   }
 
-  result <- bind_import_tables(checks, empty_business_unit_check_table())
+  result <- records_to_table(checks, empty_business_unit_check_table())
   result <- result[result$status != "no_data", , drop = FALSE]
   rownames(result) <- NULL
   result
@@ -969,7 +955,7 @@ build_business_unit_member_checks <- function(
     }
   }
 
-  result <- bind_import_tables(checks, empty_business_unit_check_table())
+  result <- records_to_table(checks, empty_business_unit_check_table())
   result <- result[result$status != "no_data", , drop = FALSE]
   rownames(result) <- NULL
   result

@@ -8,9 +8,27 @@ normalise_excel_label <- function(x) {
 
   x <- as.character(x)
   x[is.na(x)] <- ""
+
+  # Importers normalise the same few labels many thousands of times, one cell
+  # at a time; remembering single-label results avoids repeated regex work.
+  if (length(x) == 1L && nzchar(x)) {
+    cached <- excel_label_cache[[x]]
+    if (!is.null(cached)) {
+      return(cached)
+    }
+    result <- tolower(trimws(gsub("[[:space:]]+", " ", x)))
+    if (length(excel_label_cache) > 50000L) {
+      rm(list = ls(excel_label_cache, all.names = TRUE), envir = excel_label_cache)
+    }
+    assign(x, result, envir = excel_label_cache)
+    return(result)
+  }
+
   x <- trimws(gsub("[[:space:]]+", " ", x))
   tolower(x)
 }
+
+excel_label_cache <- new.env(hash = TRUE, parent = emptyenv())
 
 
 empty_import_issue_table <- function() {
@@ -59,6 +77,45 @@ bind_import_tables <- function(tables, empty_table) {
 }
 
 
+# Build a table from one-row records stored as named lists. Equivalent to
+# binding one-row data frames with bind_import_tables(), but avoids creating a
+# data frame per record, which is slow for cell-by-cell extraction.
+records_to_table <- function(records, empty_table) {
+
+  records <- Filter(Negate(is.null), records)
+
+  if (length(records) == 0L) {
+    return(empty_table)
+  }
+
+  single_values <- vapply(
+    records,
+    function(record) all(lengths(record) == 1L),
+    logical(1)
+  )
+
+  if (!all(single_values)) {
+    return(bind_import_tables(
+      lapply(records, as.data.frame, stringsAsFactors = FALSE),
+      empty_table
+    ))
+  }
+
+  columns <- names(records[[1L]])
+  table <- lapply(
+    columns,
+    function(column) do.call(c, unname(lapply(records, `[[`, column)))
+  )
+  names(table) <- columns
+
+  structure(
+    table,
+    class = "data.frame",
+    row.names = c(NA_integer_, -length(records))
+  )
+}
+
+
 workbook_source_sheet_order <- function(workbooks) {
 
   sheet_orders <- lapply(
@@ -89,6 +146,11 @@ cell_as_text <- function(raw_sheet, row, column) {
     return(NA_character_)
   }
 
+  cache <- cached_sheet_cells(raw_sheet, "cell_text")
+  if (!is.null(cache)) {
+    return(cache[row, column])
+  }
+
   value <- raw_sheet[[column]][row]
 
   if (length(value) == 0L || is.na(value)) {
@@ -107,6 +169,147 @@ cell_as_text <- function(raw_sheet, row, column) {
 }
 
 
+# Vectorised equivalent of cell_as_text() for every cell of a sheet, used by
+# routines that scan whole sheets. Element [row, column] equals
+# cell_as_text(raw_sheet, row, column); scanning cell by cell is much slower,
+# especially when the dashboard runs in the browser (Shinylive).
+sheet_text_matrix <- function(raw_sheet) {
+
+  cache <- cached_sheet_cells(raw_sheet, "cell_text")
+  if (!is.null(cache)) {
+    return(cache)
+  }
+
+  rows <- nrow(raw_sheet)
+  columns <- ncol(raw_sheet)
+  result <- matrix(NA_character_, nrow = rows, ncol = columns)
+
+  for (column in seq_len(columns)) {
+    values <- raw_sheet[[column]]
+
+    if (is.list(values) || inherits(values, c("POSIXt", "Date"))) {
+      result[, column] <- vapply(
+        seq_len(rows),
+        function(row) cell_as_text(raw_sheet, row, column),
+        character(1)
+      )
+      next
+    }
+
+    text <- as.character(values)
+    text[is.na(values)] <- NA_character_
+    text <- trimws(gsub("[[:space:]]+", " ", text))
+    text[!is.na(text) & !nzchar(text)] <- NA_character_
+    result[, column] <- text
+  }
+
+  result
+}
+
+
+# Vectorised equivalent of cell_as_number() for every cell of a sheet.
+sheet_number_matrix <- function(raw_sheet) {
+
+  rows <- nrow(raw_sheet)
+  columns <- ncol(raw_sheet)
+  result <- matrix(NA_real_, nrow = rows, ncol = columns)
+
+  for (column in seq_len(columns)) {
+    values <- raw_sheet[[column]]
+
+    if (is.numeric(values)) {
+      result[, column] <- as.numeric(values)
+    } else if (is.character(values)) {
+      text <- trimws(values)
+      is_parenthesised <- grepl("^\\(.*\\)$", text)
+      is_percentage <- grepl("%", text, fixed = TRUE)
+      numbers <- suppressWarnings(
+        as.numeric(gsub("[$,%()[:space:]]", "", text))
+      )
+      numbers[is.na(text) | !nzchar(text)] <- NA_real_
+      flip <- is_parenthesised & !is.na(numbers)
+      numbers[flip] <- -numbers[flip]
+      scale <- is_percentage & !is.na(numbers)
+      numbers[scale] <- numbers[scale] / 100
+      result[, column] <- numbers
+    } else if (!is.logical(values) || is.list(values)) {
+      result[, column] <- vapply(
+        seq_len(rows),
+        function(row) cell_as_number(raw_sheet, row, column),
+        numeric(1)
+      )
+    }
+    # Logical columns (TRUE/FALSE/NA) never parse as numbers: left as NA.
+  }
+
+  result
+}
+
+
+# Read-once caches of every cell's text and number, attached to a sheet when
+# it is read from Excel. cell_as_text() and cell_as_number() then become
+# lookups, which keeps cell-by-cell parsing fast in the browser (Shinylive).
+cache_sheet_cells <- function(raw_sheet) {
+
+  attr(raw_sheet, "cell_text") <- sheet_text_matrix(raw_sheet)
+  attr(raw_sheet, "cell_number") <- sheet_number_matrix(raw_sheet)
+  # Row subsets keep custom attributes but change row names, so the cache is
+  # only used while the sheet still has the rows it was built from.
+  attr(raw_sheet, "cell_row_names") <- .row_names_info(raw_sheet, type = 0L)
+  raw_sheet
+}
+
+
+cached_sheet_cells <- function(raw_sheet, which) {
+
+  cache <- attr(raw_sheet, which, exact = TRUE)
+
+  if (
+    is.null(cache) ||
+      nrow(cache) != nrow(raw_sheet) ||
+      ncol(cache) != ncol(raw_sheet) ||
+      !identical(
+        attr(raw_sheet, "cell_row_names", exact = TRUE),
+        .row_names_info(raw_sheet, type = 0L)
+      )
+  ) {
+    return(NULL)
+  }
+
+  cache
+}
+
+
+# Vectorised month lookup from short or long month labels ("Jan", "January",
+# "SEPT"). Returns NA for blanks and non-month labels.
+month_number_from_labels <- function(values) {
+
+  key <- normalise_excel_label(values)
+  result <- match(substr(gsub("[^a-z]", "", key), 1L, 3L), tolower(month.abb))
+  result[!nzchar(key)] <- NA_integer_
+  result
+}
+
+
+# Row with the most month labels, or NA when no row has `minimum_months`.
+find_month_header_row <- function(raw_sheet, minimum_months) {
+
+  if (!is.data.frame(raw_sheet) || nrow(raw_sheet) == 0L) {
+    return(NA_integer_)
+  }
+
+  months <- month_number_from_labels(sheet_text_matrix(raw_sheet))
+  dim(months) <- c(nrow(raw_sheet), ncol(raw_sheet))
+  counts <- rowSums(!is.na(months))
+
+  if (max(counts, 0L) < minimum_months) {
+    return(NA_integer_)
+  }
+
+  which.max(counts)
+}
+
+
 cell_as_number <- function(raw_sheet, row, column) {
 
   if (
@@ -116,6 +319,11 @@ cell_as_number <- function(raw_sheet, row, column) {
       column > ncol(raw_sheet)
   ) {
     return(NA_real_)
+  }
+
+  cache <- cached_sheet_cells(raw_sheet, "cell_number")
+  if (!is.null(cache)) {
+    return(cache[row, column])
   }
 
   value <- raw_sheet[[column]][row]

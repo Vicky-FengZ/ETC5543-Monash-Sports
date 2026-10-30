@@ -301,35 +301,7 @@ venues_month_from_text <- function(value) {
 
 find_venues_month_header <- function(raw_sheet, minimum_months = 6L) {
 
-  if (!is.data.frame(raw_sheet) || nrow(raw_sheet) == 0L) {
-    return(NA_integer_)
-  }
-
-  month_counts <- vapply(
-    seq_len(nrow(raw_sheet)),
-    function(row) {
-      sum(
-        !is.na(
-          vapply(
-            seq_len(ncol(raw_sheet)),
-            function(column) {
-              venues_month_from_text(
-                cell_as_text(raw_sheet, row, column)
-              )
-            },
-            integer(1)
-          )
-        )
-      )
-    },
-    integer(1)
-  )
-
-  if (max(month_counts, 0L) < minimum_months) {
-    return(NA_integer_)
-  }
-
-  which.max(month_counts)
+  find_month_header_row(raw_sheet, minimum_months)
 }
 
 
@@ -515,7 +487,7 @@ attendance_records_for_row <- function(
         month = period$month
       )
 
-      data.frame(
+      list(
         report_year = as.integer(workbook$report_year),
         date = period_values$date,
         month = period_values$month,
@@ -533,13 +505,12 @@ attendance_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$attendance_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(period$column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(period$column)
       )
     }
   )
 
-  bind_import_tables(records, empty_venues_attendance_table())
+  records_to_table(records, empty_venues_attendance_table())
 }
 
 
@@ -795,7 +766,7 @@ facility_hire_records_for_row <- function(
         transaction_column
       )[[metric_index]]
 
-      records[[length(records) + 1L]] <- data.frame(
+      records[[length(records) + 1L]] <- list(
         report_year = as.integer(workbook$report_year),
         date = period$date,
         month = period$month,
@@ -811,8 +782,7 @@ facility_hire_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$facility_hire_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(source_column)
       )
     }
   }
@@ -822,7 +792,7 @@ facility_hire_records_for_row <- function(
       metric <- c("Revenue", "Transactions")[[metric_index]]
       source_column <- ytd_column + metric_index - 1L
 
-      records[[length(records) + 1L]] <- data.frame(
+      records[[length(records) + 1L]] <- list(
         report_year = as.integer(workbook$report_year),
         date = as.Date(NA),
         month = NA_integer_,
@@ -838,13 +808,12 @@ facility_hire_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$facility_hire_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(source_column)
       )
     }
   }
 
-  bind_import_tables(records, empty_venues_facility_hire_table())
+  records_to_table(records, empty_venues_facility_hire_table())
 }
 
 
@@ -1077,7 +1046,7 @@ membership_records_for_row <- function(
         next
       }
 
-      records[[length(records) + 1L]] <- data.frame(
+      records[[length(records) + 1L]] <- list(
         report_year = as.integer(workbook$report_year),
         date = period$date,
         month = period$month,
@@ -1092,13 +1061,12 @@ membership_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$membership_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(source_column)
       )
     }
   }
 
-  bind_import_tables(records, empty_venues_membership_table())
+  records_to_table(records, empty_venues_membership_table())
 }
 
 
@@ -1367,7 +1335,7 @@ online_sales_records_for_row <- function(
         period$column
       )
 
-      data.frame(
+      list(
         report_year = as.integer(workbook$report_year),
         date = period_values$date,
         month = period_values$month,
@@ -1388,13 +1356,12 @@ online_sales_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$online_sales_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(period$column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(period$column)
       )
     }
   )
 
-  bind_import_tables(records, empty_venues_online_sales_table())
+  records_to_table(records, empty_venues_online_sales_table())
 }
 
 
@@ -1678,7 +1645,7 @@ merchandise_records_for_row <- function(
         source_column
       )
 
-      records[[length(records) + 1L]] <- data.frame(
+      records[[length(records) + 1L]] <- list(
         report_year = as.integer(workbook$report_year),
         date = period$date,
         month = period$month,
@@ -1694,13 +1661,12 @@ merchandise_records_for_row <- function(
         source_file = workbook$source_file,
         source_sheet = workbook$merchandise_sheet_name,
         source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
+        source_column = as.integer(source_column)
       )
     }
   }
 
-  bind_import_tables(records, empty_venues_merchandise_table())
+  records_to_table(records, empty_venues_merchandise_table())
 }
 
 

@@ -627,32 +627,7 @@ business_unit_template_month_from_label <- function(value) {
 
 find_business_unit_visit_header <- function(raw_sheet) {
 
-  if (!is.data.frame(raw_sheet) || nrow(raw_sheet) == 0L) {
-    return(NA_integer_)
-  }
-  counts <- vapply(
-    seq_len(nrow(raw_sheet)),
-    function(source_row) {
-      sum(
-        !is.na(
-          vapply(
-            seq_len(ncol(raw_sheet)),
-            function(source_column) {
-              business_unit_template_month_from_label(
-                cell_as_text(raw_sheet, source_row, source_column)
-              )
-            },
-            integer(1)
-          )
-        )
-      )
-    },
-    integer(1)
-  )
-  if (max(counts, 0L) < 10L) {
-    return(NA_integer_)
-  }
-  which.max(counts)
+  find_month_header_row(raw_sheet, 10L)
 }
 
 
@@ -712,7 +687,7 @@ clean_business_unit_template_visits <- function(
 
   raw_sheet <- workbook$sheets[[sheet_field]]
   sheet_name <- workbook$sheet_names[[sheet_field]]
-  if (!is.data.frame(raw_sheet) || nrow(raw_sheet) == 0L) {
+  if (!is.list(raw_sheet) || nrow(raw_sheet) == 0L) {
     return(empty_business_unit_template_visit_table())
   }
   header_row <- find_business_unit_visit_header(raw_sheet)
@@ -762,7 +737,7 @@ clean_business_unit_template_visits <- function(
         }
         period_type <- period$period_type[[1]]
         month <- period$month[[1]]
-        records[[length(records) + 1L]] <- data.frame(
+        records[[length(records) + 1L]] <- list(
           report_year = as.integer(workbook$report_year),
           date = if (period_type == "Month") {
             as.Date(sprintf("%04d-%02d-01", workbook$report_year, month))
@@ -791,8 +766,7 @@ clean_business_unit_template_visits <- function(
           source_file = workbook$source_file,
           source_sheet = sheet_name,
           source_row = as.integer(source_row),
-          source_column = as.integer(source_column),
-          stringsAsFactors = FALSE
+          source_column = as.integer(source_column)
         )
       }
     }
@@ -802,8 +776,7 @@ clean_business_unit_template_visits <- function(
     }
   }
 
-  result <- bind_import_tables(
-    records,
+  result <- records_to_table(records,
     empty_business_unit_template_visit_table()
   )
   if (nrow(result) > 0L) {

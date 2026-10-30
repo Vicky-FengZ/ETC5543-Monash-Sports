@@ -692,7 +692,8 @@ make_venues_operational_check <- function(
     group_data[1L, , drop = FALSE]
   }
 
-  data.frame(
+  # A one-row record; bound with records_to_table().
+  list(
     report_year = as.integer(group_data$report_year[[1]]),
     dataset = dataset,
     check_type = check_type,
@@ -708,8 +709,7 @@ make_venues_operational_check <- function(
     source_file = group_data$source_file[[1]],
     source_sheet = source_record$source_sheet[[1]],
     source_row = as.integer(source_record$source_row[[1]]),
-    source_column = as.integer(source_record$source_column[[1]]),
-    stringsAsFactors = FALSE
+    source_column = as.integer(source_record$source_column[[1]])
   )
 }
 
@@ -798,7 +798,7 @@ build_venues_period_total_checks <- function(
     )
   }
 
-  result <- bind_import_tables(
+  result <- records_to_table(
     checks,
     empty_venues_operational_check_table()
   )
@@ -1502,7 +1502,8 @@ make_venues_finance_check <- function(
     "fail"
   }
 
-  data.frame(
+  # A one-row record; bound with records_to_table().
+  list(
     report_year = month_data$report_year[[1]],
     date = month_data$date[[1]],
     month = month_data$month[[1]],
@@ -1520,8 +1521,7 @@ make_venues_finance_check <- function(
     source_file = month_data$source_file[[1]],
     source_sheet = month_data$source_sheet[[1]],
     source_row = as.integer(reported_record$source_row),
-    source_column = as.integer(reported_record$source_column),
-    stringsAsFactors = FALSE
+    source_column = as.integer(reported_record$source_column)
   )
 }
 
@@ -1722,7 +1722,7 @@ build_venues_finance_checks <- function(
     }
   }
 
-  result <- bind_import_tables(
+  result <- records_to_table(
     checks,
     empty_venues_finance_check_table()
   )

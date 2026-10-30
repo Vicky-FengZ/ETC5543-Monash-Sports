@@ -173,6 +173,7 @@ read_monthly_site_report_file <- function(
             "column_",
             seq_len(ncol(raw_sheet))
           )
+          raw_sheet <- cache_sheet_cells(raw_sheet)
 
           list(
             sheet = raw_sheet,

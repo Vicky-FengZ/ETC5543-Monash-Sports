@@ -174,13 +174,30 @@ audit_import_extensions <- function(report, workbooks, family) {
       first_column <- if (family == "venues_tracking" &&
         identical(sheet_name, workbook$merchandise_sheet_name)) 3L else 2L
       if (ncol(raw) < first_column) next
+      # Whole-sheet lookups replace per-cell text, placeholder and coverage
+      # checks; results are identical but much faster in the browser.
+      text_matrix <- sheet_text_matrix(raw)
+      placeholder <- normalise_excel_label(text_matrix) %in% c("-", "--", "na", "n/a")
+      dim(placeholder) <- dim(text_matrix)
+      covered_cells <- matrix(FALSE, nrow = nrow(raw), ncol = ncol(raw))
+      in_sheet <- coordinates$source_row >= 1L & coordinates$source_row <= nrow(raw) &
+        coordinates$source_column >= 1L & coordinates$source_column <= ncol(raw)
+      covered_cells[cbind(coordinates$source_row[in_sheet],
+        coordinates$source_column[in_sheet])] <- TRUE
       extra <- list()
       for (column in seq.int(first_column, ncol(raw))) {
+        column_values <- raw[[column]]
+        numeric_column <- is.numeric(column_values)
         for (row in data_rows) {
-          text <- cell_as_text(raw, row, column)
-          if (is.na(text) || normalise_excel_label(text) %in% c("-", "--", "na", "n/a")) next
-          number <- cell_as_number(raw, row, column)
-          is_covered <- paste(row, column, sep = ":") %in% covered
+          if (row < 1L || row > nrow(raw)) next
+          text <- text_matrix[row, column]
+          if (is.na(text) || placeholder[row, column]) next
+          number <- if (numeric_column) {
+            as.numeric(column_values[row])
+          } else {
+            cell_as_number(raw, row, column)
+          }
+          is_covered <- covered_cells[row, column]
           if (is_covered && !is.na(number)) next
           field <- paste("Column", column)
           preceding <- section_headers[section_headers < row]
@@ -192,17 +209,16 @@ audit_import_extensions <- function(report, workbooks, family) {
           # new discount categories and must not be added to opportunity twice.
           reported_subtotal <- row %in% discount_rows && !is.na(number) &&
             normalise_excel_label(field) %in% c("total", "subtotal", "total discounts")
-          extra[[length(extra) + 1L]] <- data.frame(
+          extra[[length(extra) + 1L]] <- list(
             report_year = as.integer(workbook$report_year), field = field,
             raw_value = text, value = number,
             interpretation = if (reported_subtotal) "Reported discount total" else
               if (is_covered) "Non-numeric value" else "Unmapped field",
             source_file = workbook$source_file, source_sheet = sheet_name,
-            source_row = as.integer(row), source_column = as.integer(column),
-            stringsAsFactors = FALSE)
+            source_row = as.integer(row), source_column = as.integer(column))
         }
       }
-      cells <- bind_import_tables(extra, empty_additional_import_data())
+      cells <- records_to_table(extra, empty_additional_import_data())
       if (nrow(cells) > 0L) {
         additional[[length(additional) + 1L]] <- cells
       }

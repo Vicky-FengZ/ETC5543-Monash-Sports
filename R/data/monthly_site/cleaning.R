@@ -266,7 +266,10 @@ extract_monthly_finance_section <- function(
     raw_sheet
   )
 
-  rows <- list()
+  # Month rows up to the section's TOTAL row; one record per month row and
+  # value column (built in one step rather than one data frame per cell).
+  month_rows <- integer()
+  months <- integer()
 
   for (source_row in seq.int(header_row + 1L, nrow(raw_sheet))) {
 
@@ -288,56 +291,57 @@ extract_monthly_finance_section <- function(
       next
     }
 
-    for (source_column in value_columns) {
-
-      business_unit <- group_headers[[source_column]]
-
-      if (is.na(business_unit)) {
-        business_unit <- "Unlabelled"
-      }
-
-      rows[[length(rows) + 1L]] <- data.frame(
-        report_year = as.integer(report_year),
-        date = as.Date(
-          sprintf(
-            "%04d-%02d-01",
-            report_year,
-            month
-          )
-        ),
-        month = as.integer(month),
-        month_label = month.abb[[month]],
-        site = site,
-        site_code = site_code,
-        business_unit = business_unit,
-        is_summary = normalise_excel_label(business_unit) == "ytd summary",
-        metric = if (
-          normalise_excel_label(section_label) == "income"
-        ) {
-          "Income"
-        } else {
-          "Expenses"
-        },
-        value_type = unname(
-          value_type_map[[header_labels[[source_column]]]]
-        ),
-        value = cell_as_number(
-          raw_sheet,
-          source_row,
-          source_column
-        ),
-        source_file = source_file,
-        source_sheet = sheet_name,
-        source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
-      )
-    }
+    month_rows <- c(month_rows, source_row)
+    months <- c(months, month)
   }
 
-  bind_import_tables(
-    rows,
-    empty_monthly_finance_table()
+  if (length(month_rows) == 0L) {
+    return(empty_monthly_finance_table())
+  }
+
+  record_rows <- rep(month_rows, each = length(value_columns))
+  record_months <- rep(as.integer(months), each = length(value_columns))
+  record_columns <- rep(value_columns, times = length(month_rows))
+  business_units <- group_headers[record_columns]
+  business_units[is.na(business_units)] <- "Unlabelled"
+
+  data.frame(
+    report_year = as.integer(report_year),
+    date = as.Date(
+      sprintf(
+        "%04d-%02d-01",
+        report_year,
+        record_months
+      )
+    ),
+    month = record_months,
+    month_label = month.abb[record_months],
+    site = site,
+    site_code = site_code,
+    business_unit = business_units,
+    is_summary = normalise_excel_label(business_units) == "ytd summary",
+    metric = if (
+      normalise_excel_label(section_label) == "income"
+    ) {
+      "Income"
+    } else {
+      "Expenses"
+    },
+    value_type = unname(value_type_map[header_labels[record_columns]]),
+    value = vapply(
+      seq_along(record_rows),
+      function(index) cell_as_number(
+        raw_sheet,
+        record_rows[[index]],
+        record_columns[[index]]
+      ),
+      numeric(1)
+    ),
+    source_file = source_file,
+    source_sheet = sheet_name,
+    source_row = as.integer(record_rows),
+    source_column = as.integer(record_columns),
+    stringsAsFactors = FALSE
   )
 }
 
@@ -382,7 +386,10 @@ extract_monthly_discount_section <- function(
     raw_sheet
   )
 
-  rows <- list()
+  # Month rows up to the section's TOTAL row; one record per month row and
+  # value column (built in one step rather than one data frame per cell).
+  month_rows <- integer()
+  months <- integer()
 
   for (source_row in seq.int(header_row + 1L, nrow(raw_sheet))) {
 
@@ -404,49 +411,57 @@ extract_monthly_discount_section <- function(
       next
     }
 
-    for (source_column in value_columns) {
-
-      business_unit <- group_headers[[source_column]]
-
-      if (is.na(business_unit)) {
-        business_unit <- "Unlabelled"
-      }
-
-      rows[[length(rows) + 1L]] <- data.frame(
-        report_year = as.integer(report_year),
-        date = as.Date(
-          sprintf(
-            "%04d-%02d-01",
-            report_year,
-            month
-          )
-        ),
-        month = as.integer(month),
-        month_label = month.abb[[month]],
-        site = site,
-        site_code = site_code,
-        business_unit = business_unit,
-        is_summary = normalise_excel_label(business_unit) == "ytd summary",
-        discount_type = canonical_discount_type(
-          cell_as_text(raw_sheet, header_row, source_column)
-        ),
-        value = cell_as_number(
-          raw_sheet,
-          source_row,
-          source_column
-        ),
-        source_file = source_file,
-        source_sheet = sheet_name,
-        source_row = as.integer(source_row),
-        source_column = as.integer(source_column),
-        stringsAsFactors = FALSE
-      )
-    }
+    month_rows <- c(month_rows, source_row)
+    months <- c(months, month)
   }
 
-  bind_import_tables(
-    rows,
-    empty_monthly_discount_table()
+  if (length(month_rows) == 0L) {
+    return(empty_monthly_discount_table())
+  }
+
+  record_rows <- rep(month_rows, each = length(value_columns))
+  record_months <- rep(as.integer(months), each = length(value_columns))
+  record_columns <- rep(value_columns, times = length(month_rows))
+  business_units <- group_headers[record_columns]
+  business_units[is.na(business_units)] <- "Unlabelled"
+  discount_types <- vapply(
+    value_columns,
+    function(source_column) canonical_discount_type(
+      cell_as_text(raw_sheet, header_row, source_column)
+    ),
+    character(1)
+  )
+
+  data.frame(
+    report_year = as.integer(report_year),
+    date = as.Date(
+      sprintf(
+        "%04d-%02d-01",
+        report_year,
+        record_months
+      )
+    ),
+    month = record_months,
+    month_label = month.abb[record_months],
+    site = site,
+    site_code = site_code,
+    business_unit = business_units,
+    is_summary = normalise_excel_label(business_units) == "ytd summary",
+    discount_type = rep(unname(discount_types), times = length(month_rows)),
+    value = vapply(
+      seq_along(record_rows),
+      function(index) cell_as_number(
+        raw_sheet,
+        record_rows[[index]],
+        record_columns[[index]]
+      ),
+      numeric(1)
+    ),
+    source_file = source_file,
+    source_sheet = sheet_name,
+    source_row = as.integer(record_rows),
+    source_column = as.integer(record_columns),
+    stringsAsFactors = FALSE
   )
 }
 

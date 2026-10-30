@@ -124,7 +124,7 @@ read_venues_tracking_sheet <- function(path, sheet_name) {
     seq_len(ncol(raw_sheet))
   )
 
-  raw_sheet
+  cache_sheet_cells(raw_sheet)
 }
 
 
