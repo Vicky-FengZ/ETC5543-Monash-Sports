@@ -62,7 +62,9 @@ ui <- page_navbar(
         rel = "stylesheet",
         type = "text/css",
         href = "styles.css"
-      )
+      ),
+      # Makes download buttons work in the browser (Shinylive) version.
+      tags$script(src = "browser_downloads.js")
     ),
     # Spinners on recalculating outputs, in brand colours.
     useBusyIndicators(),
