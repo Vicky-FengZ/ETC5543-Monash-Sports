@@ -27,3 +27,9 @@ desktop.ini
 # Local tooling for producing dummy data
 data-raw/
 __pycache__/
+
+# Shinylive build output
+_site/
+
+# Shinylive build logs
+deploy/*_log.txt
