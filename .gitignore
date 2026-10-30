@@ -23,3 +23,7 @@ rsconnect/
 Thumbs.db
 desktop.ini
 ~$*.xlsx
+
+# Local tooling for producing dummy data
+data-raw/
+__pycache__/

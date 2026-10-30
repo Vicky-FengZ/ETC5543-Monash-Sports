@@ -1,23 +1,118 @@
 # Monash Sport Performance Dashboard
 
-This repository contains a modular R Shiny dashboard and an Excel data
-pipeline. The pipeline reads uploaded workbooks, checks their structure and
-calculations, and converts them into long tables for use in the dashboard
-and forecasting modules.
+An R Shiny dashboard that turns Monash Sport's Excel reports into an
+interactive view of financial and operational performance, with a
+forecasting and pricing planner. It was built for the ETC5543 Business
+Analytics Creative Activity with Monash Sport.
+
+- **Team:** Ayush Pandia and Ziqi Feng
+- **Industry mentors:** Alicia Stack and Darren McLeod (Monash Sport)
+- **Academic mentor:** Minh Huynh (Monash University)
+
+**Who this repository is for**
+
+- **Monash Sport staff** using the dashboard with their own reports: start
+  with the [user guide](docs/user_guide.md), which explains how to run the
+  dashboard, store the report workbooks and upload them.
+- **Reviewers and other readers** without access to the confidential reports:
+  follow the [Quick start](#quick-start) with the synthetic workbooks in
+  `data/sample/` and run `tests/run_sample_tests.R` (see [Testing](#testing)).
+
+Monash Sport reports live in many separate workbooks. This app reads those
+workbooks, checks their structure and calculations, converts them into long
+tables and presents them on one dashboard, so trends, sites and plans can be
+compared without navigating the files by hand.
+
+## Contents
+
+- [Dashboard pages](#dashboard-pages)
+- [Quick start](#quick-start)
+- [Data availability](#data-availability)
+- [Data upload and review workflow](#data-upload-and-review-workflow)
+- [Data architecture](#data-architecture)
+- [Report contents](#report-contents)
+- [Validation](#validation)
+- [Adding future report years](#adding-future-report-years)
+- [Forecasting and business planning](#forecasting-and-business-planning)
+- [Project structure](#project-structure)
+- [Report and presentation](#report-and-presentation)
+- [Testing](#testing)
+- [Performance and website deployment](#performance-and-website-deployment)
+- [Licence](#licence)
+
+## Dashboard pages
+
+| Page | What it shows | Data needed |
+|---|---|---|
+| Executive Dashboard | One-page, presentation-ready summary of finance KPIs and charts you choose, with a full-screen Presentation View | Monthly Site Reports; Detailed Site Reports add facility charts |
+| Overview | Organisation-wide income, expenses, budget variance and revenue opportunity over time | Monthly Site Reports |
+| Site Comparison | Sites side by side, then a facility breakdown for one site | Monthly Site Reports, Detailed Site Reports |
+| Detailed Analysis → Site Detail | Visits, memberships and enrolments for one site and year | Detailed Site Reports |
+| Detailed Analysis → Venues Operations | Attendance, facility hire, memberships, finance, online sales, merchandise and workforce for Venues | Venues Tracking Reports |
+| Forecasting | 3–12 month income and expenses forecast with payroll and pricing scenarios | Monthly Site Reports (Venues Tracking Reports for the payroll estimate) |
+| Data | Upload and remove workbooks, review warnings, inspect and export the cleaned tables | — |
+
+The colours and layout follow the Monash brand; see
+[Dashboard design](docs/dashboard_design.md).
 
 ## Quick start
 
-From the project root, restore the packages and start the app:
+Requirements: R 4.4 (the project was built with R 4.4.3) and RStudio or
+another R IDE. From the project root, restore the packages recorded in
+`renv.lock` and start the app:
 
 ```r
 renv::restore()
 shiny::runApp()
 ```
 
-You can import Excel reports, inspect the cleaned data and export the results
-to Excel. Uploaded files last for the current Shiny session, and the dashboard
-modules share data from successful imports. Overview uses Monthly Site Report
-data. Other analytical pages can be connected as their charts are completed.
+Then open the **Data** page and upload the report workbooks. Without access
+to the confidential reports, upload the synthetic workbooks in `data/sample/`
+instead (see [Synthetic sample data](#synthetic-sample-data)). Uploaded files
+last for the current Shiny session, and every page uses the data from
+successful imports.
+
+## Data availability
+
+The Monash Sport source workbooks are **confidential and are not included**
+in this repository. Monash Sport staff can find how to store and upload them
+in the [user guide](docs/user_guide.md). Everyone else can use the synthetic
+sample workbooks described below.
+
+### Synthetic sample data
+
+To try the dashboard without the confidential reports, use the **synthetic
+workbooks in `data/sample/`**. They follow the same folder structure, file
+names and Excel layouts as the original reports, so they can be uploaded on
+the Data page or used by the tests. They cover 2021-2025:
+
+```text
+data/sample/
+  Monthly Site Report/                                   # e.g. Monthly Site Report 2025 -December.xlsx
+  Business Unit Templates that feed master reports/<year>/  # e.g. Aquatics Site Report 2025.xlsx
+  Business Unit Tracking Reports/                         # e.g. 2025 Venues Tracking Report.xlsx
+```
+
+The sample workbooks exist only to check that the dashboard and its upload
+pipeline run end to end. The following has been hidden:
+
+- **All figures** (income, expenses, budgets, discounts, visits, memberships,
+  hours, wages and other numbers) are randomly generated and do not reflect
+  Monash Sport's actual results, trends or patterns.
+- **Free-text commentary**, such as monthly highlights, staff notes and help
+  text, has been removed, along with cell comments and file metadata.
+- **Names of external organisations** (e.g. partner institutions and user
+  groups) have been replaced with neutral names such as "Partner
+  Organisation A".
+- **Formulas and links** to other workbooks have been removed; the files
+  contain values only.
+
+The figures, charts and forecasts produced from these files carry no meaning
+about Monash Sport and must not be interpreted.
+
+Blank versions of each report layout are provided in `www/templates/` and can
+be downloaded from the Data page. The structure of every cleaned table is
+described in the [data dictionary](docs/data_dictionary.md).
 
 ## Data upload and review workflow
 
@@ -191,7 +286,7 @@ its original Excel cell.
 
 | Report family | Upload area | Intended dashboard use |
 |---|---|---|
-| Monthly Site Reports | Monthly Site Reports | Overview, Site & Facility Comparison and Forecasting |
+| Monthly Site Reports | Monthly Site Reports | Executive Dashboard, Overview, Site & Facility Comparison and Forecasting |
 | Venues Tracking Reports | Venues Tracking Reports | Venues Operations, facility analysis and the casual-payroll reference for Forecasting |
 | Business Unit Site/Program Reports | Detailed Site Reports | Site Detail, visits, memberships and enrolments |
 
@@ -335,33 +430,28 @@ data checks, limitations, model comparison and testing instructions.
 ## Project structure
 
 ```text
-app.R
+app.R                     # assembles the navigation and connects the modules
+LICENSE
+renv.lock                 # package versions (restore with renv::restore())
 
 R/
-  config.R
-  ui_helpers.R
-  calculations.R
-  plots.R
-  forecasting.R
-  forecast_plots.R
+  config.R                # brand colours, theme, chart palettes, constants
+  ui_helpers.R            # shared UI pieces (KPI rows, navbar data status)
+  calculations.R          # finance, revenue and facility calculations
+  plots.R                 # dashboard charts (base R graphics)
+  forecasting.R           # forecast models and planning scenarios
+  forecast_plots.R        # forecasting charts
+  executive_visual_registry.R  # charts available on the Executive Dashboard
 
-  data/
-    load.R
-    common.R
-    extensibility.R
-    monthly_site/
-      import.R
-      validation.R
-      cleaning.R
-    venues/
-      import.R
-      validation.R
-      cleaning.R
-    business_unit_templates/
-      import.R
-      validation.R
-      cleaning.R
+  data/                   # Excel import pipeline
+    load.R                # sources the data layer in dependency order
+    common.R              # helpers shared by all report types
+    extensibility.R       # additional fields and metric definitions
+    monthly_site/         # import.R, validation.R, cleaning.R
+    venues/               # import.R, validation.R, cleaning.R
+    business_unit_templates/  # import.R, validation.R, cleaning.R
 
+  mod_executive_dashboard.R   # one Shiny module per page
   mod_overview.R
   mod_site_comparison.R
   mod_site_detail.R
@@ -370,39 +460,66 @@ R/
   mod_data_upload.R
 
 config/
-  metric_definitions.csv
+  metric_definitions.csv  # units and aggregation rules for imported metrics
+
+data/
+  sample/                 # synthetic workbooks with the report layouts (random values)
 
 docs/
-  forecasting.md
-  excel_templates.md
+  user_guide.md           # for Monash Sport staff: running, storing and uploading reports
+  dashboard_design.md     # brand colours, typography and layout rules
+  data_dictionary.md      # every cleaned table and column
+  excel_templates.md      # how to fill in and extend the templates
+  forecasting.md          # forecasting method, assumptions and checks
 
-tests/                 # import and dashboard regression checks
+report/
+  report.qmd              # project report (Quarto)
+
+slides/
+  slides.qmd              # project presentation (Quarto, Monash theme)
+  slides.html             # rendered presentation
+  _extensions/            # quarto-monash presentation theme
+
+tests/
+  run_tests.R             # regression tests (see Testing)
+  run_sample_tests.R      # same, plus parsing every workbook in data/sample
+  run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
+  fixtures_site_venues.R  # shared test fixtures
+  test_*.R                # one file per area
 
 www/
-  styles.css
-  templates/
-    Monthly Site Report 2026.xlsx
-    New Sport Site Report 2026.xlsx
-    2026 Venues Tracking Report.xlsx
+  styles.css              # dashboard styles (brand variables at the top)
+  brand/                  # official Monash logo used in the navbar
+  templates/              # blank Excel report templates
 ```
 
-Each file has a specific role:
+Each part has a specific role:
 
-- `app.R`: assemble the navigation and connect Shiny modules.
-- `R/data/load.R`: source the complete data layer in dependency order.
-- `R/data/common.R`: helpers shared by all report types.
-- `R/data/extensibility.R`: check for additional fields and apply metric definitions.
-- `config/metric_definitions.csv`: default units and aggregation rules for imported
-  metrics. The app reads this file at startup, so include it when distributing
-  the project.
-- `R/data/*/import.R`: read the uploaded workbooks and required worksheets.
-- `R/data/*/validation.R`: identify structural problems and reconciliation
-  differences.
-- `R/data/*/cleaning.R`: convert workbook layouts into analysis-ready tables.
-- `R/mod_*.R`: one dashboard page or feature per module.
-- `R/forecasting.R`: prepare histories, select models and calculate planning scenarios.
-- `R/forecast_plots.R`: draw the Income, Expenses and price-sensitivity charts.
-- `www/templates/`: blank Excel report templates with input guidance.
+- `R/data/*/import.R` reads the uploaded workbooks and required worksheets,
+  `validation.R` identifies structural problems and reconciliation
+  differences, and `cleaning.R` converts workbook layouts into
+  analysis-ready tables.
+- `R/mod_*.R` holds one dashboard page each; the calculation helpers for a
+  page sit at the top of its module file.
+- `config/metric_definitions.csv` is read at startup, so include it when
+  distributing the project.
+- Chart colours are defined once in `CHART_COLOURS` in `R/config.R`; page
+  colours are CSS variables at the top of `www/styles.css`.
+
+## Report and presentation
+
+The report and slides are Quarto documents. With
+[Quarto](https://quarto.org) installed, render them from the project root:
+
+```bash
+quarto render report/report.qmd
+quarto render slides/slides.qmd
+```
+
+The slides use the bundled `quarto-monash` theme in `slides/_extensions/` and
+need no R packages. `slides/slides.html` is the rendered, self-contained
+presentation. If R code chunks are added to either document, install the
+packages they use and run `renv::snapshot()` so `renv.lock` stays complete.
 
 ## Testing
 
@@ -418,15 +535,17 @@ Operations, Forecasting, Executive Dashboard), chart helpers, and a smoke
 test that draws every Site Detail and Venues chart. The run ends with
 `ALL TESTS PASSED`.
 
-`test_real_upload_parsers.R` parses the real workbooks and is skipped in the
-normal run, because `data/raw` is not in version control and parsing every
-workbook takes several minutes. Before a submission, or after changing the
-import, cleaning or validation code, run the full suite on a machine that
-has the reports:
+`test_real_upload_parsers.R` parses a complete set of report workbooks and is
+skipped in the normal run, because parsing every workbook takes several
+minutes. To include it, run the full suite on the synthetic workbooks in
+`data/sample/`:
 
 ```r
-source("tests/run_full_tests.R")
+source("tests/run_sample_tests.R")
 ```
+
+Monash Sport maintainers with the original reports can run the same suite on
+them; see section 6 of the [user guide](docs/user_guide.md).
 
 ## Performance and website deployment
 
@@ -434,3 +553,9 @@ The dashboard runs as a Shiny application. The browser displays HTML, while
 an R process on the server handles data import, validation, uploads and
 predictions. A static HTML export could include precalculated results. On its
 own, it would not support the server-side upload and forecasting workflow.
+
+## Licence
+
+The code and documentation are released under the [MIT Licence](LICENSE).
+Monash University and Monash Sport names, logos and brand assets, and the
+Monash Sport report data, are not covered by this licence.
