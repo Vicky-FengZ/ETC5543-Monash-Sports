@@ -1,0 +1,498 @@
+/*-- scss:defaults --*/
+
+// Colours shared with the dashboard (www/styles.css).
+$monash-blue: #006DAE;
+$monash-blue-dark: #005A8F;
+$blueberry: #121256;
+$electric-blue: #285AFF;
+$heritage-blue: #ABF5F9;
+$orange: #F86700;
+$blue-tint: #E8F2F9;
+$page-tint: #F4F7FA;
+$ink: #2B2F36;
+$ink-strong: #111827;
+$text-secondary: #5B6472;
+$divider: #E4E9F0;
+
+$primary: $monash-blue;
+$body-color: $ink;
+$headings-color: $ink-strong;
+$link-color: $monash-blue;
+$link-hover-color: $monash-blue-dark;
+$code-color: $blueberry;
+$border-color: $divider;
+$border-radius: 10px;
+
+// Fonts are loaded in fonts.html (same folder).
+$font-family-sans-serif: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+$font-family-base: $font-family-sans-serif;
+$font-family-monospace: "JetBrains Mono", SFMono-Regular, Consolas, monospace;
+$headings-font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", system-ui, sans-serif;
+$headings-font-weight: 700;
+$font-size-root: 17px;
+$line-height-base: 1.7;
+
+$toc-color: $text-secondary;
+$toc-active-border: $orange;
+$callout-color-note: $monash-blue;
+$callout-color-tip: #12805C;
+$callout-color-important: $electric-blue;
+$callout-color-warning: $orange;
+
+/*-- scss:rules --*/
+
+$bar-height: 60px;
+
+html {
+  scroll-padding-top: $bar-height + 20px;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba($heritage-blue, 0.7);
+}
+
+// Top bar ------------------------------------------------------------------
+
+.site-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 1031;
+  pointer-events: none;
+
+  span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, $orange, #FFB000);
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+}
+
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  height: $bar-height;
+  background: rgba($blueberry, 0.96);
+  backdrop-filter: saturate(160%) blur(10px);
+  transition: box-shadow 0.2s ease;
+
+  &.is-scrolled {
+    box-shadow: 0 6px 24px rgba($blueberry, 0.25);
+  }
+}
+
+.site-bar-inner {
+  max-width: 1240px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #FFFFFF !important;
+  text-decoration: none;
+
+}
+
+.site-brand-name {
+  white-space: nowrap;
+  font-family: $headings-font-family;
+  font-weight: 700;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+
+.site-bar-links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+
+  a {
+    color: rgba(255, 255, 255, 0.82) !important;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      color: #FFFFFF !important;
+    }
+  }
+
+  .site-bar-cta {
+    white-space: nowrap;
+    color: $blueberry !important;
+    background: #FFFFFF;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 600;
+
+    &:hover {
+      color: $blueberry !important;
+      background: $heritage-blue;
+    }
+  }
+}
+
+// Hero ---------------------------------------------------------------------
+
+#title-block-header.site-hero {
+  margin-bottom: 3rem;
+}
+
+.site-hero .quarto-title-banner {
+  position: relative;
+  overflow: hidden;
+  color: #FFFFFF;
+  margin-bottom: 0;
+  padding: 5.5rem 0 4rem;
+  background:
+    radial-gradient(900px 420px at 85% 10%, rgba($electric-blue, 0.55), transparent 60%),
+    radial-gradient(700px 380px at 10% 110%, rgba($monash-blue, 0.55), transparent 60%),
+    $blueberry;
+
+  // Faint grid, like a dashboard canvas.
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 85%);
+    -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 85%);
+    pointer-events: none;
+  }
+}
+
+.site-hero-inner {
+  position: relative;
+}
+
+.site-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 1.4rem;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.site-kicker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: $orange;
+  box-shadow: 0 0 0 4px rgba($orange, 0.25);
+}
+
+.site-hero .quarto-title-banner .title {
+  color: #FFFFFF;
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  margin: 0 0 1rem;
+  max-width: 20ch;
+  border: none;
+}
+
+.site-hero .quarto-title-banner .subtitle {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin-bottom: 2rem;
+  max-width: 40ch;
+}
+
+.site-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 2.75rem;
+}
+
+.site-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #FFFFFF !important;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+  }
+
+  &.is-primary {
+    background: $orange;
+    border-color: $orange;
+    box-shadow: 0 10px 24px rgba($orange, 0.35);
+
+    &:hover {
+      background: darken($orange, 5%);
+    }
+  }
+
+  &.is-quiet {
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.8) !important;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+.site-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+
+  > div {
+    padding: 12px 18px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+
+  dt {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: $heritage-blue;
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-weight: 500;
+    color: #FFFFFF;
+  }
+}
+
+// Body ---------------------------------------------------------------------
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+}
+
+h1:not(.title) {
+  font-size: 2rem;
+  margin-top: 4.5rem;
+  margin-bottom: 1.25rem;
+  border: none;
+}
+
+h2 {
+  font-size: 1.4rem;
+  margin-top: 2.5rem;
+  border: none;
+}
+
+h3 {
+  font-size: 1.12rem;
+  margin-top: 1.75rem;
+}
+
+// Section numbers become a small eyebrow label above the heading.
+h1 > .header-section-number {
+  display: block;
+  width: fit-content;
+  margin-bottom: 0.6rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: $blue-tint;
+  color: $monash-blue;
+  font-family: $font-family-sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+
+  &::before {
+    content: "SECTION ";
+  }
+}
+
+h2 > .header-section-number,
+h3 > .header-section-number {
+  color: $orange;
+  margin-right: 0.35em;
+}
+
+p, li {
+  max-width: 70ch;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+// The abstract reads as a summary card.
+section#abstract {
+  margin-top: 0;
+  padding: 1.75rem 2rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, $page-tint, #FFFFFF);
+  border: 1px solid $divider;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+
+  > h1 {
+    margin-top: 0;
+    font-size: 0.8rem;
+    font-family: $font-family-sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: $monash-blue;
+  }
+
+  p {
+    font-size: 1.1rem;
+    line-height: 1.75;
+  }
+}
+
+// Figures and tables sit on soft cards.
+.quarto-figure img,
+figure img {
+  border-radius: 14px;
+  border: 1px solid $divider;
+  box-shadow: 0 12px 32px rgba($blueberry, 0.10);
+}
+
+figure, .quarto-figure {
+  margin: 2.25rem 0;
+}
+
+.figure-caption, figcaption, .table-caption, caption {
+  color: $text-secondary;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+table {
+  font-size: 0.94rem;
+}
+
+thead th {
+  background: $page-tint;
+  border-bottom: 1px solid $divider !important;
+  font-weight: 600;
+}
+
+blockquote {
+  border-left: 4px solid $orange;
+  background: #FFF6EF;
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.25rem;
+  color: $ink;
+}
+
+.callout {
+  border-radius: 14px !important;
+  border-width: 1px !important;
+  box-shadow: none;
+}
+
+code {
+  background: $page-tint;
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+}
+
+// References and appendix are quieter.
+#refs, section.appendix, #quarto-appendix {
+  font-size: 0.92rem;
+  color: $text-secondary;
+}
+
+// "On this page" sidebar ---------------------------------------------------
+
+#quarto-margin-sidebar {
+  top: $bar-height + 24px !important;
+}
+
+#TOC {
+  font-size: 0.88rem;
+
+  h2 {
+    font-family: $font-family-sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: $text-secondary;
+  }
+
+  .nav-link.active {
+    color: $ink-strong;
+    font-weight: 600;
+  }
+
+  .header-section-number {
+    display: none;
+  }
+}
+
+.quarto-other-links {
+  font-size: 0.86rem;
+}
+
+// Small screens ------------------------------------------------------------
+
+@media (max-width: 767.98px) {
+  .site-bar-links a:not(.site-bar-cta) {
+    display: none;
+  }
+
+  .site-bar-inner {
+    padding: 0 16px;
+  }
+
+  .site-brand-name {
+    font-size: 0.92rem;
+  }
+
+  .site-bar-links .site-bar-cta {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .site-hero .quarto-title-banner {
+    padding: 3.5rem 0 2.75rem;
+  }
+
+  section#abstract {
+    padding: 1.25rem 1.25rem;
+  }
+}
+
+@media print {
+  .site-bar, .site-progress, .site-actions {
+    display: none;
+  }
+}

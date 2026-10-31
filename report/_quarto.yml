@@ -1,0 +1,84 @@
+# Settings for the report. The text and the title, authors and date are in
+# report.qmd; this file holds everything about how it is rendered.
+#
+# Render both versions from the project root (RStudio Terminal):
+#   quarto render report/report.qmd
+# The PDF and the website are written to report/_output/.
+
+project:
+  type: default
+  output-dir: _output
+  render:
+    - report.qmd
+
+lang: en-AU
+date-format: "D MMMM YYYY"
+
+bibliography:
+  - references/references.bib
+  - references/packages.bib
+csl: references/apa.csl
+link-citations: true
+
+number-sections: true
+toc: true
+toc-depth: 2
+
+execute:
+  echo: false
+  warning: false
+  message: false
+fig-align: center
+fig-width: 8
+fig-height: 4.5
+fig-dpi: 300
+
+format:
+  # PDF: Monash report format (quarto-monash/report, Typst version, in
+  # _extensions/report). Typst ships with Quarto, so no LaTeX is needed.
+  report-typst:
+    output-file: report.pdf
+    toc-title: Contents
+    section-numbering: "1.1"
+    papersize: a4
+    # The template's fonts, found whichever folder Quarto runs from.
+    font-paths:
+      - _extensions/report/fonts
+      - report/_extensions/report/fonts
+    # Pandoc formats the citations, so the PDF uses the same APA style as
+    # the website and can read both .bib files.
+    citeproc: true
+    keep-typ: false
+
+  # Website: one self-contained page. Its look is in website/:
+  # styles.scss (colours, fonts, layout), title-block.html (the title area),
+  # top-bar.html and top-bar-script.html (top bar and reading progress) and
+  # fonts.html (web fonts).
+  html:
+    output-file: index.html
+    theme: [default, website/styles.scss]
+    title-block-banner: true
+    template-partials:
+      - website/title-block.html
+    include-in-header: website/fonts.html
+    include-before-body: website/top-bar.html
+    include-after-body: website/top-bar-script.html
+    toc-location: right
+    toc-title: On this page
+    toc-expand: 1
+    page-layout: article
+    grid:
+      body-width: 780px
+      margin-width: 250px
+    embed-resources: true
+    smooth-scroll: true
+    anchor-sections: true
+    lightbox: true
+    fig-cap-location: bottom
+    tbl-cap-location: top
+    citations-hover: true
+    footnotes-hover: true
+    crossrefs-hover: true
+    reference-location: document
+    link-external-newwindow: true
+    format-links: false
