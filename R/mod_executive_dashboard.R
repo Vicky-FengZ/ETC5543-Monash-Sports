@@ -1009,14 +1009,21 @@ mod_executive_dashboard_ui <- function(id) {
                     )
                   ),
 
-                  selectInput(
-                    ns("site"),
-                    "Site",
-                    choices = c(
-                      "All Monash Sport",
-                      SITE_NAMES
+                  conditionalPanel(
+                    condition =
+                      "input.dashboard_section == 'site'",
+
+                    selectInput(
+                      ns("site"),
+                      "Site",
+                      choices = c(
+                        "All Monash Sport",
+                        SITE_NAMES
+                      ),
+                      selected = "All Monash Sport"
                     ),
-                    selected = "All Monash Sport"
+
+                    ns = ns
                   ),
 
                   div(
@@ -1137,8 +1144,18 @@ mod_executive_dashboard_server <- function(
 
       active_focus <- reactive({
 
+        section <- input$dashboard_section
+
+        if (
+          is.null(section) ||
+            length(section) == 0L ||
+            is.na(section[[1L]])
+        ) {
+          return("Overview")
+        }
+
         switch(
-          input$dashboard_section,
+          as.character(section[[1L]]),
 
           site = "Site",
 
@@ -1607,6 +1624,33 @@ mod_executive_dashboard_server <- function(
             input$comparison_year
         }
 
+        focus <-
+          active_focus()
+
+        effective_site <-
+          if (
+            identical(
+              focus,
+              "Overview"
+            )
+          ) {
+
+            "All Monash Sport"
+
+          } else if (
+            identical(
+              focus,
+              "Metrics"
+            )
+          ) {
+
+            "All Venues"
+
+          } else {
+
+            input$site
+          }
+
         list(
           view_mode =
             input$view_mode,
@@ -1618,7 +1662,7 @@ mod_executive_dashboard_server <- function(
             comparison_year,
 
           site =
-            input$site
+            effective_site
         )
       })
 

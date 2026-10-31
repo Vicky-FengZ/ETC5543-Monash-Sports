@@ -971,7 +971,6 @@ shiny::testServer(
 
     session$flushReact()
 
-
     stopifnot(
       identical(
         available_executive_years(),
@@ -1116,6 +1115,30 @@ shiny::testServer(
       !"metric" %in%
         names(year_review_context)
     )
+
+    # Overview must remain organisation-wide even if a site input is supplied.
+      session$setInputs(
+        site = "Aquatics Clayton"
+      )
+
+      session$flushReact()
+
+      overview_scope_context <-
+        executive_context()
+
+      stopifnot(
+        identical(
+          overview_scope_context$site,
+          "All Monash Sport"
+        )
+      )
+
+      # Restore the browser input for the remaining tests in this block.
+      session$setInputs(
+        site = "All Monash Sport"
+      )
+
+      session$flushReact()
 
 
     # ---------------------------------------------------------------------
@@ -1287,29 +1310,43 @@ shiny::testServer(
       )
 
       session$setInputs(
-    dashboard_section = "site"
-  )
-
-  session$flushReact()
-
-  stopifnot(
-    identical(
-      active_category(),
-      "Finance"
-    ),
-
-    identical(
-      active_focus(),
-      "Site"
-    )
-  )
-    
-    stopifnot(
-      identical(
-        selected_visuals$Site,
-        expected_site_defaults
+        dashboard_section = "site"
       )
-    )
+
+      session$flushReact()
+
+      session$setInputs(
+        site = "Aquatics Clayton"
+      )
+
+      session$flushReact()
+
+      site_scope_context <-
+        executive_context()
+
+      stopifnot(
+        identical(
+          active_category(),
+          "Finance"
+        ),
+
+        identical(
+          active_focus(),
+          "Site"
+        ),
+
+        identical(
+          site_scope_context$site,
+          "Aquatics Clayton"
+        )
+      )
+
+      stopifnot(
+        identical(
+          selected_visuals$Site,
+          expected_site_defaults
+        )
+      )
     
     site_registry <- picker_registry()
 
@@ -1373,6 +1410,9 @@ shiny::testServer(
 
     session$flushReact()
 
+    metrics_scope_context <-
+      executive_context()
+
     stopifnot(
 
       identical(
@@ -1383,6 +1423,11 @@ shiny::testServer(
       identical(
         active_focus(),
         "Metrics"
+      ),
+
+      identical(
+        metrics_scope_context$site,
+        "All Venues"
       ),
 
       length(
@@ -1400,42 +1445,74 @@ shiny::testServer(
           "budget_vs_actual"
         )
       ),
-
-      identical(
-        selected_visuals$Site,
-        "site_ranking"
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Return to Overview and confirm selections were preserved
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      dashboard_section = "finance"
-    )
-
-    session$flushReact()
-
-    stopifnot(
-
-      identical(
-        active_category(),
-        "Finance"
-      ),
-
-      identical(
-        active_focus(),
-        "Overview"
-      ),
-
-      identical(
-        selected_visuals$Overview,
-        c(
-          "monthly_income_expenses",
-          "budget_vs_actual"
+          identical(
+            selected_visuals$Site,
+            "site_ranking"
+          )
         )
-      ),
+
+      # ---------------------------------------------------------------------
+      # Focus scopes remain independent after switching
+      # ---------------------------------------------------------------------
+
+      session$setInputs(
+        dashboard_section = "site"
+      )
+
+      session$flushReact()
+
+      site_round_trip_context <-
+        executive_context()
+
+      stopifnot(
+        identical(
+          active_focus(),
+          "Site"
+        ),
+
+        identical(
+          site_round_trip_context$site,
+          "Aquatics Clayton"
+        )
+      )
+
+      # ---------------------------------------------------------------------
+      # Return to Overview and confirm selections were preserved
+      # ---------------------------------------------------------------------
+
+      session$setInputs(
+        dashboard_section = "finance"
+      )
+
+      session$flushReact()
+
+      overview_round_trip_context <-
+        executive_context()
+
+      stopifnot(
+
+        identical(
+          active_category(),
+          "Finance"
+        ),
+
+        identical(
+          active_focus(),
+          "Overview"
+        ),
+
+        identical(
+          overview_round_trip_context$site,
+          "All Monash Sport"
+        ),
+
+        identical(
+          selected_visuals$Overview,
+          c(
+            "monthly_income_expenses",
+            "budget_vs_actual"
+          )
+        ),
 
       identical(
         selected_visuals$Site,
