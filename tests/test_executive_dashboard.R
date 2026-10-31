@@ -725,6 +725,301 @@ stopifnot(
   )
 )
 
+# Dynamic Executive years come from the uploaded report families.
+
+dynamic_year_data <- list(
+
+  monthly_reports = list(
+
+    finance = data.frame(
+      report_year = c(
+        2024L,
+        2027L
+      ),
+      value = c(
+        100,
+        200
+      ),
+      stringsAsFactors = FALSE
+    )
+  ),
+
+  site_reports = NULL,
+
+  venues_reports = list(
+
+    attendance = data.frame(
+      report_year = c(
+        2025L,
+        2028L
+      ),
+      value = c(
+        1000,
+        1200
+      ),
+      stringsAsFactors = FALSE
+    )
+  )
+)
+
+
+stopifnot(
+
+  identical(
+    executive_available_years(
+      dashboard_data =
+        dynamic_year_data,
+      focus =
+        "Overview"
+    ),
+    c(
+      2024L,
+      2027L
+    )
+  ),
+
+  identical(
+    executive_available_years(
+      dashboard_data =
+        dynamic_year_data,
+      focus =
+        "Site"
+    ),
+    c(
+      2024L,
+      2027L
+    )
+  ),
+
+  identical(
+    executive_available_years(
+      dashboard_data =
+        dynamic_year_data,
+      focus =
+        "Metrics"
+    ),
+    c(
+      2025L,
+      2028L
+    )
+  ),
+
+  length(
+    executive_available_years(
+      dashboard_data =
+        dynamic_year_data,
+      focus =
+        "Unknown"
+    )
+  ) == 0L
+)
+
+stopifnot(
+
+  identical(
+    executive_comparison_year_choices(
+      year = "2030",
+      years = c(
+        2028L,
+        2029L,
+        2030L,
+        2031L
+      )
+    ),
+    c(
+      "2028",
+      "2029",
+      "2031"
+    )
+  ),
+
+  identical(
+    executive_comparison_year_choices(
+      year = "2029",
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "2030"
+  ),
+
+  length(
+    executive_comparison_year_choices(
+      year = "2030",
+      years = 2030L
+    )
+  ) == 0L,
+
+  length(
+    executive_comparison_year_choices(
+      year = NULL,
+      years = integer()
+    )
+  ) == 0L
+)
+
+# The Executive module uses the correct dynamic year family
+# for each dashboard focus.
+
+dynamic_selector_data <- shiny::reactiveVal(
+  list(
+
+    monthly_reports = list(
+
+      finance = data.frame(
+        report_year = c(
+          2029L,
+          2030L
+        ),
+        value = c(
+          100,
+          200
+        ),
+        stringsAsFactors = FALSE
+      )
+    ),
+
+    site_reports = NULL,
+
+    venues_reports = list(
+
+      attendance = data.frame(
+        report_year = c(
+          2028L,
+          2031L
+        ),
+        value = c(
+          1000,
+          1200
+        ),
+        stringsAsFactors = FALSE
+      )
+    )
+  )
+)
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = dynamic_selector_data
+  ),
+  {
+
+    session$setInputs(
+      dashboard_section = "finance"
+    )
+
+    session$flushReact()
+
+
+    stopifnot(
+      identical(
+        available_executive_years(),
+        c(
+          2029L,
+          2030L
+        )
+      )
+    )
+
+    year_selector_html <-
+      output$year_selector$html
+
+
+    stopifnot(
+      grepl(
+        "2029",
+        year_selector_html,
+        fixed = TRUE
+      ),
+      grepl(
+        "2030",
+        year_selector_html,
+        fixed = TRUE
+      )
+    )
+
+    session$setInputs(
+      year = "2030"
+    )
+
+    session$flushReact()
+
+
+    comparison_selector_html <-
+      output$comparison_year_selector$html
+
+
+    stopifnot(
+      grepl(
+        "2029",
+        comparison_selector_html,
+        fixed = TRUE
+      ),
+
+      !grepl(
+        'value="2030"',
+        comparison_selector_html,
+        fixed = TRUE
+      )
+    )
+
+    session$setInputs(
+      dashboard_section = "site"
+    )
+
+    session$flushReact()
+
+
+    stopifnot(
+      identical(
+        available_executive_years(),
+        c(
+          2029L,
+          2030L
+        )
+      )
+    )
+
+
+    session$setInputs(
+      dashboard_section = "metrics"
+    )
+
+    session$flushReact()
+
+
+    stopifnot(
+      identical(
+        available_executive_years(),
+        c(
+          2028L,
+          2031L
+        )
+      )
+    )
+
+    metrics_year_selector_html <-
+      output$year_selector$html
+
+
+    stopifnot(
+      grepl(
+        "2028",
+        metrics_year_selector_html,
+        fixed = TRUE
+      ),
+      grepl(
+        "2031",
+        metrics_year_selector_html,
+        fixed = TRUE
+      )
+    )
+  }
+)
+
+
 cat(
   "PASS Executive Dashboard context helpers\n"
 )

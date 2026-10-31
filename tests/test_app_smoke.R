@@ -157,7 +157,8 @@ smoke_static_plots <- smoke_plot_ids(smoke_ui)
 stopifnot(
   length(smoke_static_outputs) > 50L,
   !is.null(smoke_static_inputs[["overview-to_year"]]),
-  !is.null(smoke_static_inputs[["executive_dashboard-year"]])
+  "executive_dashboard-year_selector" %in%
+    smoke_static_outputs
 )
 
 smoke_upload <- function(paths) {

@@ -201,6 +201,108 @@ executive_default_comparison_year <- function(
   candidates[[1L]]
 }
 
+executive_available_years <- function(
+    dashboard_data,
+    focus
+) {
+
+  if (
+    is.null(focus) ||
+      length(focus) == 0L ||
+      is.na(focus[[1L]])
+  ) {
+    return(integer())
+  }
+
+  focus <- as.character(
+    focus[[1L]]
+  )
+
+
+  if (
+    focus %in%
+      c(
+        "Overview",
+        "Site"
+      )
+  ) {
+
+    monthly_reports <-
+      executive_source_data(
+        dashboard_data = dashboard_data,
+        source_group = "monthly"
+      )
+
+    return(
+      reporting_monthly_years(
+        monthly_reports
+      )
+    )
+  }
+
+
+  if (identical(
+    focus,
+    "Metrics"
+  )) {
+
+    venues_reports <-
+      executive_source_data(
+        dashboard_data = dashboard_data,
+        source_group = "venues"
+      )
+
+    return(
+      reporting_venues_years(
+        venues_reports
+      )
+    )
+  }
+
+
+  integer()
+}
+
+executive_comparison_year_choices <- function(
+    year,
+    years
+) {
+
+  years <-
+    reporting_normalize_years(
+      years
+    )
+
+  if (length(years) == 0L) {
+    return(character())
+  }
+
+
+  if (
+    is.null(year) ||
+      length(year) == 0L ||
+      is.na(year[[1L]]) ||
+      !nzchar(
+        as.character(
+          year[[1L]]
+        )
+      )
+  ) {
+
+    return(
+      as.character(
+        years
+      )
+    )
+  }
+
+
+  setdiff(
+    as.character(years),
+    as.character(year[[1L]])
+  )
+}
+
 executive_filter_monthly_reports_by_site <- function(
     monthly_reports,
     site
@@ -891,29 +993,16 @@ mod_executive_dashboard_ui <- function(id) {
                   div(
                     class = "executive-dashboard-year-controls",
 
-                    selectInput(
-                      ns("year"),
-                      "Year",
-                      choices = APP_YEARS,
-                      selected = LATEST_APP_YEAR
+                    uiOutput(
+                      ns("year_selector")
                     ),
 
                     conditionalPanel(
                       condition =
                         "input.view_mode == 'Comparison'",
 
-                      selectInput(
-                        ns("comparison_year"),
-                        "Compare To",
-                        choices = setdiff(
-                          APP_YEARS,
-                          LATEST_APP_YEAR
-                        ),
-                        selected =
-                          executive_default_comparison_year(
-                            year = LATEST_APP_YEAR,
-                            years = APP_YEARS
-                          )
+                      uiOutput(
+                        ns("comparison_year_selector")
                       ),
 
                       ns = ns
@@ -1059,36 +1148,40 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      available_executive_years <- reactive({
+
+        executive_available_years(
+          dashboard_data =
+            dashboard_data_value(),
+          focus =
+            active_focus()
+        )
+      })
+
       # -------------------------------------------------------------------
       # Independent dashboard context by focus
       # -------------------------------------------------------------------
-
-      default_comparison_year <-
-        executive_default_comparison_year(
-          year = LATEST_APP_YEAR,
-          years = APP_YEARS
-        )
 
       dashboard_contexts <- reactiveValues(
 
         Overview = list(
           view_mode = "Year Review",
-          year = as.character(LATEST_APP_YEAR),
-          comparison_year = default_comparison_year,
+          year = "",
+          comparison_year = NULL,
           site = "All Monash Sport"
         ),
 
         Site = list(
           view_mode = "Year Review",
-          year = as.character(LATEST_APP_YEAR),
-          comparison_year = default_comparison_year,
+          year = "",
+          comparison_year = NULL,
           site = "All Monash Sport"
         ),
 
         Metrics = list(
           view_mode = "Year Review",
-          year = as.character(LATEST_APP_YEAR),
-          comparison_year = default_comparison_year,
+          year = "",
+          comparison_year = NULL,
           site = "All Monash Sport"
         )
       )
@@ -1128,6 +1221,165 @@ mod_executive_dashboard_server <- function(
         context
     }
       
+      # -------------------------------------------------------------------
+      # Dynamic Executive year selector
+      # -------------------------------------------------------------------
+
+      output$year_selector <- renderUI({
+
+        years <-
+          available_executive_years()
+
+
+        if (length(years) == 0L) {
+
+          return(
+            selectInput(
+              ns("year"),
+              "Year",
+              choices = c(
+                "No data loaded" = ""
+              ),
+              selected = ""
+            )
+          )
+        }
+
+
+        focus <-
+          active_focus()
+
+
+        context <- if (
+          !is.null(focus) &&
+            focus %in%
+              c(
+                "Overview",
+                "Site",
+                "Metrics"
+              )
+        ) {
+
+          dashboard_contexts[[focus]]
+
+        } else {
+
+          NULL
+        }
+
+
+        context_year <- if (
+          !is.null(context) &&
+            !is.null(context$year) &&
+            length(context$year) > 0L
+        ) {
+
+          as.character(
+            context$year[[1L]]
+          )
+
+        } else {
+
+          ""
+        }
+
+
+        selected_year <- if (
+          context_year %in%
+            as.character(years)
+        ) {
+
+          context_year
+
+        } else {
+
+          as.character(
+            reporting_latest_year(
+              years
+            )
+          )
+        }
+
+
+        selectInput(
+          ns("year"),
+          "Year",
+          choices =
+            as.character(years),
+          selected =
+            selected_year
+        )
+      })
+      
+      output$comparison_year_selector <- renderUI({
+
+        years <-
+          available_executive_years()
+
+
+        selected_year <- input$year
+
+
+        choices <-
+          executive_comparison_year_choices(
+            year =
+              selected_year,
+            years =
+              years
+          )
+
+
+        if (length(choices) == 0L) {
+
+          return(
+            selectInput(
+              ns("comparison_year"),
+              "Compare To",
+              choices = c(
+                "No comparison available" = ""
+              ),
+              selected = ""
+            )
+          )
+        }
+
+
+        current_value <- isolate(
+          input$comparison_year
+        )
+
+
+        selected_value <- if (
+          !is.null(current_value) &&
+            length(current_value) > 0L &&
+            current_value %in% choices
+        ) {
+
+          as.character(
+            current_value[[1L]]
+          )
+
+        } else {
+
+          executive_default_comparison_year(
+            year =
+              selected_year,
+            years =
+              years
+          )
+        }
+
+
+        selectInput(
+          ns("comparison_year"),
+          "Compare To",
+          choices =
+            choices,
+          selected =
+            selected_value
+        )
+      })
+
       # -------------------------------------------------------------------
       # Selected visuals
       # -------------------------------------------------------------------
@@ -1177,42 +1429,96 @@ mod_executive_dashboard_server <- function(
             )
           }
 
-
           context <-
             dashboard_contexts[[new_focus]]
 
+          focus_years <-
+            executive_available_years(
+              dashboard_data =
+                dashboard_data_value(),
+              focus =
+                new_focus
+            )
+
+
+          context_year <-
+            as.character(
+              context$year
+            )
+
+
+          selected_year <- if (
+            length(focus_years) > 0L &&
+              context_year %in%
+                as.character(focus_years)
+          ) {
+
+            context_year
+
+          } else if (
+            length(focus_years) > 0L
+          ) {
+
+            as.character(
+              reporting_latest_year(
+                focus_years
+              )
+            )
+
+          } else {
+
+            ""
+          }
+
 
           comparison_choices <-
-            setdiff(
-              as.character(APP_YEARS),
-              as.character(context$year)
+            executive_comparison_year_choices(
+              year =
+                selected_year,
+              years =
+                focus_years
             )
+
 
           comparison_year <-
             context$comparison_year
 
+
           if (
-            is.null(comparison_year) ||
-              !comparison_year %in%
-                comparison_choices
+            length(comparison_choices) == 0L
           ) {
 
-            comparison_year <-
-              executive_default_comparison_year(
-                year = context$year,
-                years = APP_YEARS
+            comparison_choices_ui <-
+              c(
+                "No comparison available" = ""
               )
-          }
 
+            comparison_year <- ""
+
+          } else {
+
+            comparison_choices_ui <-
+              comparison_choices
+
+            if (
+              is.null(comparison_year) ||
+                !comparison_year %in%
+                  comparison_choices
+            ) {
+
+              comparison_year <-
+                executive_default_comparison_year(
+                  year =
+                    selected_year,
+                  years =
+                    focus_years
+                )
+            }
+          }
 
           freezeReactiveValue(
             input,
             "view_mode"
-          )
-
-          freezeReactiveValue(
-            input,
-            "year"
           )
 
           freezeReactiveValue(
@@ -1225,7 +1531,6 @@ mod_executive_dashboard_server <- function(
             "site"
           )
 
-
           updateSelectInput(
             session,
             "view_mode",
@@ -1235,16 +1540,9 @@ mod_executive_dashboard_server <- function(
 
           updateSelectInput(
             session,
-            "year",
-            selected =
-              context$year
-          )
-
-          updateSelectInput(
-            session,
             "comparison_year",
             choices =
-              comparison_choices,
+              comparison_choices_ui,
             selected =
               comparison_year
           )
@@ -1323,39 +1621,6 @@ mod_executive_dashboard_server <- function(
             input$site
         )
       })
-
-      observeEvent(
-        input$year,
-        {
-
-          choices <- setdiff(
-            as.character(APP_YEARS),
-            as.character(input$year)
-          )
-
-          current_value <- input$comparison_year
-
-          if (
-            is.null(current_value) ||
-              !current_value %in% choices
-          ) {
-
-            current_value <-
-              executive_default_comparison_year(
-                year = input$year,
-                years = APP_YEARS
-              )
-          }
-
-          updateSelectInput(
-            session,
-            "comparison_year",
-            choices = choices,
-            selected = current_value
-          )
-        },
-        ignoreInit = FALSE
-      )
 
       # -------------------------------------------------------------------
       # Executive Finance data

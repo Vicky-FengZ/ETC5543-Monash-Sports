@@ -86,9 +86,6 @@ app_theme <- bslib::bs_theme(
   "border-radius-lg" = "4px"
 )
 
-APP_YEARS <- 2021:2025
-LATEST_APP_YEAR <- max(APP_YEARS)
-
 KNOWN_SITE_CATALOGUE <- data.frame(
   display_name = c(
     "H&F Clayton",
