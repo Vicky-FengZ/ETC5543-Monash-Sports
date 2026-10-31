@@ -28,6 +28,7 @@ empty_venues_finance_check_table <- function() {
 }
 
 
+# Zero-row table of operational checks (expected, reported, difference, status).
 empty_venues_operational_check_table <- function() {
 
   data.frame(
@@ -52,6 +53,8 @@ empty_venues_operational_check_table <- function() {
 }
 
 
+# Warnings when an operational sheet is missing or empty, its month headings are missing or
+# duplicated, or it has no reported-total column.
 validate_venues_operational_sheet <- function(
   workbook,
   data_field,
@@ -174,6 +177,8 @@ validate_venues_operational_sheet <- function(
 }
 
 
+# Warnings when the Court Hire comparison sheet is missing or empty, or its comparison blocks
+# (including Total Court Hire) are missing or duplicated.
 validate_venues_court_hire_sheet <- function(workbook) {
 
   raw_sheet <- workbook$court_hire_sheet
@@ -254,6 +259,8 @@ validate_venues_court_hire_sheet <- function(workbook) {
 }
 
 
+# Warnings when the Casual Hours sheet is missing or empty, or its monthly summary block is
+# missing, incomplete or has no Total row.
 validate_venues_casual_hours_sheet <- function(workbook) {
 
   raw_sheet <- workbook$casual_hours_sheet
@@ -354,6 +361,8 @@ validate_venues_casual_hours_sheet <- function(workbook) {
 }
 
 
+# Warnings when the report year's Casual Salaries block is missing, repeated, incomplete or
+# has no Total row.
 validate_venues_casual_wages_sheet <- function(workbook) {
 
   raw_sheet <- workbook$casual_wages_sheet
@@ -484,6 +493,8 @@ validate_venues_casual_wages_sheet <- function(workbook) {
 }
 
 
+# Structure checks of one workbook: the finance sheet's monthly blocks, then each
+# operational sheet.
 validate_venues_tracking_report_workbook <- function(workbook) {
 
   if (!inherits(workbook, "venues_tracking_report_workbook")) {
@@ -613,6 +624,7 @@ validate_venues_tracking_report_workbook <- function(workbook) {
 }
 
 
+# One check comparing the sum of the monthly values with the reported total for one row.
 make_venues_operational_check <- function(
   group_data,
   dataset,
@@ -714,6 +726,7 @@ make_venues_operational_check <- function(
 }
 
 
+# Checks that monthly values add up to the reported total for every row of a table.
 build_venues_period_total_checks <- function(
   data,
   dataset,
@@ -823,6 +836,7 @@ build_venues_period_total_checks <- function(
 }
 
 
+# Monthly-to-YTD checks for attendance.
 build_venues_attendance_checks <- function(
   attendance,
   validation_tolerance = 0.01
@@ -848,6 +862,7 @@ build_venues_attendance_checks <- function(
 }
 
 
+# Monthly-to-total checks for facility hire.
 build_venues_facility_hire_checks <- function(
   facility_hire,
   validation_tolerance = 0.01
@@ -872,6 +887,7 @@ build_venues_facility_hire_checks <- function(
 }
 
 
+# Monthly-to-total checks for summable membership metrics.
 build_venues_membership_checks <- function(
   membership,
   validation_tolerance = 0.01
@@ -896,6 +912,7 @@ build_venues_membership_checks <- function(
 }
 
 
+# Monthly-to-YTD checks for online sales.
 build_venues_online_sales_checks <- function(
   online_sales,
   validation_tolerance = 0.01
@@ -921,6 +938,7 @@ build_venues_online_sales_checks <- function(
 }
 
 
+# Monthly-to-YTD checks for merchandise.
 build_venues_merchandise_checks <- function(
   merchandise,
   validation_tolerance = 0.01
@@ -945,6 +963,7 @@ build_venues_merchandise_checks <- function(
 }
 
 
+# Checks that Variance equals Actual minus Budget for each row and period.
 build_venues_variance_identity_checks <- function(
   data,
   dataset,
@@ -1087,6 +1106,7 @@ build_venues_variance_identity_checks <- function(
 }
 
 
+# Checks that the reported growth equals the report year compared with the previous year.
 build_venues_court_hire_growth_checks <- function(
   court_hire,
   validation_tolerance = 0.01
@@ -1181,6 +1201,7 @@ build_venues_court_hire_growth_checks <- function(
 }
 
 
+# All court hire checks: monthly-to-total revenue and growth.
 build_venues_court_hire_checks <- function(
   court_hire,
   validation_tolerance = 0.01
@@ -1214,6 +1235,7 @@ build_venues_court_hire_checks <- function(
 }
 
 
+# Casual hours checks: monthly-to-total and Variance = Paid - Budgeted.
 build_venues_casual_hours_checks <- function(
   casual_hours,
   validation_tolerance = 0.01
@@ -1254,6 +1276,7 @@ build_venues_casual_hours_checks <- function(
 }
 
 
+# Casual wages checks: monthly-to-total and Variance = Actual - Budget.
 build_venues_casual_wages_checks <- function(
   casual_wages,
   validation_tolerance = 0.01
@@ -1289,6 +1312,7 @@ build_venues_casual_wages_checks <- function(
 }
 
 
+# One warning per file, dataset and check type that has failed or incomplete checks.
 validate_venues_operational_checks <- function(checks) {
 
   if (!is.data.frame(checks) || nrow(checks) == 0L) {
@@ -1372,6 +1396,7 @@ validate_venues_operational_checks <- function(checks) {
 }
 
 
+# Warnings across all uploaded years: two files for one year, or missing years in the series.
 validate_venues_tracking_report_collection <- function(workbooks) {
 
   if (length(workbooks) == 0L) {
@@ -1429,6 +1454,8 @@ validate_venues_tracking_report_collection <- function(workbooks) {
 }
 
 
+# The single finance value for a row type, metric and value type (optionally one fund), with its
+# source cell; NA when there is not exactly one.
 venues_finance_record <- function(
   data,
   row_type,
@@ -1466,6 +1493,7 @@ venues_finance_record <- function(
 }
 
 
+# Value as a number, with missing values counted as zero.
 venues_number_or_zero <- function(value) {
 
   if (length(value) == 0L || is.na(value)) {
@@ -1476,6 +1504,7 @@ venues_number_or_zero <- function(value) {
 }
 
 
+# One finance check row comparing an expected and a reported value.
 make_venues_finance_check <- function(
   month_data,
   fund,
@@ -1526,6 +1555,8 @@ make_venues_finance_check <- function(
 }
 
 
+# Finance checks: Variance = Actual - Budget, Profit/Loss = Income - Expenses, fund lines
+# adding up to the month total, and year-to-date values adding up month by month.
 build_venues_finance_checks <- function(
   finance,
   validation_tolerance = 0.01
@@ -1748,6 +1779,7 @@ build_venues_finance_checks <- function(
 }
 
 
+# One warning per file and check type that has failed or incomplete finance checks.
 validate_venues_finance_checks <- function(checks) {
 
   if (!is.data.frame(checks) || nrow(checks) == 0L) {

@@ -18,6 +18,7 @@ require_monthly_report_packages <- function() {
 }
 
 
+# Monthly Site Report workbooks in a folder (and its subfolders), skipping Excel lock files.
 discover_monthly_site_report_files <- function(
   data_dir = file.path(
     "data",
@@ -75,6 +76,7 @@ discover_monthly_site_report_files <- function(
 }
 
 
+# Report year from the file name, which must contain exactly one four-digit year.
 extract_monthly_site_report_year <- function(source_name) {
 
   year_matches <- regmatches(
@@ -102,6 +104,7 @@ extract_monthly_site_report_year <- function(source_name) {
 }
 
 
+# Sheets to import: every sheet except DASHBOARD and Excel chart sheets.
 monthly_site_import_sheet_names <- function(sheet_names) {
 
   keys <- normalise_excel_label(sheet_names)
@@ -115,6 +118,8 @@ monthly_site_import_sheet_names <- function(sheet_names) {
 }
 
 
+# Reads every importable sheet of one Monthly Site Report as raw cells.
+# Unreadable sheets become warnings instead of stopping the import.
 read_monthly_site_report_file <- function(
   path,
   source_name = basename(path)
@@ -238,6 +243,10 @@ read_monthly_site_report_file <- function(
 }
 
 
+# Reads, validates and cleans Monthly Site Reports into finance, discount and Total Revenue
+# tables.
+# Pass `paths` (with `source_names` for uploads) or a `data_dir` to search. With strict = TRUE
+# a validation error stops the import; with FALSE it is returned in the validation table.
 load_monthly_site_reports <- function(
   data_dir = file.path(
     "data",
@@ -447,6 +456,7 @@ load_monthly_site_reports <- function(
 }
 
 
+# Short summary of the imported Monthly Site Reports when the object is printed.
 print.monthly_site_report_data <- function(x, ...) {
 
   years <- sort(unique(x$files$report_year))

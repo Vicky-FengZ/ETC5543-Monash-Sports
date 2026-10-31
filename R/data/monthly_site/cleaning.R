@@ -12,6 +12,7 @@ first_column_labels <- function(raw_sheet) {
 }
 
 
+# TRUE when a sheet has both INCOME and EXPENSES sections.
 sheet_has_finance_sections <- function(raw_sheet) {
 
   labels <- first_column_labels(raw_sheet)
@@ -20,12 +21,14 @@ sheet_has_finance_sections <- function(raw_sheet) {
 }
 
 
+# TRUE when a sheet has a DISCOUNTS section.
 sheet_has_discount_section <- function(raw_sheet) {
 
   "discounts" %in% first_column_labels(raw_sheet)
 }
 
 
+# TRUE when a sheet has a "Total Revenue (Actual + Opp)" row.
 sheet_has_total_revenue_section <- function(raw_sheet) {
 
   labels <- first_column_labels(raw_sheet)
@@ -34,6 +37,7 @@ sheet_has_total_revenue_section <- function(raw_sheet) {
 }
 
 
+# Zero-row finance table with the cleaned column types.
 empty_monthly_finance_table <- function() {
 
   data.frame(
@@ -57,6 +61,7 @@ empty_monthly_finance_table <- function() {
 }
 
 
+# Zero-row discount table with the cleaned column types.
 empty_monthly_discount_table <- function() {
 
   data.frame(
@@ -79,6 +84,7 @@ empty_monthly_discount_table <- function() {
 }
 
 
+# Zero-row Total Revenue table, including the validation columns.
 empty_monthly_total_revenue_table <- function() {
 
   data.frame(
@@ -105,6 +111,8 @@ empty_monthly_total_revenue_table <- function() {
 }
 
 
+# Standard site name from a sheet name, without the cost-centre code, e.g. "H&F Clayton
+# (Z07601)" -> "H&F Clayton".
 canonical_site_name <- function(sheet_name) {
 
   clean_name <- trimws(sheet_name)
@@ -137,6 +145,8 @@ canonical_site_name <- function(sheet_name) {
 }
 
 
+# Cost-centre code such as "Z07601" from the sheet name or the first rows of column A; NA when
+# none.
 extract_site_code <- function(sheet_name, raw_sheet) {
 
   candidates <- c(
@@ -173,6 +183,8 @@ extract_site_code <- function(sheet_name, raw_sheet) {
 }
 
 
+# Business unit heading for every column: the group row above INCOME, carried right across
+# merged cells.
 fill_group_headers <- function(raw_sheet, header_row) {
 
   # INCOME and EXPENSES share the business-unit headings placed immediately
@@ -214,6 +226,8 @@ fill_group_headers <- function(raw_sheet, header_row) {
 }
 
 
+# Long table of one INCOME or EXPENSES block: one row per month, business unit and value type
+# (Budget, Actual, Variance), with the source cell of every value.
 extract_monthly_finance_section <- function(
   raw_sheet,
   report_year,
@@ -346,6 +360,7 @@ extract_monthly_finance_section <- function(
 }
 
 
+# Long table of the DISCOUNTS block: one row per month, business unit and discount type.
 extract_monthly_discount_section <- function(
   raw_sheet,
   report_year,
@@ -466,6 +481,7 @@ extract_monthly_discount_section <- function(
 }
 
 
+# Sum of the values that are present; NA when none is.
 sum_available_values <- function(values) {
 
   values <- suppressWarnings(
@@ -480,6 +496,9 @@ sum_available_values <- function(values) {
 }
 
 
+# Reported Total Revenue per business unit, compared with Actual Income plus discount
+# opportunity
+# recalculated from the cleaned tables (difference, tolerance and pass/fail status).
 extract_monthly_total_revenue_section <- function(
   raw_sheet,
   report_year,
@@ -640,6 +659,7 @@ extract_monthly_total_revenue_section <- function(
 }
 
 
+# Finance rows from every sheet of a workbook that has INCOME and EXPENSES sections.
 clean_monthly_site_report_finance <- function(workbook) {
 
   if (!inherits(workbook, "monthly_site_report_workbook")) {
@@ -696,6 +716,7 @@ clean_monthly_site_report_finance <- function(workbook) {
 }
 
 
+# Discount rows from every sheet of a workbook that has a DISCOUNTS section.
 clean_monthly_site_report_discounts <- function(workbook) {
 
   if (!inherits(workbook, "monthly_site_report_workbook")) {
@@ -748,6 +769,7 @@ clean_monthly_site_report_discounts <- function(workbook) {
 }
 
 
+# Total Revenue checks from every sheet of a workbook that reports Total Revenue.
 clean_monthly_site_report_total_revenue <- function(
   workbook,
   finance,

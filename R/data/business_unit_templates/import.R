@@ -16,6 +16,8 @@ require_business_unit_template_packages <- function() {
 }
 
 
+# Detailed Site Report workbooks in a folder (and its year subfolders), skipping Excel lock
+# files.
 discover_business_unit_template_files <- function(
   data_dir = file.path(
     "data",
@@ -71,6 +73,7 @@ discover_business_unit_template_files <- function(
 }
 
 
+# Report year from the file name, which must contain exactly one four-digit year.
 extract_business_unit_template_year <- function(source_name) {
 
   year_matches <- regmatches(
@@ -97,6 +100,8 @@ extract_business_unit_template_year <- function(source_name) {
 }
 
 
+# Business unit from the file name, without the year and "Site/Program Report",
+# e.g. "Aquatics Site Report 2025.xlsx" -> "Aquatics"; known units get their standard name.
 extract_business_unit_report_name <- function(source_name) {
 
   label <- tools::file_path_sans_ext(basename(source_name))
@@ -139,6 +144,7 @@ extract_business_unit_report_name <- function(source_name) {
 }
 
 
+# Campus of a business unit (Clayton, Caulfield, Peninsula, Multi-campus or Unspecified).
 business_unit_template_campus <- function(report_unit) {
 
   key <- normalise_excel_label(report_unit)
@@ -160,6 +166,7 @@ business_unit_template_campus <- function(report_unit) {
 }
 
 
+# Reads one worksheet as raw cells (no header row) and caches its text and numbers.
 read_business_unit_template_sheet <- function(path, sheet_name) {
 
   raw_sheet <- suppressMessages(
@@ -183,6 +190,7 @@ read_business_unit_template_sheet <- function(path, sheet_name) {
 }
 
 
+# Name of the sheet matching `expected_name`; NA when absent, error when several match.
 find_business_unit_template_sheet <- function(
   sheet_names,
   expected_name,
@@ -230,6 +238,8 @@ find_business_unit_template_sheet <- function(
 }
 
 
+# Reads the known sheets of one Detailed Site Report (Finance, Direct and Indirect Visits,
+# Memberships, Enrollments) as raw cells.
 read_business_unit_template_file <- function(
   path,
   source_name = basename(path)
@@ -306,6 +316,9 @@ read_business_unit_template_file <- function(
 }
 
 
+# Reads, validates and cleans Detailed Site Reports into finance, discount, visit, membership
+# and enrolment tables plus their checks. Pass `paths` (with `source_names` for uploads) or a
+# `data_dir`. With strict = TRUE a validation error stops the import.
 load_business_unit_template_reports <- function(
   data_dir = file.path(
     "data",
@@ -542,6 +555,7 @@ load_business_unit_template_reports <- function(
 }
 
 
+# Zero-row table describing the imported files and the sheet used for each dataset.
 empty_business_unit_template_file_table <- function() {
 
   data.frame(
@@ -561,6 +575,7 @@ empty_business_unit_template_file_table <- function() {
 }
 
 
+# Short summary of the imported Detailed Site Reports when the object is printed.
 print.business_unit_template_report_data <- function(x, ...) {
 
   years <- sort(unique(x$files$report_year))

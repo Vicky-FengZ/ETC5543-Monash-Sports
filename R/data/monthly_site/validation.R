@@ -98,6 +98,8 @@ validate_monthly_site_report_workbook <- function(workbook) {
 }
 
 
+# Warnings for business units whose reported Total Revenue differs from Actual Income plus
+# discount opportunity, or could not be checked.
 validate_monthly_total_revenue_table <- function(total_revenue) {
 
   if (
@@ -179,6 +181,7 @@ validate_monthly_total_revenue_table <- function(total_revenue) {
 }
 
 
+# Warnings across all uploaded years: two files for one year, or missing years in the series.
 validate_monthly_site_report_collection <- function(workbooks) {
 
   if (length(workbooks) == 0L) {

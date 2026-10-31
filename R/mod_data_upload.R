@@ -152,6 +152,7 @@ basic_upload_script <- function() {
 }
 
 
+# Records the workbook's sheet order on a parsed result (used for the preview's sheet tabs).
 attach_basic_upload_sheet_order <- function(result, path) {
   existing_order <- attr(result, "source_sheet_order", exact = TRUE)
 
@@ -168,6 +169,7 @@ attach_basic_upload_sheet_order <- function(result, path) {
 }
 
 
+# Zero-row table of uploaded files: id, type, name, temporary path, status and messages.
 empty_basic_upload_registry <- function() {
   data.frame(
     file_id = character(),
@@ -185,6 +187,8 @@ empty_basic_upload_registry <- function() {
 }
 
 
+# Parser for each report type: import one workbook (strict = FALSE, so problems are returned
+# rather than thrown), then run the upload checks below.
 basic_upload_parsers <- function() {
   # Each parser runs the report's importer, then the upload checks below.
   run <- function(loader, report_type) {
@@ -312,6 +316,7 @@ basic_upload_content_year <- function(path, report_type) {
 }
 
 
+# Report year taken from the file name; NA when there is not exactly one.
 basic_upload_name_year <- function(result, source_name) {
   files <- result$files
   years <- if (is.data.frame(files) && "report_year" %in% names(files)) {
@@ -325,6 +330,8 @@ basic_upload_name_year <- function(result, source_name) {
 }
 
 
+# Adds blocking errors for a file-name year that differs from the workbook and for a workbook
+# without figures.
 add_basic_upload_checks <- function(result, path, report_type, source_name) {
   issues <- list()
   name_year <- basic_upload_name_year(result, source_name)
@@ -499,6 +506,7 @@ format_basic_year_span <- function(years, dash = "–", join = ", ") {
 }
 
 
+# One manifest row per saved file: name, report type, years, size and warning count.
 basic_saved_data_file_table <- function(rows, results) {
   data.frame(
     original_name = as.character(rows$original_name),
@@ -545,6 +553,7 @@ basic_saved_data_summary <- function(files) {
 }
 
 
+# Lines such as "Monthly Site Reports: 5 files (2021-2025)" for the saved-data card.
 basic_saved_data_summary_text <- function(files) {
   summary <- basic_saved_data_summary(files)
   paste0(
@@ -607,6 +616,7 @@ basic_saved_local_date <- function(time, utc_offset = NULL) {
 }
 
 
+# Whole days between the save date and today on the user's clock.
 basic_saved_data_days_old <- function(saved_at, today = Sys.time(), utc_offset = NULL) {
   as.integer(
     basic_saved_local_date(today, utc_offset) -
@@ -685,6 +695,7 @@ read_basic_saved_data <- function(path) {
 }
 
 
+# Number of errors and warnings in a parsed result, and the first error message.
 basic_upload_result_issues <- function(result) {
   validation <- result$validation
 
@@ -709,6 +720,7 @@ basic_upload_result_issues <- function(result) {
 }
 
 
+# Plain-language note on what a warning means for the dashboard figures.
 basic_upload_warning_impact <- function(message) {
   text <- tolower(message)
 
@@ -760,6 +772,7 @@ basic_upload_warning_impact <- function(message) {
 }
 
 
+# Warning messages of a parsed result with their worksheet and impact note.
 basic_upload_warning_rows <- function(result) {
   empty <- data.frame(
     sheet = character(), message = character(), impact = character(),
@@ -801,6 +814,7 @@ basic_upload_warning_rows <- function(result) {
 }
 
 
+# Collapsible list of a file's warnings, grouped by worksheet.
 basic_upload_warning_details_ui <- function(warnings, file_name) {
   if (is.null(warnings) || nrow(warnings) == 0L) {
     return(NULL)
@@ -839,6 +853,8 @@ basic_upload_warning_details_ui <- function(warnings, file_name) {
 }
 
 
+# Combines the parsed results of several files of one report type into one object
+# (tables stacked; sheet order kept).
 combine_basic_upload_results <- function(objects, result_class) {
   objects <- Filter(Negate(is.null), objects)
 
@@ -913,6 +929,7 @@ BASIC_PREVIEW_TABLES <- list(
 BASIC_PREVIEW_ALL_SHEETS <- "__all_source_sheets__"
 
 
+# The combined report for a report type from the dashboard data.
 basic_preview_report <- function(data, report_type) {
   if (!is.list(data) ||
       length(report_type) != 1L ||
@@ -925,6 +942,7 @@ basic_preview_report <- function(data, report_type) {
 }
 
 
+# Tables of a report that the preview offers, in a fixed order.
 basic_preview_table_names <- function(report, report_type = NULL) {
   if (!is.list(report) || is.null(names(report))) {
     return(character())
@@ -949,12 +967,14 @@ basic_preview_table_names <- function(report, report_type = NULL) {
 }
 
 
+# Readable table name, e.g. "facility_hire" -> "Facility Hire".
 basic_preview_table_label <- function(table_name) {
   labels <- gsub("_", " ", as.character(table_name), fixed = TRUE)
   tools::toTitleCase(labels)
 }
 
 
+# Zero-row preview table for Monthly Site Reports.
 empty_monthly_site_preview_table <- function() {
   data.frame(
     data_section = character(),
@@ -983,6 +1003,7 @@ empty_monthly_site_preview_table <- function() {
 }
 
 
+# A column of `data`, or `missing_value` repeated when the column is absent.
 basic_preview_column <- function(data, column, missing_value) {
   if (!is.data.frame(data) || nrow(data) == 0L) {
     return(rep(missing_value, 0L))
@@ -996,6 +1017,7 @@ basic_preview_column <- function(data, column, missing_value) {
 }
 
 
+# Value as a Date, from dates, date-times, numbers or text.
 basic_preview_as_date <- function(value) {
   if (inherits(value, "Date")) {
     return(as.Date(value))
@@ -1013,6 +1035,7 @@ basic_preview_as_date <- function(value) {
 }
 
 
+# Preview rows for one section of a Monthly Site Report (finance, discounts or Total Revenue).
 make_monthly_site_preview_rows <- function(
   data,
   data_section,
@@ -1094,6 +1117,8 @@ make_monthly_site_preview_rows <- function(
 }
 
 
+# One long preview table for Monthly Site Reports: finance, discounts and Total Revenue
+# with a common set of columns.
 basic_preview_monthly_site_data <- function(report) {
   if (!is.list(report)) {
     return(NULL)
@@ -1213,11 +1238,13 @@ basic_preview_monthly_site_data <- function(report) {
 }
 
 
+# Missing values of the same type as `prototype`.
 basic_preview_typed_missing <- function(prototype, size) {
   prototype[rep(NA_integer_, as.integer(size))]
 }
 
 
+# Stacks tables with different columns, filling absent columns with typed missing values.
 bind_basic_preview_tables <- function(tables) {
   tables <- Filter(is.data.frame, tables)
 
@@ -1263,6 +1290,7 @@ bind_basic_preview_tables <- function(tables) {
 }
 
 
+# One preview table for Detailed Site or Venues reports, combining their tables.
 basic_preview_combined_report_data <- function(report, report_type) {
   if (!is.list(report) ||
       length(report_type) != 1L ||
@@ -1333,6 +1361,7 @@ basic_preview_combined_report_data <- function(report, report_type) {
 }
 
 
+# Removes columns that are empty in every row.
 basic_preview_drop_empty_columns <- function(data) {
   if (!is.data.frame(data) || ncol(data) == 0L || nrow(data) == 0L) {
     return(data)
@@ -1354,6 +1383,7 @@ basic_preview_drop_empty_columns <- function(data) {
 }
 
 
+# Reporting years present in a preview table.
 basic_preview_years <- function(data) {
   if (!is.data.frame(data) || !"report_year" %in% names(data)) {
     return(character())
@@ -1364,11 +1394,14 @@ basic_preview_years <- function(data) {
 }
 
 
+# Lower-case sheet label used to compare sheet names.
 basic_preview_sheet_key <- function(value) {
   tolower(basic_preview_sheet_label(value))
 }
 
 
+# Display label for a source sheet. Year-specific names such as "2025 Casual Hours" or
+# "Court Hire 2024 vs 2025" get one label so all years appear on one tab.
 basic_preview_sheet_label <- function(value) {
   value <- as.character(value)
   value[is.na(value)] <- ""
@@ -1407,6 +1440,7 @@ basic_preview_sheet_label <- function(value) {
 }
 
 
+# Sheet tabs to show, in workbook order.
 basic_preview_source_sheets <- function(data, source_sheet_order = character()) {
   if (!is.data.frame(data) || !"source_sheet" %in% names(data)) {
     return(character())
@@ -1431,6 +1465,7 @@ basic_preview_source_sheets <- function(data, source_sheet_order = character()) 
 }
 
 
+# Distinct non-blank values of a column (filter choices).
 basic_preview_field_values <- function(data, column) {
   if (!is.data.frame(data) || !column %in% names(data)) {
     return(character())
@@ -1442,6 +1477,7 @@ basic_preview_field_values <- function(data, column) {
 }
 
 
+# Selected values that are still available.
 basic_preview_valid_selections <- function(selected, available) {
   if (is.null(selected) || length(selected) == 0L) {
     return(character())
@@ -1453,6 +1489,7 @@ basic_preview_valid_selections <- function(selected, available) {
 }
 
 
+# Preview rows after the year, sheet, measure, value type and text search filters.
 filter_basic_preview_table <- function(
   data,
   year = character(),
@@ -1565,6 +1602,7 @@ filter_basic_preview_table <- function(
 }
 
 
+# Preview table with readable sheet labels and dates for display.
 format_basic_preview_table <- function(data) {
   if (!is.data.frame(data)) {
     return(NULL)
@@ -1596,6 +1634,8 @@ format_basic_preview_table <- function(data) {
 }
 
 
+# Sort after a column heading is clicked: a new column sorts descending first; clicking the
+# same column again switches direction.
 next_basic_preview_sort <- function(
   clicked_column,
   current_column = "__none__",
@@ -1628,6 +1668,7 @@ next_basic_preview_sort <- function(
 }
 
 
+# Text shown in one preview cell (numbers without scientific notation).
 basic_preview_cell_text <- function(value) {
   if (length(value) == 0L || is.na(value[[1L]])) {
     return("")
@@ -1648,6 +1689,7 @@ basic_preview_cell_text <- function(value) {
 }
 
 
+# HTML table of the current preview page with sortable column headings.
 basic_preview_table_ui <- function(
   data,
   sort_column = "__none__",
@@ -1734,6 +1776,7 @@ basic_preview_table_ui <- function(
 }
 
 
+# Preview rows sorted by one column, or in original order.
 sort_basic_preview_table <- function(
   data,
   column = "__none__",
@@ -1763,6 +1806,7 @@ sort_basic_preview_table <- function(
 }
 
 
+# Rows of one preview page, with the page number, page count and row range.
 paginate_basic_preview_table <- function(data, page = 1L, page_size = 25L) {
   if (!is.data.frame(data)) {
     return(list(
@@ -1809,6 +1853,7 @@ paginate_basic_preview_table <- function(data, page = 1L, page_size = 25L) {
 }
 
 
+# Valid, unique Excel sheet names (no forbidden characters, at most 31 characters).
 basic_cleaned_export_sheet_names <- function(labels) {
   labels <- as.character(labels)
   labels[is.na(labels)] <- ""
@@ -1843,6 +1888,7 @@ basic_cleaned_export_sheet_names <- function(labels) {
 }
 
 
+# Table ready for Excel export: readable sheet labels, no factor or list columns.
 basic_cleaned_export_table <- function(data) {
   if (!is.data.frame(data)) {
     return(NULL)
@@ -1875,6 +1921,7 @@ basic_cleaned_export_table <- function(data) {
 }
 
 
+# Filtered and sorted export, one worksheet per source sheet.
 basic_cleaned_export_sheets <- function(
   data,
   source_sheets = character(),
@@ -1949,6 +1996,7 @@ basic_cleaned_export_sheets <- function(
 }
 
 
+# Excel file name for an export, e.g. cleaned-monthly-site-reports-2024-2025.xlsx.
 basic_cleaned_export_filename <- function(report_type, years = character()) {
   report_label <- unname(BASIC_UPLOAD_REPORT_TYPES[[report_type]])
 
@@ -1970,6 +2018,7 @@ basic_cleaned_export_filename <- function(report_type, years = character()) {
 }
 
 
+# Upload card for one report type: file picker, description and template download link.
 basic_upload_card <- function(
   ns,
   title,
