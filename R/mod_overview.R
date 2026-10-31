@@ -40,15 +40,19 @@ mod_overview_ui <- function(id) {
           selectInput(
             ns("from_year"),
             "From Year",
-            choices = APP_YEARS,
-            selected = min(APP_YEARS)
+            choices = c(
+              "No data loaded" = ""
+            ),
+            selected = ""
           ),
 
           selectInput(
             ns("to_year"),
             "To Year",
-            choices = APP_YEARS,
-            selected = max(APP_YEARS)
+            choices = c(
+              "No data loaded" = ""
+            ),
+            selected = ""
           ),
 
           col_widths = c(3, 3)
@@ -339,18 +343,10 @@ mod_overview_server <- function(
       })
 
       available_years <- reactive({
-        reports <- monthly_reports()
 
-        if (
-          is.null(reports) ||
-            is.null(reports$finance) ||
-            nrow(reports$finance) == 0L
-        ) {
-          return(integer())
-        }
-
-        years <- sort(unique(as.integer(reports$finance$report_year)))
-        years[!is.na(years)]
+        reporting_monthly_years(
+          monthly_reports()
+        )
       })
 
       annual_finance <- reactive({
@@ -438,6 +434,12 @@ mod_overview_server <- function(
         {
           req(input$from_year)
 
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
           from_year <- as.integer(
             input$from_year
           )
@@ -445,21 +447,17 @@ mod_overview_server <- function(
           current_to <- if (
             is.null(input$to_year)
           ) {
-            max(APP_YEARS)
+            max(years)
           } else {
             as.integer(input$to_year)
-          }
-
-          years <- available_years()
-
-          if (length(years) == 0L) {
-            years <- APP_YEARS
           }
 
           updateSelectInput(
             session,
             "to_year",
-            choices = years,
+            choices = years[
+              years >= from_year
+            ],
             selected = max(
               from_year,
               current_to
@@ -474,6 +472,12 @@ mod_overview_server <- function(
         {
           req(input$to_year)
 
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
           to_year <- as.integer(
             input$to_year
           )
@@ -481,21 +485,17 @@ mod_overview_server <- function(
           current_from <- if (
             is.null(input$from_year)
           ) {
-            min(APP_YEARS)
+            min(years)
           } else {
             as.integer(input$from_year)
-          }
-
-          years <- available_years()
-
-          if (length(years) == 0L) {
-            years <- APP_YEARS
           }
 
           updateSelectInput(
             session,
             "from_year",
-            choices = years,
+            choices = years[
+              years <= to_year
+            ],
             selected = min(
               to_year,
               current_from

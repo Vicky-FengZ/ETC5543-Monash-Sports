@@ -111,6 +111,73 @@ stopifnot(
   identical(enrolment_trend$total_active[2:3], c(80, 90)),
   identical(share_trend$student_share, c(0.75, 0.78))
 )
+
+# -------------------------------------------------------------------------
+# Dynamic Site Detail discovery
+# -------------------------------------------------------------------------
+
+future_site_detail_fixture <- list(
+
+  files = data.frame(
+    source_file = "Esports Site Report 2027.xlsx",
+    report_year = 2027L,
+    report_unit = "Esports",
+    campus = "Clayton",
+    site_code = "E01",
+    stringsAsFactors = FALSE
+  ),
+
+  visits = data.frame(
+    report_year = 2027L,
+    report_unit = "Esports",
+    campus = "Clayton",
+    value = 100,
+    stringsAsFactors = FALSE
+  )
+)
+
+
+stopifnot(
+  identical(
+    site_detail_available_years(
+      future_site_detail_fixture
+    ),
+    2027L
+  )
+)
+
+
+stopifnot(
+  identical(
+    site_detail_available_sites(
+      future_site_detail_fixture,
+      year = 2027L
+    ),
+    "Esports"
+  )
+)
+
+
+filtered_future_site <-
+  site_detail_filter_rows(
+    future_site_detail_fixture$visits,
+    year = 2027L,
+    site = "Esports"
+  )
+
+
+stopifnot(
+  nrow(filtered_future_site) == 1L,
+  identical(
+    filtered_future_site$report_unit[[1L]],
+    "Esports"
+  ),
+  identical(
+    filtered_future_site$campus[[1L]],
+    "Clayton"
+  )
+)
+
 cat("PASS Site Detail enrolment KPIs and trends ignore zero-filled months\n")
 
 cat("PASS test_site_detail.R\n")

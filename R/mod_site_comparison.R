@@ -6,6 +6,25 @@
 # Organises the page from broad comparison to drill-down:
 # Site trend -> latest-year site snapshot -> facility-level analysis.
 
+site_comparison_available_sites <- function(
+    site_reports
+) {
+
+  catalogue <-
+    reporting_detailed_site_catalogue(
+      site_reports
+    )
+
+  if (
+    !is.data.frame(catalogue) ||
+      nrow(catalogue) == 0L
+  ) {
+    return(character())
+  }
+
+  catalogue$display_name
+}
+
 mod_site_comparison_ui <- function(id) {
   
   ns <- shiny::NS(id)
@@ -39,15 +58,19 @@ mod_site_comparison_ui <- function(id) {
           selectInput(
             ns("from_year"),
             "From Year",
-            choices = APP_YEARS,
-            selected = min(APP_YEARS)
+            choices = c(
+              "No data loaded" = ""
+            ),
+            selected = ""
           ),
-          
+
           selectInput(
             ns("to_year"),
             "To Year",
-            choices = APP_YEARS,
-            selected = max(APP_YEARS)
+            choices = c(
+              "No data loaded" = ""
+            ),
+            selected = ""
           ),
           
           selectInput(
@@ -271,8 +294,8 @@ mod_site_comparison_ui <- function(id) {
           selectInput(
             ns("selected_site"),
             label = "Site",
-            choices = SITE_NAMES,
-            selected = SITE_NAMES[[1]]
+            choices = character(),
+            selectize = FALSE
           ),
           
           # The view switcher lives with the other facility controls; the
@@ -564,6 +587,41 @@ mod_site_comparison_server <- function(
         dashboard_data$sites
       })
 
+      available_facility_sites <- reactive({
+
+        site_comparison_available_sites(
+          site_reports()
+        )
+      })
+
+
+      observeEvent(
+        available_facility_sites(),
+        {
+
+          sites <- available_facility_sites()
+
+          selected_site <- if (
+            !is.null(input$selected_site) &&
+              input$selected_site %in% sites
+          ) {
+            input$selected_site
+          } else if (length(sites) > 0L) {
+            sites[[1L]]
+          } else {
+            character()
+          }
+
+          updateSelectInput(
+            session,
+            "selected_site",
+            choices = sites,
+            selected = selected_site
+          )
+        },
+        ignoreInit = FALSE
+      )
+
       site_annual_finance <- reactive({
         calculate_site_annual_finance(
           monthly_reports()
@@ -621,27 +679,9 @@ mod_site_comparison_server <- function(
 
       available_years <- reactive({
 
-        x <- site_annual_finance()
-
-        if (
-          is.null(x) ||
-            !is.data.frame(x) ||
-            nrow(x) == 0L
-        ) {
-          return(integer())
-        }
-
-        years <- sort(
-          unique(
-            as.integer(
-              x$report_year
-            )
-          )
+        reporting_monthly_years(
+          monthly_reports()
         )
-
-        years[
-          !is.na(years)
-        ]
       })
 
 
@@ -685,25 +725,26 @@ mod_site_comparison_server <- function(
         input$from_year,
         {
           req(input$from_year)
-          
+
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
           from_year <- as.integer(
             input$from_year
           )
-          
-                    years <- available_years()
-
-          if (length(years) == 0L) {
-            years <- APP_YEARS
-          }
 
           current_to <- if (
-            is.null(input$to_year)
+            is.null(input$to_year) ||
+              !nzchar(input$to_year)
           ) {
             max(years)
           } else {
             as.integer(input$to_year)
           }
-          
+
           updateSelectInput(
             session,
             "to_year",
@@ -723,25 +764,26 @@ mod_site_comparison_server <- function(
         input$to_year,
         {
           req(input$to_year)
-          
+
+          years <- available_years()
+
+          if (length(years) == 0L) {
+            return()
+          }
+
           to_year <- as.integer(
             input$to_year
           )
-          
-                    years <- available_years()
-
-          if (length(years) == 0L) {
-            years <- APP_YEARS
-          }
 
           current_from <- if (
-            is.null(input$from_year)
+            is.null(input$from_year) ||
+              !nzchar(input$from_year)
           ) {
             min(years)
           } else {
             as.integer(input$from_year)
           }
-          
+
           updateSelectInput(
             session,
             "from_year",
@@ -1820,6 +1862,7 @@ mod_site_comparison_server <- function(
           ),
           monthly_reports = monthly_reports,
           available_years = available_years,
+          available_facility_sites = available_facility_sites,
           site_annual_finance = site_annual_finance,
           filtered_site_finance = filtered_site_finance,
           snapshot_site_finance = snapshot_site_finance,

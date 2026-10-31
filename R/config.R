@@ -89,18 +89,37 @@ app_theme <- bslib::bs_theme(
 APP_YEARS <- 2021:2025
 LATEST_APP_YEAR <- max(APP_YEARS)
 
-SITE_NAMES <- c(
-  "H&F Clayton",
-  "Venues Clayton",
-  "Aquatics Clayton",
-  "Caulfield",
-  "Peninsula",
-  "Participation Programs"
+KNOWN_SITE_CATALOGUE <- data.frame(
+  display_name = c(
+    "H&F Clayton",
+    "Venues Clayton",
+    "Aquatics Clayton",
+    "Caulfield",
+    "Peninsula",
+    "Participation Programs"
+  ),
+  report_unit = c(
+    "Health & Fitness",
+    "Venues",
+    "Aquatics",
+    "Caulfield",
+    "Peninsula",
+    "Participation Programs"
+  ),
+  campus = c(
+    "Clayton",
+    "Clayton",
+    "Clayton",
+    "Caulfield",
+    "Peninsula",
+    "Multi-campus"
+  ),
+  stringsAsFactors = FALSE
 )
 
-SITE_DETAIL_YEARS <- 2025
-
-VENUES_TRACKING_YEARS <- 2022:2025
+# Backward-compatible display-name vector. Existing modules can continue
+# using SITE_NAMES while site discovery is migrated to the shared catalogue.
+SITE_NAMES <- KNOWN_SITE_CATALOGUE$display_name
 
 FINANCE_METRICS <- c(
   "Income",

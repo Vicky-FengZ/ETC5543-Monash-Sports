@@ -48,27 +48,8 @@ venues_operations_available_years <- function(
     venues_reports
 ) {
 
-  if (
-    is.null(venues_reports) ||
-      !is.list(venues_reports) ||
-      is.null(venues_reports$attendance) ||
-      !is.data.frame(venues_reports$attendance)
-  ) {
-    return(integer())
-  }
-
-  years <- suppressWarnings(
-    as.integer(
-      venues_reports$attendance$report_year
-    )
-  )
-
-  sort(
-    unique(
-      years[
-        !is.na(years)
-      ]
-    )
+  reporting_venues_years(
+    venues_reports
   )
 }
 

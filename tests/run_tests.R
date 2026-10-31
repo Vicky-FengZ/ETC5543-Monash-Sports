@@ -32,11 +32,22 @@ load_test_setup <- function() {
     library(bsicons)
   })
   for (file in c(
-    "R/data/load.R", "R/calculations.R", "R/plots.R", "R/forecasting.R",
-    "R/forecast_plots.R", "R/config.R", "R/executive_visual_registry.R",
-    "R/ui_helpers.R", "R/mod_overview.R", "R/mod_site_comparison.R",
-    "R/mod_forecasting.R", "R/mod_executive_dashboard.R", "R/mod_site_detail.R",
-    "R/mod_venues_operations.R", "R/mod_data_upload.R",
+    "R/data/load.R", 
+    "R/calculations.R", 
+    "R/plots.R", 
+    "R/forecasting.R",
+    "R/forecast_plots.R", 
+    "R/config.R", 
+    "R/reporting_context.R", 
+    "R/executive_visual_registry.R",
+    "R/ui_helpers.R", 
+    "R/mod_overview.R", 
+    "R/mod_site_comparison.R",
+    "R/mod_forecasting.R", 
+    "R/mod_executive_dashboard.R", 
+    "R/mod_site_detail.R",
+    "R/mod_venues_operations.R", 
+    "R/mod_data_upload.R",
     # Shared fixtures for the Site Detail / Venues tests and plot smoke tests.
     "tests/fixtures_site_venues.R",
     # Several tests upload the same sample workbooks; parse each one once.
@@ -53,18 +64,30 @@ load_test_setup <- function() {
 # sets environment variables for the group only.
 test_groups <- list(
   list(files = c(
-    "test_data_pipeline_regressions.R", "test_venues_tracking_extensions.R",
-    "test_basic_upload.R", "test_upload_warnings.R", "test_extensible_imports.R",
-    "test_excel_templates.R", "test_cross_page_consistency.R"
+    "test_data_pipeline_regressions.R", 
+    "test_venues_tracking_extensions.R",
+    "test_basic_upload.R", 
+    "test_upload_warnings.R", 
+    "test_extensible_imports.R",
+    "test_excel_templates.R", 
+    "test_cross_page_consistency.R"
   )),
   list(files = "test_upload_realworld.R"),
   list(files = c(
-    "test_forecasting.R", "test_forecasting_simple.R", "test_forecasting_manual.R",
-    "test_forecasting_layout.R", "test_forecasting_options.R"
+    "test_forecasting.R", 
+    "test_forecasting_simple.R", 
+    "test_forecasting_manual.R",
+    "test_forecasting_layout.R", 
+    "test_forecasting_options.R"
   )),
   list(files = c(
-    "test_overview_charts.R", "test_site_comparison.R", "test_executive_dashboard.R",
-    "test_chart_and_ui_helpers.R", "test_site_detail.R", "test_venues_operations.R",
+    "test_reporting_context.R",
+    "test_overview_charts.R", 
+    "test_site_comparison.R", 
+    "test_executive_dashboard.R",
+    "test_chart_and_ui_helpers.R", 
+    "test_site_detail.R", 
+    "test_venues_operations.R",
     "test_plot_smoke.R"
   )),
   # Whole app on every page. The full report set (and the real-workbook

@@ -47,7 +47,8 @@ site_detail_filter_rows <- function(
   ) {
 
     key <- facility_site_key(
-      as.character(site[[1L]])
+      as.character(site[[1L]]),
+      facility_data = data
     )
 
     if (
@@ -76,57 +77,14 @@ site_detail_filter_rows <- function(
   ]
 }
 
-
 site_detail_available_years <- function(
     site_reports
 ) {
 
-  if (
-    is.null(site_reports) ||
-      !is.list(site_reports)
-  ) {
-    return(integer())
-  }
-
-  tables <- lapply(
-    c(
-      "visits",
-      "memberships",
-      "enrollments"
-    ),
-    function(name) {
-      site_reports[[name]]
-    }
-  )
-
-  years <- unlist(
-    lapply(
-      tables,
-      function(data) {
-
-        if (
-          is.null(data) ||
-            !is.data.frame(data) ||
-            !"report_year" %in% names(data)
-        ) {
-          return(integer())
-        }
-
-        as.integer(data$report_year)
-      }
-    ),
-    use.names = FALSE
-  )
-
-  sort(
-    unique(
-      years[
-        !is.na(years)
-      ]
-    )
+  reporting_detailed_years(
+    site_reports
   )
 }
-
 
 site_detail_available_sites <- function(
     site_reports,
@@ -140,6 +98,23 @@ site_detail_available_sites <- function(
     return(character())
   }
 
+  catalogue <-
+    reporting_detailed_site_catalogue(
+      site_reports,
+      year = year
+    )
+
+  if (
+    is.data.frame(catalogue) &&
+      nrow(catalogue) > 0L
+  ) {
+    return(
+      catalogue$display_name
+    )
+  }
+
+  # Backward-compatible fallback for older synthetic/test objects
+  # that do not contain the Detailed Report file manifest.
   SITE_NAMES[
     vapply(
       SITE_NAMES,
@@ -154,14 +129,26 @@ site_detail_available_sites <- function(
             ),
             function(name) {
 
-              data <- site_detail_filter_rows(
-                site_reports[[name]],
-                year = year,
-                site = site
-              )
+              data <-
+                site_reports[[name]]
 
-              is.data.frame(data) &&
-                nrow(data) > 0L
+              if (
+                is.null(data) ||
+                  !is.data.frame(data) ||
+                  nrow(data) == 0L
+              ) {
+                return(FALSE)
+              }
+
+              filtered <-
+                site_detail_filter_rows(
+                  data,
+                  year = year,
+                  site = site
+                )
+
+              is.data.frame(filtered) &&
+                nrow(filtered) > 0L
             },
             logical(1)
           )

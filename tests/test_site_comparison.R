@@ -943,6 +943,137 @@ stopifnot(
   ) == 0L
 )
 
+# Future site resolution ---------------------------------------------------
+
+future_facility_data <- data.frame(
+  report_unit = c(
+    "Esports",
+    "Fitness Centre",
+    "Fitness Centre"
+  ),
+  campus = c(
+    "Clayton",
+    "Clayton",
+    "Caulfield"
+  ),
+  stringsAsFactors = FALSE
+)
+
+
+esports_key <- facility_site_key(
+  "Esports",
+  facility_data = future_facility_data
+)
+
+stopifnot(
+  identical(
+    esports_key$report_unit,
+    "Esports"
+  ),
+  identical(
+    esports_key$campus,
+    "Clayton"
+  )
+)
+
+
+fitness_clayton_key <- facility_site_key(
+  "Fitness Centre · Clayton",
+  facility_data = future_facility_data
+)
+
+stopifnot(
+  identical(
+    fitness_clayton_key$report_unit,
+    "Fitness Centre"
+  ),
+  identical(
+    fitness_clayton_key$campus,
+    "Clayton"
+  )
+)
+
+
+fitness_caulfield_key <- facility_site_key(
+  "Fitness Centre · Caulfield",
+  facility_data = future_facility_data
+)
+
+stopifnot(
+  identical(
+    fitness_caulfield_key$report_unit,
+    "Fitness Centre"
+  ),
+  identical(
+    fitness_caulfield_key$campus,
+    "Caulfield"
+  )
+)
+
+
+# A duplicated report-unit without the campus suffix is ambiguous.
+stopifnot(
+  is.null(
+    facility_site_key(
+      "Fitness Centre",
+      facility_data = future_facility_data
+    )
+  )
+)
+
+
+# Unknown names must still fail safely.
+stopifnot(
+  is.null(
+    facility_site_key(
+      "Completely Unknown Site",
+      facility_data = future_facility_data
+    )
+  )
+)
+
+future_finance_row <-
+  facility_finance[
+    1L,
+    ,
+    drop = FALSE
+  ]
+
+  future_finance_row$report_unit <-
+    "Esports"
+
+  future_finance_row$campus <-
+    "Clayton"
+
+  future_finance_row$business_unit <-
+    "Esports Arena"
+
+
+  extensible_facility_finance <- rbind(
+    facility_finance,
+    future_finance_row
+  )
+
+
+  filtered_esports <-
+    filter_facility_finance_by_site(
+      extensible_facility_finance,
+      "Esports"
+    )
+
+
+  stopifnot(
+    nrow(filtered_esports) == 1L,
+    identical(
+      filtered_esports$report_unit[[1L]],
+      "Esports"
+    ),
+    identical(
+      filtered_esports$campus[[1L]],
+      "Clayton"
+    )
+  )
+
 # -------------------------------------------------------------------------
 # Facility Ranking plot
 # -------------------------------------------------------------------------
@@ -1876,6 +2007,49 @@ shiny::testServer(
       )
     )
   }
+)
+
+# -------------------------------------------------------------------------
+# Dynamic Facility Breakdown sites
+# -------------------------------------------------------------------------
+
+future_comparison_site_reports <- list(
+  files = data.frame(
+    source_file = c(
+      "Aquatics Site Report 2027.xlsx",
+      "Esports Site Report 2027.xlsx"
+    ),
+    report_year = c(
+      2027L,
+      2027L
+    ),
+    report_unit = c(
+      "Aquatics",
+      "Esports"
+    ),
+    campus = c(
+      "Clayton",
+      "Clayton"
+    ),
+    site_code = c(
+      "A01",
+      "E01"
+    ),
+    stringsAsFactors = FALSE
+  )
+)
+
+
+stopifnot(
+  identical(
+    site_comparison_available_sites(
+      future_comparison_site_reports
+    ),
+    c(
+      "Aquatics Clayton",
+      "Esports"
+    )
+  )
 )
 
 cat("PASS test_site_comparison.R\n")

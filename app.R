@@ -18,6 +18,7 @@ options(shiny.maxRequestSize = 100 * 1024^2)
 # -------------------------------------------------------------------------
 
 source("R/config.R")
+source("R/reporting_context.R")
 source("R/ui_helpers.R")
 
 source("R/data/load.R")

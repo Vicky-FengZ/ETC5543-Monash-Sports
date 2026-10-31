@@ -1557,11 +1557,64 @@ calculate_facility_annual_finance <- function(
   result
 }
 
-facility_site_key <- function(site) {
+facility_site_key <- function(
+    site,
+    facility_data = NULL
+) {
 
-  site <- as.character(site)
+  if (
+    is.null(site) ||
+      length(site) == 0L
+  ) {
+    return(NULL)
+  }
 
-  switch(
+  site <- trimws(
+    as.character(site[[1L]])
+  )
+
+  if (!nzchar(site)) {
+    return(NULL)
+  }
+
+  # Existing configured sites keep their established mapping.
+  if (
+    exists(
+      "KNOWN_SITE_CATALOGUE",
+      inherits = TRUE
+    )
+  ) {
+
+    known_catalogue <- get(
+      "KNOWN_SITE_CATALOGUE",
+      inherits = TRUE
+    )
+
+    known_match <- match(
+      site,
+      known_catalogue$display_name
+    )
+
+    if (!is.na(known_match)) {
+
+      return(
+        list(
+          report_unit =
+            known_catalogue$report_unit[
+              known_match
+            ],
+          campus =
+            known_catalogue$campus[
+              known_match
+            ]
+        )
+      )
+    }
+  }
+
+  # Backward-compatible fallback if calculations.R is sourced without
+  # config.R in an isolated context.
+  legacy_key <- switch(
     site,
 
     "H&F Clayton" = list(
@@ -1596,6 +1649,111 @@ facility_site_key <- function(site) {
 
     NULL
   )
+
+  if (!is.null(legacy_key)) {
+    return(legacy_key)
+  }
+
+  # Future sites can be resolved directly from the Detailed Site data.
+  if (
+    is.null(facility_data) ||
+      !is.data.frame(facility_data) ||
+      nrow(facility_data) == 0L ||
+      !all(
+        c(
+          "report_unit",
+          "campus"
+        ) %in% names(facility_data)
+      )
+  ) {
+    return(NULL)
+  }
+
+  site_pairs <- unique(
+    data.frame(
+      report_unit = trimws(
+        as.character(
+          facility_data$report_unit
+        )
+      ),
+      campus = trimws(
+        as.character(
+          facility_data$campus
+        )
+      ),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  site_pairs <- site_pairs[
+    !is.na(site_pairs$report_unit) &
+      nzchar(site_pairs$report_unit) &
+      !is.na(site_pairs$campus) &
+      nzchar(site_pairs$campus),
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(site_pairs) == 0L) {
+    return(NULL)
+  }
+
+  # When the report-unit name is unique, use the clean report-unit name.
+  direct_matches <- which(
+    site_pairs$report_unit ==
+      site
+  )
+
+  if (length(direct_matches) == 1L) {
+
+    row <- site_pairs[
+      direct_matches,
+      ,
+      drop = FALSE
+    ]
+
+    return(
+      list(
+        report_unit =
+          row$report_unit[[1L]],
+        campus =
+          row$campus[[1L]]
+      )
+    )
+  }
+
+  # If the same report-unit exists at multiple campuses, the catalogue
+  # exposes it as "Report Unit · Campus".
+  disambiguated_names <- paste0(
+    site_pairs$report_unit,
+    " · ",
+    site_pairs$campus
+  )
+
+  disambiguated_match <- which(
+    disambiguated_names ==
+      site
+  )
+
+  if (length(disambiguated_match) == 1L) {
+
+    row <- site_pairs[
+      disambiguated_match,
+      ,
+      drop = FALSE
+    ]
+
+    return(
+      list(
+        report_unit =
+          row$report_unit[[1L]],
+        campus =
+          row$campus[[1L]]
+      )
+    )
+  }
+
+  NULL
 }
 
 
@@ -1614,7 +1772,10 @@ filter_facility_finance_by_site <- function(
     )
   }
 
-  key <- facility_site_key(site)
+  key <- facility_site_key(
+    site,
+    facility_data = facility_finance
+  )
 
   if (is.null(key)) {
     return(
@@ -1939,7 +2100,10 @@ filter_facility_discounts_by_site <- function(
     )
   }
 
-  key <- facility_site_key(site)
+  key <- facility_site_key(
+    site,
+    facility_data = facility_discounts
+  )
 
   if (is.null(key)) {
     return(
@@ -2126,7 +2290,8 @@ filter_facility_revenue_by_site <- function(
   }
 
   key <- facility_site_key(
-    site
+    site,
+    facility_data = facility_revenue
   )
 
   if (is.null(key)) {
@@ -2431,7 +2596,10 @@ filter_facility_monthly_discounts_by_site <- function(
     )
   }
 
-  key <- facility_site_key(site)
+  key <- facility_site_key(
+    site,
+    facility_data = facility_discounts
+  )
 
   if (is.null(key)) {
     return(
