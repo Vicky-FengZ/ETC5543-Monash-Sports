@@ -78,7 +78,9 @@ make_warning_upload_result <- function(source_name, result_class, payload) {
   }
   structure(list(
     finance = data.frame(
-      report_year = 2025L, site = "Clayton", source_sheet = "Finance",
+      # The clean file is another year: two files for one year are refused.
+      report_year = if (payload == "clean") 2024L else 2025L,
+      site = "Clayton", source_sheet = "Finance",
       source_file = source_name, metric = "Income", value_type = "Actual", value = 100,
       stringsAsFactors = FALSE
     ),
