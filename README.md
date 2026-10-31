@@ -486,8 +486,10 @@ data checks, limitations, model comparison and testing instructions.
 app.R                     # assembles the navigation and connects the modules
 LICENSE
 renv.lock                 # package versions (restore with renv::restore())
+.renvignore               # folders renv skips (deploy/ and local data)
 
 R/
+  _disable_autoload.R     # app.R sources R/ itself; stops Shiny loading it twice
   config.R                # brand colours, theme, chart palettes, constants
   ui_helpers.R            # shared UI pieces (KPI rows, navbar data status)
   calculations.R          # finance, revenue and facility calculations
@@ -538,6 +540,7 @@ deploy/
 
 .github/workflows/
   deploy-shinylive.yml    # publishes _site/ to GitHub Pages on every push
+  tests.yml               # runs the sample test suite on every push
 
 tests/
   run_tests.R             # regression tests (see Testing)
