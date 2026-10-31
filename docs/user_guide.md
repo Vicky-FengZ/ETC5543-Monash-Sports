@@ -67,7 +67,7 @@ report type from it, so:
 | Business unit reports contain `Site Report` or `Program Report` | `Participation Program Report 2026.xlsx` |
 | Venues reports contain `Venues Tracking Report` | `2026 Venues Tracking Report.xlsx` |
 | Keep **one** Monthly Site Report and one Venues Tracking Report per year | Replace the year's file with the latest version instead of adding a second one |
-| Keep drafts, old copies and other files elsewhere | Duplicate years are flagged as warnings |
+| Keep drafts, old copies and other files elsewhere | A second file for a year that is already loaded is not used (see below) |
 
 Keep the worksheet names, headings and layouts of the existing reports. Blank
 templates are available from the Data page and in `www/templates/`; see
@@ -96,6 +96,18 @@ templates are available from the Data page and in `www/templates/`; see
 
 To add or replace a single file later, use the card for its report type under
 **Or add files to one report type**.
+
+Three messages under a `failed` file are common:
+
+- **"… are already loaded from …"**: another file for the same year (and,
+  for Detailed Site Reports, the same business unit) is already in use, so
+  this one was left out to avoid counting the figures twice. Remove the file
+  you do not want, then upload the other one again, or give the new file the
+  same name as the old one so it replaces it.
+- **"The file name says 2026, but the workbook holds 2025 figures"**: the
+  file name has the wrong year. Rename the file and upload it again.
+- **"This workbook has no figures yet"**: it is a blank template. Upload it
+  once at least one month has been filled in.
 
 If a red message says **The upload did not finish**, the files never reached
 the dashboard. Wait until any parsing has finished, then select them again.
@@ -180,6 +192,21 @@ full test suite against the real reports:
    ```
 
    The run takes several minutes and ends with `ALL TESTS PASSED`.
+
+The full run also checks the key figures:
+
+- The first run saves the dashboard's annual figures and the totals of each
+  cleaned table to `data/raw/dashboard_key_numbers.csv`. Later runs stop
+  with a list of differences if a code change alters any of them. After an
+  intended change, run `Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = "true")`
+  before the tests, check the new file, then unset it.
+- To check the dashboard against figures confirmed in the Excel reports,
+  create `data/raw/expected_values.csv` with the columns `check`, `key`,
+  `expected` and `tolerance`. Copy the `check` and `key` of the figures you
+  confirmed from `dashboard_key_numbers.csv`, for example the
+  `Overview annual finance` row `2025 | … | income_actual`, and enter the
+  value from the Finance Summary sheet. `tests/snapshots/sample_expected_values.csv`
+  shows the format.
 
 Before committing, check that `git status` does not list any file from
 `data/raw/`.

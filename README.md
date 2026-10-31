@@ -184,6 +184,15 @@ A file with the same report family and filename as an existing upload replaces
 the session copy after it passes parsing and validation. If the replacement
 fails, the previous ready file and its dashboard data stay available.
 
+Only one file per report year is used (per business unit and year for
+Detailed Site Reports). A second file for a year that is already loaded
+under another name, such as `Monthly Site Report 2025 -November.xlsx` next
+to `-December.xlsx`, is marked `failed` and names the file already in use,
+because using both would count the same figures twice. Two more checks
+block a file: a year in the file name that differs from the year inside the
+workbook (Monthly Site Reports and Venues Tracking Reports), and a workbook
+without any figures, such as a blank template.
+
 Use the remove button beside a status row to delete the temporary upload and
 its parsed result. Your original Excel file stays unchanged.
 
@@ -536,6 +545,7 @@ tests/
   run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
   fixtures_site_venues.R  # shared test fixtures
   test_*.R                # one file per area
+  snapshots/              # accepted key figures for the sample workbooks
 
 www/
   styles.css              # dashboard styles (brand variables at the top)
@@ -583,16 +593,36 @@ They cover data import helpers, uploads and validation, every dashboard
 page's calculations (Overview, Site Comparison, Site Detail, Venues
 Operations, Forecasting, Executive Dashboard), chart helpers, and a smoke
 test that draws every Site Detail and Venues chart. The run ends with
-`ALL TESTS PASSED`.
+`ALL TESTS PASSED`. Two tests check the app as it is used:
 
-`test_real_upload_parsers.R` parses a complete set of report workbooks and is
-skipped in the normal run, because parsing every workbook takes several
-minutes. To include it, run the full suite on the synthetic workbooks in
-`data/sample/`:
+- `test_upload_realworld.R` runs the real importers on the sample workbooks
+  for situations met in practice: two files for the same report year (the
+  second is not used), a file name whose year differs from the workbook, a
+  blank template, unreadable or empty workbooks, saved data that overlaps
+  the session, and a new report year reaching the year filters.
+- `test_app_smoke.R` starts the whole app from `app.R`, sets every control
+  to the value it shows when the page opens, and renders every output on
+  every page with no data, one report type at a time, one year, and one file
+  of each type; the headline figures of each loaded report type must appear.
+- `test_cross_page_consistency.R` checks that Overview, the Executive
+  Dashboard, Site Comparison and the Forecasting history show the same
+  income, expenses, net result and budget variance.
+
+The full suite adds three steps that parse a complete set of workbooks and
+take several minutes: `test_real_upload_parsers.R`, `test_key_numbers.R`
+and the full-set part of `test_app_smoke.R` (which also loads the set from
+saved data). Run it on the synthetic workbooks in `data/sample/`:
 
 ```r
 source("tests/run_sample_tests.R")
 ```
+
+`test_key_numbers.R` compares the dashboard's annual figures and the totals
+of every cleaned table with an accepted snapshot
+(`tests/snapshots/sample_key_numbers.csv` for the sample workbooks), so a
+code change cannot alter the numbers unnoticed. After an intended change,
+rerun with `Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = "true")`, review
+the differences in the file and keep it.
 
 Monash Sport maintainers with the original reports can run the same suite on
 them; see section 6 of the [user guide](docs/user_guide.md).

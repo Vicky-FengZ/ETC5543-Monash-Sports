@@ -38,6 +38,8 @@ source(file.path("tests", "fixtures_site_venues.R"))
 source(file.path("tests", "test_data_pipeline_regressions.R"))
 source(file.path("tests", "test_venues_tracking_extensions.R"))
 source(file.path("tests", "test_basic_upload.R"))
+source(file.path("tests", "test_upload_realworld.R"))
+source(file.path("tests", "test_cross_page_consistency.R"))
 source(file.path("tests", "test_upload_warnings.R"))
 source(file.path("tests", "test_extensible_imports.R"))
 source(file.path("tests", "test_excel_templates.R"))
@@ -56,5 +58,8 @@ source(file.path("tests", "test_plot_smoke.R"))
 # Real workbooks: skipped unless MONASH_SPORT_REAL_DATA_ROOT is set
 # (tests/run_full_tests.R sets it to data/raw).
 source(file.path("tests", "test_real_upload_parsers.R"))
+source(file.path("tests", "test_key_numbers.R"))
+# Whole app on every page; the full report set only when the root is set.
+source(file.path("tests", "test_app_smoke.R"))
 
 cat("ALL TESTS PASSED\n")

@@ -186,32 +186,251 @@ empty_basic_upload_registry <- function() {
 
 
 basic_upload_parsers <- function() {
-  list(
-    monthly_site = function(path, source_name) {
-      result <- load_monthly_site_reports(
-        paths = path,
-        source_names = source_name,
-        strict = FALSE
-      )
-      attach_basic_upload_sheet_order(result, path)
-    },
-    site_detail = function(path, source_name) {
-      result <- load_business_unit_template_reports(
-        paths = path,
-        source_names = source_name,
-        strict = FALSE
-      )
-      attach_basic_upload_sheet_order(result, path)
-    },
-    venues_tracking = function(path, source_name) {
-      result <- load_venues_tracking_reports(
-        paths = path,
-        source_names = source_name,
-        strict = FALSE
-      )
-      attach_basic_upload_sheet_order(result, path)
+  # Each parser runs the report's importer, then the upload checks below.
+  run <- function(loader, report_type) {
+    function(path, source_name) {
+      result <- loader(paths = path, source_names = source_name, strict = FALSE)
+      result <- attach_basic_upload_sheet_order(result, path)
+      add_basic_upload_checks(result, path, report_type, source_name)
     }
+  }
+
+  list(
+    monthly_site = run(load_monthly_site_reports, "monthly_site"),
+    site_detail = run(load_business_unit_template_reports, "site_detail"),
+    venues_tracking = run(load_venues_tracking_reports, "venues_tracking")
   )
+}
+
+
+# Upload checks -----------------------------------------------------------
+# Checks that only make sense for one uploaded workbook at a time: the year
+# in the file name must match the year inside the workbook, and the
+# workbook must contain some figures (a blank template adds an empty year).
+
+# Tables that hold figures typed into each report (calculated checks are
+# left out, because a blank template still produces them).
+BASIC_UPLOAD_REPORTED_TABLES <- list(
+  monthly_site = c("finance", "discounts"),
+  site_detail = c("finance", "discounts", "visits", "memberships", "enrollments"),
+  venues_tracking = c(
+    "finance", "attendance", "facility_hire", "membership", "online_sales",
+    "merchandise", "casual_hours", "casual_wages"
+  )
+)
+
+BASIC_UPLOAD_ID_COLUMNS <- c(
+  "report_year", "salary_year", "month", "source_row", "source_column"
+)
+
+
+# Number of reported figures (non-missing numeric cells) in a result.
+basic_upload_reported_values <- function(result, report_type) {
+  tables <- BASIC_UPLOAD_REPORTED_TABLES[[report_type]]
+  sum(vapply(
+    tables,
+    function(table_name) {
+      table <- result[[table_name]]
+      if (!is.data.frame(table) || nrow(table) == 0L) {
+        return(0L)
+      }
+      numeric <- vapply(table, is.numeric, logical(1)) &
+        !names(table) %in% BASIC_UPLOAD_ID_COLUMNS
+      sum(!is.na(unlist(table[numeric], use.names = FALSE)))
+    },
+    integer(1)
+  ))
+}
+
+
+# Report year found inside the workbook, or NA when it cannot be told.
+# Monthly Site Reports: the month headings of the Finance Summary sheet are
+# dates, and at least three quarters of them must share one year.
+# Venues Tracking Reports: sheet names such as "Court Hire 2024 vs 2025" and
+# "2025 Casual Hours". Detailed Site Reports carry no year inside.
+basic_upload_content_year <- function(path, report_type) {
+  tryCatch(
+    {
+      sheets <- readxl::excel_sheets(path)
+
+      if (identical(report_type, "venues_tracking")) {
+        versus <- regmatches(
+          sheets,
+          regexpr("vs[[:space:]]*(19|20)[0-9]{2}[[:space:]]*$", sheets, ignore.case = TRUE)
+        )
+        casual <- regmatches(
+          sheets,
+          regexpr(
+            "^[[:space:]]*(19|20)[0-9]{2}(?=[[:space:]]+Casual Hours)",
+            sheets,
+            perl = TRUE,
+            ignore.case = TRUE
+          )
+        )
+        years <- unique(suppressWarnings(as.integer(c(
+          gsub("[^0-9]", "", versus),
+          trimws(casual)
+        ))))
+        years <- years[!is.na(years)]
+        return(if (length(years) == 1L) years else NA_integer_)
+      }
+
+      if (identical(report_type, "monthly_site")) {
+        sheet <- grep("finance summary", sheets, ignore.case = TRUE, value = TRUE)[1]
+        if (is.na(sheet)) {
+          return(NA_integer_)
+        }
+        cells <- suppressMessages(readxl::read_excel(
+          path,
+          sheet = sheet,
+          col_names = FALSE,
+          n_max = 40,
+          col_types = "list",
+          .name_repair = "minimal"
+        ))
+        years <- unlist(lapply(cells, function(column) {
+          unlist(lapply(column, function(value) {
+            if (inherits(value, c("POSIXct", "Date"))) {
+              as.integer(format(value, "%Y"))
+            }
+          }))
+        }))
+        if (length(years) < 6L) {
+          return(NA_integer_)
+        }
+        counts <- table(years)
+        if (max(counts) / length(years) < 0.75) {
+          return(NA_integer_)
+        }
+        return(as.integer(names(counts)[which.max(counts)]))
+      }
+
+      NA_integer_
+    },
+    error = function(error) NA_integer_
+  )
+}
+
+
+basic_upload_name_year <- function(result, source_name) {
+  files <- result$files
+  years <- if (is.data.frame(files) && "report_year" %in% names(files)) {
+    files$report_year
+  } else {
+    basic_saved_result_years(result, source_name)
+  }
+  years <- unique(suppressWarnings(as.integer(years)))
+  years <- years[!is.na(years)]
+  if (length(years) == 1L) years else NA_integer_
+}
+
+
+add_basic_upload_checks <- function(result, path, report_type, source_name) {
+  issues <- list()
+  name_year <- basic_upload_name_year(result, source_name)
+  content_year <- basic_upload_content_year(path, report_type)
+
+  if (!is.na(name_year) && !is.na(content_year) && name_year != content_year) {
+    issues[[length(issues) + 1L]] <- make_import_issue(
+      level = "error",
+      source_file = source_name,
+      message = paste0(
+        "The file name says ", name_year, ", but the workbook holds ",
+        content_year, " figures. Rename the file to the correct year ",
+        "(", content_year, "), then upload it again."
+      )
+    )
+  }
+
+  if (basic_upload_reported_values(result, report_type) == 0L) {
+    issues[[length(issues) + 1L]] <- make_import_issue(
+      level = "error",
+      source_file = source_name,
+      message = paste(
+        "This workbook has no figures yet; it looks like a blank template.",
+        "Upload it once at least one month has been filled in."
+      )
+    )
+  }
+
+  if (length(issues) > 0L) {
+    result$validation <- bind_import_tables(
+      c(list(result$validation), issues),
+      empty_import_issue_table()
+    )
+  }
+
+  result
+}
+
+
+# What a ready file covers: one key per report year (and per business unit
+# for Detailed Site Reports). Two files with the same key would be counted
+# twice, so only one of them may be used.
+basic_upload_coverage <- function(result, report_type, file_name) {
+  files <- result$files
+  years <- if (is.data.frame(files) && "report_year" %in% names(files)) {
+    files$report_year
+  } else {
+    basic_saved_result_years(result, file_name)
+  }
+  years <- suppressWarnings(as.integer(years))
+  units <- if (identical(report_type, "site_detail") &&
+    is.data.frame(files) && "report_unit" %in% names(files) &&
+    length(files$report_unit) == length(years)) {
+    as.character(files$report_unit)
+  } else {
+    rep(NA_character_, length(years))
+  }
+  keep <- !is.na(years)
+  years <- years[keep]
+  units <- units[keep]
+
+  if (length(years) == 0L) {
+    return(character())
+  }
+
+  labels <- paste0(
+    BASIC_UPLOAD_REPORT_TYPES[[report_type]],
+    " for ",
+    ifelse(is.na(units), "", paste0(units, " ")),
+    years
+  )
+  keys <- paste(report_type, tolower(trimws(units)), years, sep = "|")
+  labels <- labels[!duplicated(keys)]
+  stats::setNames(labels, unique(keys))
+}
+
+
+# Message for a file that covers a year already provided by another ready
+# file, or NULL. `others` are registry rows; `results` their parsed data.
+basic_upload_conflict <- function(result, report_type, file_name, others, results) {
+  coverage <- basic_upload_coverage(result, report_type, file_name)
+
+  if (length(coverage) == 0L || nrow(others) == 0L) {
+    return(NULL)
+  }
+
+  for (index in seq_len(nrow(others))) {
+    other <- results[[others$file_id[[index]]]]
+    if (is.null(other)) {
+      next
+    }
+    shared <- intersect(
+      names(coverage),
+      names(basic_upload_coverage(other, others$report_type[[index]], others$original_name[[index]]))
+    )
+    if (length(shared) > 0L) {
+      return(paste0(
+        "Not used: the ", coverage[[shared[[1L]]]], " are already loaded from ",
+        "\u201c", others$original_name[[index]], "\u201d. Using both files would ",
+        "count the same figures twice. Keep one file per year: remove the ",
+        "other file first, or give this file the same name so it replaces it."
+      ))
+    }
+  }
+
+  NULL
 }
 
 
@@ -2427,6 +2646,36 @@ mod_data_upload_server <- function(
                   tolower(trimws(current$original_name)) ==
                     tolower(trimws(row$original_name[[1L]]))
               ]
+              conflict <- basic_upload_conflict(
+                parsed,
+                report_type,
+                row$original_name[[1L]],
+                current[
+                  current$status == "ready" &
+                    current$report_type == report_type &
+                    !current$file_id %in% c(file_id, replacement_ids),
+                  ,
+                  drop = FALSE
+                ],
+                parsed_results()
+              )
+
+              if (!is.null(conflict)) {
+                update_registry_row(
+                  file_id,
+                  status = "failed",
+                  progress = 1,
+                  detail = "Same report year already loaded",
+                  warning_count = issues$warnings,
+                  error_message = conflict
+                )
+                progress$set(
+                  value = offset + index,
+                  detail = paste(row$original_name[[1L]], "complete")
+                )
+                next
+              }
+
               remove_session_files(replacement_ids)
 
               results <- parsed_results()
@@ -2611,14 +2860,38 @@ mod_data_upload_server <- function(
           error_message = NA_character_,
           stringsAsFactors = FALSE
         )
+
+        # A saved file whose year is already provided by another file in the
+        # session (under a different name) is not used, as for uploads.
+        current <- registry()
+        current <- current[current$status == "ready", , drop = FALSE]
+        current_results <- parsed_results()
+        conflicts <- vapply(
+          seq_len(nrow(files)),
+          function(index) {
+            message <- basic_upload_conflict(
+              saved$results[[index]],
+              files$report_type[[index]],
+              files$original_name[[index]],
+              current[current$report_type == files$report_type[[index]], , drop = FALSE],
+              current_results
+            )
+            if (is.null(message)) NA_character_ else message
+          },
+          character(1)
+        )
+        used <- is.na(conflicts)
+        new_rows$status[!used] <- "failed"
+        new_rows$detail[!used] <- "Same report year already loaded"
+        new_rows$error_message[!used] <- conflicts[!used]
         registry(rbind(registry(), new_rows))
 
         results <- parsed_results()
-        results[file_ids] <- saved$results
+        results[file_ids[used]] <- saved$results[used]
         parsed_results(results)
 
         notes <- warning_details()
-        for (index in seq_along(file_ids)) {
+        for (index in which(used)) {
           if (!is.null(saved$warnings[[index]])) {
             notes[[file_ids[[index]]]] <- saved$warnings[[index]]
           }
@@ -2629,7 +2902,8 @@ mod_data_upload_server <- function(
           file_name = as.character(upload_info$name[[1L]]),
           saved_at = saved$saved_at,
           files = files,
-          replaced = length(replaced_ids)
+          replaced = length(replaced_ids),
+          not_used = files$original_name[!used]
         ))
         invisible(NULL)
       }
@@ -2673,15 +2947,16 @@ mod_data_upload_server <- function(
           paste(days_old, "days ago")
         }
         stale <- days_old > BASIC_SAVED_DATA_STALE_DAYS
+        caution <- stale || length(notice$not_used) > 0L
         files <- notice$files
 
         div(
           class = paste(
             "basic-upload-notice basic-saved-data-manifest",
-            if (stale) "is-warning" else "is-success"
+            if (caution) "is-warning" else "is-success"
           ),
           role = "status",
-          bs_icon(if (stale) "exclamation-triangle" else "check2-circle"),
+          bs_icon(if (caution) "exclamation-triangle" else "check2-circle"),
           div(
             tags$strong(paste0(
               "Saved data loaded · saved on ",
@@ -2694,6 +2969,14 @@ mod_data_upload_server <- function(
                 "This data is more than ", BASIC_SAVED_DATA_STALE_DAYS,
                 " days old. Reports updated since then are not included; ",
                 "upload the newer reports to replace them, then save again."
+              ))
+            },
+            if (length(notice$not_used) > 0L) {
+              p(paste0(
+                "Not used, because another file in this session already ",
+                "covers the same year: ",
+                paste(notice$not_used, collapse = ", "),
+                ". See the file list below."
               ))
             },
             if (notice$replaced > 0L) {
