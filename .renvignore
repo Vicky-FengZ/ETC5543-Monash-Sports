@@ -1,0 +1,11 @@
+# Folders renv does not scan for package dependencies. deploy/ only builds
+# the website (its packages are installed by the GitHub Actions workflow);
+# the others are local, untracked or generated (see .gitignore).
+deploy/
+data-raw/
+data/raw/
+_site/
+rsconnect/
+.quarto/
+*_files/
+*_cache/
