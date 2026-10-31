@@ -1237,7 +1237,10 @@ shiny::testServer(
       path
     }
     stale <- load_file(variant(function(x) {
-      x$saved_at <- Sys.time() - 40 * 24 * 60 * 60
+      x$saved_at <- as.POSIXct(
+        paste(
+          Sys.Date() - 40,"12:00:00"),
+          tz = Sys.timezone())
       x
     }))
     stopifnot(

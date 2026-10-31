@@ -973,117 +973,13 @@ mod_executive_dashboard_ui <- function(id) {
                   )
                 )
               ),
-                
+
               # KPI strip -------------------------------------------------
-              
-              div(
-                class = "executive-kpi-grid",
 
-                div(
-                  class = "executive-kpi-card",
-
-                  div(
-                    class = "executive-kpi-content",
-
-                    div(
-                      class = "executive-kpi-label",
-                      "Total Income"
-                    ),
-
-                    div(
-                      class = "executive-kpi-value",
-                      textOutput(
-                        ns("kpi_total_income"),
-                        inline = TRUE
-                      )
-                    )
-                  ),
-
-                  div(
-                    class = "executive-kpi-icon",
-                    bs_icon("cash-stack")
-                  )
-                ),
-
-                div(
-                  class = "executive-kpi-card",
-
-                  div(
-                    class = "executive-kpi-content",
-
-                    div(
-                      class = "executive-kpi-label",
-                      "Total Expenses"
-                    ),
-
-                    div(
-                      class = "executive-kpi-value",
-                      textOutput(
-                        ns("kpi_total_expenses"),
-                        inline = TRUE
-                      )
-                    )
-                  ),
-
-                  div(
-                    class = "executive-kpi-icon",
-                    bs_icon("receipt")
-                  )
-                ),
-
-                div(
-                  class = "executive-kpi-card",
-
-                  div(
-                    class = "executive-kpi-content",
-
-                    div(
-                      class = "executive-kpi-label",
-                      "Net Result"
-                    ),
-
-                    div(
-                      class = "executive-kpi-value",
-                      textOutput(
-                        ns("kpi_net_result"),
-                        inline = TRUE
-                      )
-                    )
-                  ),
-
-                  div(
-                    class = "executive-kpi-icon",
-                    bs_icon("wallet2")
-                  )
-                ),
-
-                div(
-                  class = "executive-kpi-card",
-
-                  div(
-                    class = "executive-kpi-content",
-
-                    div(
-                      class = "executive-kpi-label",
-                      "Budget Variance"
-                    ),
-
-                    div(
-                      class = "executive-kpi-value",
-                      textOutput(
-                        ns("kpi_budget_variance"),
-                        inline = TRUE
-                      )
-                    )
-                  ),
-
-                  div(
-                    class = "executive-kpi-icon",
-                    bs_icon("bullseye")
-                  )
-                )
+              uiOutput(
+                ns("executive_kpi_grid")
               ),
-
+                              
               # Responsive visual board -----------------------------------
               uiOutput(
                 ns("finance_visual_grid")
@@ -1163,7 +1059,75 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      # -------------------------------------------------------------------
+      # Independent dashboard context by focus
+      # -------------------------------------------------------------------
 
+      default_comparison_year <-
+        executive_default_comparison_year(
+          year = LATEST_APP_YEAR,
+          years = APP_YEARS
+        )
+
+      dashboard_contexts <- reactiveValues(
+
+        Overview = list(
+          view_mode = "Year Review",
+          year = as.character(LATEST_APP_YEAR),
+          comparison_year = default_comparison_year,
+          site = "All Monash Sport"
+        ),
+
+        Site = list(
+          view_mode = "Year Review",
+          year = as.character(LATEST_APP_YEAR),
+          comparison_year = default_comparison_year,
+          site = "All Monash Sport"
+        ),
+
+        Metrics = list(
+          view_mode = "Year Review",
+          year = as.character(LATEST_APP_YEAR),
+          comparison_year = default_comparison_year,
+          site = "All Monash Sport"
+        )
+      )
+
+      previous_focus <- reactiveVal(
+        "Overview"
+      )
+
+      save_dashboard_context <- function(
+        focus
+    ) {
+
+      context <-
+        dashboard_contexts[[focus]]
+
+      if (!is.null(input$view_mode)) {
+        context$view_mode <-
+          input$view_mode
+      }
+
+      if (!is.null(input$year)) {
+        context$year <-
+          input$year
+      }
+
+      if (!is.null(input$comparison_year)) {
+        context$comparison_year <-
+          input$comparison_year
+      }
+
+      if (!is.null(input$site)) {
+        context$site <-
+          input$site
+      }
+
+      dashboard_contexts[[focus]] <-
+        context
+    }
+      
       # -------------------------------------------------------------------
       # Selected visuals
       # -------------------------------------------------------------------
@@ -1189,6 +1153,115 @@ mod_executive_dashboard_server <- function(
             category = "Metrics",
             focus = "Metrics"
           )
+        )
+      
+      observeEvent(
+        input$dashboard_section,
+        {
+
+          new_focus <-
+            active_focus()
+
+          old_focus <-
+            previous_focus()
+
+          if (
+            !identical(
+              old_focus,
+              new_focus
+            )
+          ) {
+
+            save_dashboard_context(
+              old_focus
+            )
+          }
+
+
+          context <-
+            dashboard_contexts[[new_focus]]
+
+
+          comparison_choices <-
+            setdiff(
+              as.character(APP_YEARS),
+              as.character(context$year)
+            )
+
+          comparison_year <-
+            context$comparison_year
+
+          if (
+            is.null(comparison_year) ||
+              !comparison_year %in%
+                comparison_choices
+          ) {
+
+            comparison_year <-
+              executive_default_comparison_year(
+                year = context$year,
+                years = APP_YEARS
+              )
+          }
+
+
+          freezeReactiveValue(
+            input,
+            "view_mode"
+          )
+
+          freezeReactiveValue(
+            input,
+            "year"
+          )
+
+          freezeReactiveValue(
+            input,
+            "comparison_year"
+          )
+
+          freezeReactiveValue(
+            input,
+            "site"
+          )
+
+
+          updateSelectInput(
+            session,
+            "view_mode",
+            selected =
+              context$view_mode
+          )
+
+          updateSelectInput(
+            session,
+            "year",
+            selected =
+              context$year
+          )
+
+          updateSelectInput(
+            session,
+            "comparison_year",
+            choices =
+              comparison_choices,
+            selected =
+              comparison_year
+          )
+
+          updateSelectInput(
+            session,
+            "site",
+            selected =
+              context$site
+          )
+
+
+          previous_focus(
+            new_focus
+          )
+        },
+        ignoreInit = TRUE
       )
 
 
@@ -1422,6 +1495,54 @@ mod_executive_dashboard_server <- function(
         x[1L, , drop = FALSE]
       })
 
+      executive_kpi_comparison_finance <- reactive({
+
+        context <- executive_context()
+
+        if (
+          !identical(
+            context$view_mode,
+            "Comparison"
+          ) ||
+            is.null(
+              context$comparison_year
+            )
+        ) {
+          return(NULL)
+        }
+
+        x <- executive_annual_finance()
+
+        comparison_year <-
+          suppressWarnings(
+            as.integer(
+              context$comparison_year
+            )
+          )
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L ||
+            is.na(comparison_year)
+        ) {
+          return(NULL)
+        }
+
+        x <-
+          x[
+            x$report_year == comparison_year,
+            ,
+            drop = FALSE
+          ]
+
+        if (nrow(x) == 0L) {
+          return(NULL)
+        }
+
+        x[1L, , drop = FALSE]
+      })
+
       output$kpi_total_income <- renderText({
 
         x <- executive_kpi_finance()
@@ -1489,7 +1610,610 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      # -------------------------------------------------------------------
+      # Executive Metrics KPI data
+      # -------------------------------------------------------------------
 
+      executive_venues_reports <- reactive({
+
+        dashboard_data <-
+          dashboard_data_value()
+
+        if (is.null(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data,
+            "venues_tracking_report_data"
+          )
+        ) {
+          return(dashboard_data)
+        }
+
+        if (!is.list(dashboard_data)) {
+          return(NULL)
+        }
+
+        if (
+          inherits(
+            dashboard_data$venues_reports,
+            "venues_tracking_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$venues_reports
+          )
+        }
+
+        if (
+          inherits(
+            dashboard_data$venues,
+            "venues_tracking_report_data"
+          )
+        ) {
+          return(
+            dashboard_data$venues
+          )
+        }
+
+        NULL
+      })
+
+      executive_metrics_attendance_for_year <- function(
+          year
+      ) {
+
+        reports <-
+          executive_venues_reports()
+
+        if (
+          is.null(reports) ||
+            !is.list(reports) ||
+            is.null(reports$attendance) ||
+            !is.data.frame(reports$attendance)
+        ) {
+          return(NULL)
+        }
+
+        venues_operations_filter_year(
+          reports$attendance,
+          year = year
+        )
+      }
+
+
+      executive_metrics_attendance <- reactive({
+
+        context <-
+          executive_context()
+
+        executive_metrics_attendance_for_year(
+          context$year
+        )
+      })
+
+
+      executive_metrics_attendance_kpis <- reactive({
+
+        venues_operations_attendance_kpis(
+          executive_metrics_attendance()
+        )
+      })
+
+      executive_metrics_comparison_kpis <- reactive({
+
+        context <-
+          executive_context()
+
+        if (
+          !identical(
+            context$view_mode,
+            "Comparison"
+          ) ||
+            is.null(
+              context$comparison_year
+            )
+        ) {
+          return(NULL)
+        }
+
+        attendance <-
+          executive_metrics_attendance_for_year(
+            context$comparison_year
+          )
+
+        venues_operations_attendance_kpis(
+          attendance
+        )
+      })
+
+      executive_format_count <- function(
+          value
+      ) {
+
+        if (
+          is.null(value) ||
+            length(value) == 0L ||
+            !is.finite(value[[1L]])
+        ) {
+          return("—")
+        }
+
+        format(
+          round(
+            value[[1L]]
+          ),
+          big.mark = ",",
+          scientific = FALSE,
+          trim = TRUE
+        )
+      }
+
+      executive_currency_change_label <- function(
+          current,
+          previous,
+          comparison_year
+      ) {
+
+        if (
+          is.null(current) ||
+            is.null(previous) ||
+            length(current) == 0L ||
+            length(previous) == 0L ||
+            !is.finite(current[[1L]]) ||
+            !is.finite(previous[[1L]])
+        ) {
+          return(NULL)
+        }
+
+        difference <-
+          current[[1L]] -
+            previous[[1L]]
+
+        prefix <-
+          if (difference > 0) {
+            "+"
+          } else {
+            ""
+          }
+
+        paste0(
+          prefix,
+          format_compact_currency(
+            difference
+          ),
+          " vs ",
+          comparison_year
+        )
+      }
+
+
+      executive_count_change_label <- function(
+          current,
+          previous,
+          comparison_year
+      ) {
+
+        if (
+          is.null(current) ||
+            is.null(previous) ||
+            length(current) == 0L ||
+            length(previous) == 0L ||
+            !is.finite(current[[1L]]) ||
+            !is.finite(previous[[1L]])
+        ) {
+          return(NULL)
+        }
+
+        difference <-
+          current[[1L]] -
+            previous[[1L]]
+
+        prefix <-
+          if (difference > 0) {
+            "+"
+          } else {
+            ""
+          }
+
+        paste0(
+          prefix,
+          executive_format_count(
+            difference
+          ),
+          " vs ",
+          comparison_year
+        )
+      }
+
+      executive_kpi_specs <- reactive({
+
+        focus <-
+          active_focus()
+
+        context <-
+          executive_context()
+
+
+        # ---------------------------------------------------------------
+        # Metrics
+        # ---------------------------------------------------------------
+
+        if (
+          identical(
+            focus,
+            "Metrics"
+          )
+        ) {
+
+          values <-
+            executive_metrics_attendance_kpis()
+
+          comparison_values <-
+            executive_metrics_comparison_kpis()
+
+          comparison_year <-
+            context$comparison_year
+
+          peak_month <- "—"
+
+          if (
+            !is.null(values$peak_month) &&
+              length(values$peak_month) > 0L &&
+              !is.na(values$peak_month[[1L]]) &&
+              nzchar(
+                as.character(
+                  values$peak_month[[1L]]
+                )
+              )
+          ) {
+
+            peak_month <-
+              as.character(
+                values$peak_month[[1L]]
+              )
+          }
+
+
+          return(
+            list(
+
+              list(
+                title = "Total Attendance",
+                value =
+                  executive_format_count(
+                    values$total_attendance
+                  ),
+                comparison =
+                  if (!is.null(comparison_values)) {
+                    executive_count_change_label(
+                      values$total_attendance,
+                      comparison_values$total_attendance,
+                      comparison_year
+                    )
+                  } else {
+                    NULL
+                  },
+                icon = "people"
+              ),
+
+              list(
+                title = "Average / Month",
+                value =
+                  executive_format_count(
+                    values$average_monthly
+                  ),
+                comparison =
+                  if (!is.null(comparison_values)) {
+                    executive_count_change_label(
+                      values$average_monthly,
+                      comparison_values$average_monthly,
+                      comparison_year
+                    )
+                  } else {
+                    NULL
+                  },
+                icon = "calendar3"
+              ),
+
+              list(
+                title = "Peak Attendance",
+                value =
+                  executive_format_count(
+                    values$peak_value
+                  ),
+                comparison =
+                  if (!is.null(comparison_values)) {
+                    executive_count_change_label(
+                      values$peak_value,
+                      comparison_values$peak_value,
+                      comparison_year
+                    )
+                  } else {
+                    NULL
+                  },
+                icon = "bar-chart-line"
+              ),
+
+              list(
+                title = "Peak Month",
+                value = peak_month,
+                comparison =
+                  if (
+                    !is.null(comparison_values) &&
+                      !is.null(
+                        comparison_values$peak_month
+                      ) &&
+                      length(
+                        comparison_values$peak_month
+                      ) > 0L &&
+                      !is.na(
+                        comparison_values$peak_month[[1L]]
+                      )
+                  ) {
+
+                    paste0(
+                      comparison_year,
+                      ": ",
+                      comparison_values$peak_month[[1L]]
+                    )
+
+                  } else {
+
+                    NULL
+                  },
+                icon = "calendar-event"
+              )
+            )
+          )
+        }
+
+
+        # ---------------------------------------------------------------
+        # Overview / Site finance
+        # ---------------------------------------------------------------
+
+        finance <-
+          executive_kpi_finance()
+
+        income <- "—"
+        expenses <- "—"
+        net_result <- "—"
+        budget_variance <- "—"
+
+        if (
+          !is.null(finance) &&
+            is.data.frame(finance) &&
+            nrow(finance) > 0L
+        ) {
+
+          if (
+            is.finite(
+              finance$income_actual[[1L]]
+            )
+          ) {
+            income <-
+              format_compact_currency(
+                finance$income_actual[[1L]]
+              )
+          }
+
+          if (
+            is.finite(
+              finance$expenses_actual[[1L]]
+            )
+          ) {
+            expenses <-
+              format_compact_currency(
+                finance$expenses_actual[[1L]]
+              )
+          }
+
+          if (
+            is.finite(
+              finance$net_actual[[1L]]
+            )
+          ) {
+            net_result <-
+              format_compact_currency(
+                finance$net_actual[[1L]]
+              )
+          }
+
+          if (
+            is.finite(
+              finance$budget_variance[[1L]]
+            )
+          ) {
+            budget_variance <-
+              format_compact_currency(
+                finance$budget_variance[[1L]]
+              )
+          }
+        }
+
+        comparison_finance <-
+          executive_kpi_comparison_finance()
+
+        comparison_year <-
+          context$comparison_year
+
+        site_selected <-
+          identical(
+            focus,
+            "Site"
+          ) &&
+            !is.null(context$site) &&
+            !identical(
+              context$site,
+              "All Monash Sport"
+            )
+        
+        list(
+          list(
+            title =
+              if (site_selected) {
+                "Site Income"
+              } else {
+                "Total Income"
+              },
+            value = income,
+            output_id = "kpi_total_income",
+            comparison =
+              if (!is.null(comparison_finance)) {
+                executive_currency_change_label(
+                  finance$income_actual,
+                  comparison_finance$income_actual,
+                  comparison_year
+                )
+              } else {
+                NULL
+              },
+            icon = "cash-stack"
+          ),
+
+          list(
+            title =
+              if (site_selected) {
+                "Site Expenses"
+              } else {
+                "Total Expenses"
+              },
+            value = expenses,
+            output_id = "kpi_total_expenses",
+            comparison =
+              if (!is.null(comparison_finance)) {
+                executive_currency_change_label(
+                  finance$expenses_actual,
+                  comparison_finance$expenses_actual,
+                  comparison_year
+                )
+              } else {
+                NULL
+              },
+            icon = "receipt"
+          ),
+
+          list(
+            title = "Net Result",
+            value = net_result,
+            output_id = "kpi_net_result",
+            comparison =
+              if (!is.null(comparison_finance)) {
+                executive_currency_change_label(
+                  finance$net_actual,
+                  comparison_finance$net_actual,
+                  comparison_year
+                )
+              } else {
+                NULL
+              },
+            icon = "wallet2"
+          ),
+
+          list(
+            title = "Budget Variance",
+            value = budget_variance,
+            output_id = "kpi_budget_variance",
+            comparison =
+              if (!is.null(comparison_finance)) {
+                executive_currency_change_label(
+                  finance$budget_variance,
+                  comparison_finance$budget_variance,
+                  comparison_year
+                )
+              } else {
+                NULL
+              },
+            icon = "bullseye"
+          )
+        )
+      })
+
+      output$executive_kpi_grid <- renderUI({
+
+        specs <-
+          executive_kpi_specs()
+
+        div(
+          class = "executive-kpi-grid",
+
+          tagList(
+            lapply(
+              specs,
+              function(spec) {
+
+                div(
+                  class = "executive-kpi-card",
+
+                  div(
+                    class = "executive-kpi-content",
+
+                    div(
+                      class = "executive-kpi-label",
+                      spec$title
+                    ),
+
+                    div(
+                      class = "executive-kpi-value",
+
+                      if (
+                        !is.null(spec$output_id)
+                      ) {
+
+                        textOutput(
+                          ns(spec$output_id),
+                          inline = TRUE
+                        )
+
+                      } else {
+
+                        spec$value
+                      }
+                    ),
+
+                    if (
+                      !is.null(spec$comparison) &&
+                        length(spec$comparison) > 0L &&
+                        !is.na(spec$comparison[[1L]]) &&
+                        nzchar(
+                          as.character(
+                            spec$comparison[[1L]]
+                          )
+                        )
+                    ) {
+
+                      div(
+                        class = "executive-kpi-comparison",
+
+                        tags$small(
+                          class = "text-secondary",
+                          spec$comparison
+                        )
+                      )
+
+                    } else {
+
+                      NULL
+                    }
+                  ),
+
+                  div(
+                    class = "executive-kpi-icon",
+
+                    bs_icon(
+                      spec$icon
+                    )
+                  )
+                )
+              }
+            )
+          )
+        )
+      })
+      
       executive_annual_revenue <- reactive({
 
         x <-
@@ -1830,61 +2554,6 @@ mod_executive_dashboard_server <- function(
 
         x[
           x$report_year %in% years,
-          ,
-          drop = FALSE
-        ]
-      })
-
-      executive_facility_snapshot_discounts <- reactive({
-
-        context <- executive_context()
-
-        x <- executive_facility_annual_discounts()
-
-        if (
-          is.null(x) ||
-            !is.data.frame(x) ||
-            nrow(x) == 0L
-        ) {
-          return(x)
-        }
-
-        if (
-          is.null(context$site) ||
-            identical(
-              context$site,
-              "All Monash Sport"
-            )
-        ) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x <-
-          filter_facility_discounts_by_site(
-            x,
-            context$site
-          )
-
-        year <- executive_snapshot_year()
-
-        if (is.na(year)) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x[
-          x$report_year == year,
           ,
           drop = FALSE
         ]
@@ -2651,83 +3320,6 @@ mod_executive_dashboard_server <- function(
             plot_facility_performance_over_time(
               x,
               metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_facility_discount_mix <-
-        renderPlot(
-          {
-
-            reports <-
-              executive_detailed_site_reports()
-
-            context <-
-              executive_context()
-
-            validate(
-              need(
-                !is.null(reports),
-                paste(
-                  "Upload the relevant Detailed Site Report",
-                  "on the Data page."
-                )
-              ),
-
-              need(
-                !identical(
-                  context$site,
-                  "All Monash Sport"
-                ),
-                paste(
-                  "Select a specific Site to view",
-                  "facility-level discount mix."
-                )
-              )
-            )
-
-            x <-
-              executive_facility_snapshot_discounts()
-
-            validate(
-              need(
-                nrow(x) > 0L,
-                paste(
-                  "No facility discount data is available",
-                  "for the selected site and year."
-                )
-              )
-            )
-
-            complete <-
-              is.finite(
-                x$student_discount
-              ) &
-              is.finite(
-                x$staff_discount
-              ) &
-              is.finite(
-                x$other_discount
-              ) &
-              is.finite(
-                x$total_discount
-              ) &
-              x$total_discount > 0
-
-            validate(
-              need(
-                any(complete),
-                paste(
-                  "No complete facility discount mix values",
-                  "are available for the selected site and year."
-                )
-              )
-            )
-
-            plot_facility_discount_mix(
-              x
             )
           },
           res = 96,
