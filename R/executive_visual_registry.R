@@ -35,6 +35,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "monthly_income_expenses",
     title = "Income vs Expenses",
     category = "Finance",
+    focus = "Overview",
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
@@ -47,6 +48,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "annual_performance_trend",
     title = "Annual Performance Trend",
     category = "Finance",
+    focus = "Overview",
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
@@ -59,6 +61,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "budget_vs_actual",
     title = "Budget vs Actual",
     category = "Finance",
+    focus = "Overview",
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
@@ -71,9 +74,10 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_performance",
     title = "Site Performance Over Time",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     required_data = "finance",
-    default_selected = FALSE,
+    default_selected = TRUE,
     preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
@@ -83,6 +87,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_ranking",
     title = "Site Ranking",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
@@ -95,9 +100,10 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_budget_performance",
     title = "Site Budget Performance",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     required_data = "finance",
-    default_selected = FALSE,
+    default_selected = TRUE,
     preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
@@ -107,6 +113,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_revenue_opportunity",
     title = "Revenue Opportunity",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     required_data = c(
       "finance",
@@ -122,6 +129,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_discount_mix",
     title = "Discount Mix",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     required_data = "discounts",
     default_selected = TRUE,
@@ -134,6 +142,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "revenue_capture",
     title = "Revenue Capture",
     category = "Finance",
+    focus = "Overview",
     source_group = "monthly",
     required_data = c(
       "finance",
@@ -149,6 +158,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "site_values",
     title = "Site Values",
     category = "Finance",
+    focus = "Site",
     source_group = "monthly",
     component_type = "table",
     required_data = "finance",
@@ -167,6 +177,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_ranking",
     title = "Facility Ranking",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = "finance",
     default_selected = FALSE,
@@ -179,6 +190,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_performance",
     title = "Facility Performance Over Time",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = "finance",
     default_selected = FALSE,
@@ -191,6 +203,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_discount_mix",
     title = "Facility Discount Mix",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = "discounts",
     default_selected = FALSE,
@@ -203,6 +216,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_discount_trend",
     title = "Discount Opportunity Trend",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = "discounts",
     default_selected = FALSE,
@@ -215,6 +229,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_revenue_opportunity",
     title = "Actual vs Potential Revenue",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = c(
       "finance",
@@ -230,6 +245,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "facility_capture_rate",
     title = "Facility Revenue Capture Rate",
     category = "Finance",
+    focus = "Site",
     source_group = "detailed",
     required_data = c(
       "finance",
@@ -249,6 +265,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     id = "key_insights",
     title = "Key Insights",
     category = "Finance",
+    focus = "Overview",
     source_group = "supporting",
     component_type = "insight",
     required_data = character(),
@@ -310,7 +327,8 @@ executive_visual_component_type <- function(
 executive_visual_ids <- function(
     category = NULL,
     source_group = NULL,
-    component_type = NULL
+    component_type = NULL,
+    focus = NULL
 ) {
 
   visuals <- EXECUTIVE_VISUAL_REGISTRY
@@ -319,6 +337,7 @@ executive_visual_ids <- function(
     TRUE,
     length(visuals)
   )
+
 
   if (!is.null(category)) {
 
@@ -334,6 +353,22 @@ executive_visual_ids <- function(
     )
   }
 
+
+  if (!is.null(focus)) {
+
+    keep <- keep & vapply(
+      visuals,
+      function(x) {
+        identical(
+          x$focus,
+          focus
+        )
+      },
+      logical(1)
+    )
+  }
+
+
   if (!is.null(source_group)) {
 
     keep <- keep & vapply(
@@ -347,6 +382,7 @@ executive_visual_ids <- function(
       logical(1)
     )
   }
+
 
   if (!is.null(component_type)) {
 
@@ -368,16 +404,19 @@ executive_visual_ids <- function(
     )
   }
 
+
   names(visuals)[keep]
 }
 
 executive_default_visual_ids <- function(
-    category = "Finance"
+    category = "Finance",
+    focus = NULL
 ) {
 
   ids <- executive_visual_ids(
-    category = category
-  )
+    category = category,
+    focus = focus
+    )
 
   ids[
     vapply(
@@ -426,6 +465,7 @@ executive_registry_table <- function() {
         id = x$id,
         title = x$title,
         category = x$category,
+        focus = x$focus,
         component_type = executive_visual_component_type(x),
         source_group = x$source_group,
         source_label =

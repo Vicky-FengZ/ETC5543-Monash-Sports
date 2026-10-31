@@ -21,6 +21,7 @@ stopifnot(
       "id",
       "title",
       "category",
+      "focus",
       "component_type",
       "source_group",
       "source_label",
@@ -31,6 +32,65 @@ stopifnot(
       "supports_comparison"
     ) %in% names(registry)
   )
+)
+
+# Executive focus grouping ------------------------------------------------
+
+overview_ids <- executive_visual_ids(
+  focus = "Overview"
+)
+
+site_ids <- executive_visual_ids(
+  focus = "Site"
+)
+
+metrics_ids <- executive_visual_ids(
+  focus = "Metrics"
+)
+
+
+stopifnot(
+
+  identical(
+    overview_ids,
+    c(
+      "monthly_income_expenses",
+      "annual_performance_trend",
+      "budget_vs_actual",
+      "revenue_capture",
+      "key_insights"
+    )
+  ),
+
+  identical(
+    site_ids,
+    c(
+      "site_performance",
+      "site_ranking",
+      "site_budget_performance",
+      "site_revenue_opportunity",
+      "site_discount_mix",
+      "site_values",
+      "facility_ranking",
+      "facility_performance",
+      "facility_discount_mix",
+      "facility_discount_trend",
+      "facility_revenue_opportunity",
+      "facility_capture_rate"
+    )
+  ),
+
+  length(
+    metrics_ids
+  ) == 0L,
+
+  length(
+    overview_ids
+  ) +
+    length(
+      site_ids
+    ) ==
+    17L
 )
 
 
@@ -110,7 +170,9 @@ expected_defaults <- c(
   "monthly_income_expenses",
   "annual_performance_trend",
   "budget_vs_actual",
+  "site_performance",
   "site_ranking",
+  "site_budget_performance",
   "site_revenue_opportunity",
   "site_discount_mix",
   "revenue_capture",
@@ -118,10 +180,46 @@ expected_defaults <- c(
   "key_insights"
 )
 
+expected_overview_defaults <- c(
+  "monthly_income_expenses",
+  "annual_performance_trend",
+  "budget_vs_actual",
+  "revenue_capture",
+  "key_insights"
+)
+
+expected_site_defaults <- c(
+  "site_performance",
+  "site_ranking",
+  "site_budget_performance",
+  "site_revenue_opportunity",
+  "site_discount_mix",
+  "site_values"
+)
+
 stopifnot(
   identical(
     executive_default_visual_ids(),
     expected_defaults
+  )
+)
+
+stopifnot(
+
+  identical(
+    executive_default_visual_ids(
+      category = "Finance",
+      focus = "Overview"
+    ),
+    expected_overview_defaults
+  ),
+
+  identical(
+    executive_default_visual_ids(
+      category = "Finance",
+      focus = "Site"
+    ),
+    expected_site_defaults
   )
 )
 
@@ -419,6 +517,52 @@ stopifnot(
   )
 )
 
+stopifnot(
+
+  identical(
+    executive_context_trend_years(
+      context = list(
+        view_mode = "Year Review",
+        year = "2026",
+        comparison_year = NULL
+      ),
+      available_years = c(
+        2023,
+        2024,
+        2025,
+        2026,
+        2027
+      )
+    ),
+    c(
+      2023L,
+      2024L,
+      2025L,
+      2026L
+    )
+  ),
+
+  identical(
+    executive_context_trend_years(
+      context = list(
+        view_mode = "Comparison",
+        year = "2026",
+        comparison_year = "2024"
+      ),
+      available_years = c(
+        2023,
+        2024,
+        2025,
+        2026
+      )
+    ),
+    c(
+      2024L,
+      2026L
+    )
+  )
+)
+
 cat(
   "PASS Executive Dashboard context helpers\n"
 )
@@ -471,6 +615,13 @@ shiny::testServer(
       identical(
         active_category(),
         "Finance"
+      )
+    )
+
+    stopifnot(
+      identical(
+        active_focus(),
+        "Overview"
       )
     )
 
@@ -555,9 +706,9 @@ shiny::testServer(
         "Net Result"
       ),
       metric_budget_vs_actual = "Expenses",
-      metric_site_ranking = "Income"
+      metric_site_ranking = "Income",
+      metric_facility_performance = "Expenses"
     )
-
     session$flushReact()
 
     stopifnot(
@@ -580,6 +731,11 @@ shiny::testServer(
         "Income"
       ),
 
+      identical(
+        input$metric_facility_performance,
+        "Expenses"
+      ),
+
       !"metric" %in%
         names(
           executive_context()
@@ -592,8 +748,8 @@ shiny::testServer(
 
     stopifnot(
       identical(
-        selected_visuals$Finance,
-        expected_defaults
+        selected_visuals$Overview,
+        expected_overview_defaults
       )
     )
 
@@ -602,43 +758,52 @@ shiny::testServer(
     # Monthly data makes all 10 Monthly Site visuals available
     # ---------------------------------------------------------------------
 
-    finance_registry <- picker_registry()
+    overview_registry <- picker_registry()
 
-    monthly_registry <- finance_registry[
-      finance_registry$source_group ==
-        "monthly",
-      ,
-      drop = FALSE
-    ]
+      monthly_registry <- overview_registry[
+        overview_registry$source_group ==
+          "monthly",
+        ,
+        drop = FALSE
+      ]
 
-    detailed_registry <- finance_registry[
-      finance_registry$source_group ==
-        "detailed",
-      ,
-      drop = FALSE
-    ]
+      detailed_registry <- overview_registry[
+        overview_registry$source_group ==
+          "detailed",
+        ,
+        drop = FALSE
+      ]
 
-    stopifnot(
-      nrow(monthly_registry) == 10L,
-      all(monthly_registry$available),
+      supporting_registry <- overview_registry[
+        overview_registry$source_group ==
+          "supporting",
+        ,
+        drop = FALSE
+      ]
 
-      nrow(detailed_registry) == 6L,
-      !any(detailed_registry$available)
-    )
 
-    supporting_registry <- finance_registry[
-      finance_registry$source_group ==
-        "supporting",
-      ,
-      drop = FALSE
-    ]
+      stopifnot(
 
-    stopifnot(
-      nrow(supporting_registry) == 1L,
-      supporting_registry$available[[1L]],
-      supporting_registry$component_type[[1L]] ==
-        "insight"
-    )
+        nrow(monthly_registry) == 4L,
+        all(
+          monthly_registry$available
+        ),
+
+        nrow(detailed_registry) == 0L,
+
+        nrow(supporting_registry) == 1L,
+        supporting_registry$available[[1L]],
+
+        identical(
+          supporting_registry$id[[1L]],
+          "key_insights"
+        ),
+
+        all(
+          overview_registry$focus ==
+            "Overview"
+        )
+      ) 
 
     # ---------------------------------------------------------------------
     # Apply a custom visual selection
@@ -646,23 +811,57 @@ shiny::testServer(
 
     session$setInputs(
       visuals_monthly = c(
-        "site_performance",
-        "site_ranking"
+        "monthly_income_expenses",
+        "budget_vs_actual"
       ),
       apply_visuals = 1
     )
 
     session$flushReact()
 
-    stopifnot(
-      identical(
-        selected_visuals$Finance,
-        c(
-          "site_performance",
-          "site_ranking"
+      stopifnot(
+        identical(
+          selected_visuals$Overview,
+          c(
+            "monthly_income_expenses",
+            "budget_vs_actual"
+          )
         )
       )
+
+      session$setInputs(
+    dashboard_section = "site"
+  )
+
+  session$flushReact()
+
+  stopifnot(
+    identical(
+      active_category(),
+      "Finance"
+    ),
+
+    identical(
+      active_focus(),
+      "Site"
     )
+  )
+    
+    stopifnot(
+      identical(
+        selected_visuals$Site,
+        expected_site_defaults
+      )
+    )
+    
+    site_registry <- picker_registry()
+
+      stopifnot(
+        nrow(site_registry) > 0L,
+        all(
+          site_registry$focus == "Site"
+        )
+      )
 
     # ---------------------------------------------------------------------
     # Table and insight components can be selected
@@ -670,7 +869,6 @@ shiny::testServer(
 
     session$setInputs(
       visuals_monthly = "site_values",
-      visuals_supporting = "key_insights",
       visuals_detailed = character(),
       apply_visuals = 2
     )
@@ -679,11 +877,8 @@ shiny::testServer(
 
     stopifnot(
       identical(
-        selected_visuals$Finance,
-        c(
-          "site_values",
-          "key_insights"
-        )
+        selected_visuals$Site,
+        "site_values"
       )
     )
 
@@ -706,14 +901,13 @@ shiny::testServer(
 
     stopifnot(
       identical(
-        selected_visuals$Finance,
+        selected_visuals$Site,
         "site_ranking"
       )
     )
 
-
     # ---------------------------------------------------------------------
-    # Finance and Metrics maintain independent selections
+    # Overview, Site and Metrics maintain independent selections
     # ---------------------------------------------------------------------
 
     session$setInputs(
@@ -723,8 +917,14 @@ shiny::testServer(
     session$flushReact()
 
     stopifnot(
+
       identical(
         active_category(),
+        "Metrics"
+      ),
+
+      identical(
+        active_focus(),
         "Metrics"
       ),
 
@@ -737,13 +937,23 @@ shiny::testServer(
       ) == 0L,
 
       identical(
-        selected_visuals$Finance,
+        selected_visuals$Overview,
+        c(
+          "monthly_income_expenses",
+          "budget_vs_actual"
+        )
+      ),
+
+      identical(
+        selected_visuals$Site,
         "site_ranking"
       )
     )
 
+    # ---------------------------------------------------------------------
+    # Return to Overview and confirm selections were preserved
+    # ---------------------------------------------------------------------
 
-    # Return to Finance and confirm its selection was preserved.
     session$setInputs(
       dashboard_section = "finance"
     )
@@ -751,8 +961,27 @@ shiny::testServer(
     session$flushReact()
 
     stopifnot(
+
       identical(
-        selected_visuals$Finance,
+        active_category(),
+        "Finance"
+      ),
+
+      identical(
+        active_focus(),
+        "Overview"
+      ),
+
+      identical(
+        selected_visuals$Overview,
+        c(
+          "monthly_income_expenses",
+          "budget_vs_actual"
+        )
+      ),
+
+      identical(
+        selected_visuals$Site,
         "site_ranking"
       )
     )

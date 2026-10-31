@@ -315,6 +315,64 @@ executive_context_years <- function(
   )
 }
 
+executive_context_trend_years <- function(
+    context,
+    available_years
+  ) {
+
+    available_years <-
+      suppressWarnings(
+        as.integer(
+          available_years
+        )
+      )
+
+    available_years <-
+      sort(
+        unique(
+          available_years[
+            !is.na(available_years)
+          ]
+        )
+      )
+
+    if (
+      is.null(context) ||
+        is.null(context$year)
+    ) {
+      return(integer())
+    }
+
+    selected_year <-
+      suppressWarnings(
+        as.integer(
+          context$year[[1L]]
+        )
+      )
+
+    if (is.na(selected_year)) {
+      return(integer())
+    }
+
+    if (
+      identical(
+        context$view_mode,
+        "Comparison"
+      )
+    ) {
+
+      return(
+        executive_context_years(
+          context
+        )
+      )
+    }
+
+    available_years[
+      available_years <= selected_year
+    ]
+  }
+
 executive_visual_metric_control_ui <- function(
     visual_id,
     ns
@@ -385,6 +443,32 @@ executive_visual_metric_control_ui <- function(
           selected = "Net Result"
         )
       ),
+
+    facility_ranking =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_facility_ranking"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),
+
+    facility_performance =
+      div(
+        class =
+          "chart-header-control executive-visual-metric-control",
+
+        selectInput(
+          ns("metric_facility_performance"),
+          label = NULL,
+          choices = metric_choices,
+          selected = "Net Result"
+        )
+      ),  
 
     site_budget_performance =
       div(
@@ -763,20 +847,25 @@ mod_executive_dashboard_ui <- function(id) {
         )
       ),
 
-      # Finance / Metrics switcher ----------------------------------------
+      # Executive Dashboard focus switcher -------------------------------
       div(
         class = "executive-dashboard-navigation",
 
-        navset_pill(
-          id = ns("dashboard_section"),
+        radioButtons(
+          ns("dashboard_section"),
+          label = NULL,
+          choices = c(
+            "Overview" = "finance",
+            "Site" = "site",
+            "Metrics" = "metrics"
+          ),
           selected = "finance",
+          inline = TRUE
+        )
+      ),
 
-          nav_panel(
-            "Finance",
-            value = "finance",
-
-            div(
-              class = "pt-3",
+      div(
+        class = "pt-3",
 
               # Dashboard controls ----------------------------------------
               div(
@@ -1005,38 +1094,9 @@ mod_executive_dashboard_ui <- function(id) {
                 ns("finance_supporting_components")
               )
             )
-          ),
-
-          nav_panel(
-            "Metrics",
-              value = "metrics",
-
-              div(
-                class = "pt-3",
-
-                card(
-                  full_screen = TRUE,
-
-                  card_header(
-                    "Metrics Dashboard"
-                  ),
-
-                  placeholder_chart(
-                    "Operational and participation metrics",
-                    paste(
-                      "Direct Visits, Indirect Visits, memberships,",
-                      "enrolments and venue metrics will be added",
-                      "as those dashboard sections are completed."
-                    )
-                  )
-                )
-              )
-            )
           )
         )
-      )
-    )
-  }
+      }
 
 mod_executive_dashboard_server <- function(
     id,
@@ -1090,6 +1150,19 @@ mod_executive_dashboard_server <- function(
         "Finance"
       })
 
+      active_focus <- reactive({
+
+        switch(
+          input$dashboard_section,
+
+          site = "Site",
+
+          metrics = "Metrics",
+
+          "Overview"
+        )
+      })
+
 
       # -------------------------------------------------------------------
       # Selected visuals
@@ -1099,14 +1172,22 @@ mod_executive_dashboard_server <- function(
 
       selected_visuals <- reactiveValues(
 
-        Finance =
+        Overview =
           executive_default_visual_ids(
-            "Finance"
+            category = "Finance",
+            focus = "Overview"
+          ),
+
+        Site =
+          executive_default_visual_ids(
+            category = "Finance",
+            focus = "Site"
           ),
 
         Metrics =
           executive_default_visual_ids(
-            "Metrics"
+            category = "Metrics",
+            focus = "Metrics"
           )
       )
 
@@ -1117,12 +1198,21 @@ mod_executive_dashboard_server <- function(
 
       picker_registry <- reactive({
 
-        executive_registry_availability_table(
-          dashboard_data =
-            dashboard_data_value(),
-          category =
-            active_category()
-        )
+        registry <-
+          executive_registry_availability_table(
+            dashboard_data =
+              dashboard_data_value(),
+            category =
+              active_category()
+          )
+
+        focus <- active_focus()
+
+        registry[
+          registry$focus == focus,
+          ,
+          drop = FALSE
+        ]
       })
 
       # -------------------------------------------------------------------
@@ -1206,6 +1296,30 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      executive_detailed_site_reports <- reactive({
+
+        executive_source_data(
+          dashboard_data =
+            dashboard_data_value(),
+          source_group =
+            "detailed"
+        )
+      })
+
+      executive_facility_annual_finance <- reactive({
+
+        calculate_facility_annual_finance(
+          executive_detailed_site_reports()
+        )
+      })
+
+      executive_facility_annual_discounts <- reactive({
+
+        calculate_facility_annual_discounts(
+          executive_detailed_site_reports()
+        )
+      })
+
 
       executive_scoped_monthly_reports <- reactive({
 
@@ -1256,7 +1370,11 @@ mod_executive_dashboard_server <- function(
             executive_scoped_monthly_reports()
           )
 
-        years <- executive_selected_years()
+        years <-
+          executive_context_trend_years(
+            context = executive_context(),
+            available_years = x$report_year
+          )
 
         if (length(years) == 0L) {
           return(x[0, , drop = FALSE])
@@ -1379,7 +1497,11 @@ mod_executive_dashboard_server <- function(
             executive_scoped_monthly_reports()
           )
 
-        years <- executive_selected_years()
+        years <-
+          executive_context_trend_years(
+            context = executive_context(),
+            available_years = x$report_year
+          )
 
         if (length(years) == 0L) {
           return(x[0, , drop = FALSE])
@@ -1541,6 +1663,223 @@ mod_executive_dashboard_server <- function(
         if (is.na(year)) {
           return(
             x[0, , drop = FALSE]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      executive_facility_snapshot_finance <- reactive({
+
+        context <- executive_context()
+
+        if (
+          is.null(context$site) ||
+            identical(
+              context$site,
+              "All Monash Sport"
+            )
+        ) {
+          return(
+            executive_facility_annual_finance()[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x <- executive_facility_annual_finance()
+
+        x <-
+          filter_facility_finance_by_site(
+            x,
+            context$site
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      executive_facility_snapshot_discounts <- reactive({
+
+        context <- executive_context()
+
+        x <- executive_facility_annual_discounts()
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L
+        ) {
+          return(x)
+        }
+
+        if (
+          is.null(context$site) ||
+            identical(
+              context$site,
+              "All Monash Sport"
+            )
+        ) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x <-
+          filter_facility_discounts_by_site(
+            x,
+            context$site
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x[
+          x$report_year == year,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      executive_facility_trend_finance <- reactive({
+
+        context <- executive_context()
+
+        x <- executive_facility_annual_finance()
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L
+        ) {
+          return(x)
+        }
+
+        if (
+          is.null(context$site) ||
+            identical(
+              context$site,
+              "All Monash Sport"
+            )
+        ) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x <-
+          filter_facility_finance_by_site(
+            x,
+            context$site
+          )
+
+        years <-
+          executive_context_trend_years(
+            context = context,
+            available_years =
+              x$report_year
+          )
+
+        if (length(years) == 0L) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x[
+          x$report_year %in% years,
+          ,
+          drop = FALSE
+        ]
+      })
+
+      executive_facility_snapshot_discounts <- reactive({
+
+        context <- executive_context()
+
+        x <- executive_facility_annual_discounts()
+
+        if (
+          is.null(x) ||
+            !is.data.frame(x) ||
+            nrow(x) == 0L
+        ) {
+          return(x)
+        }
+
+        if (
+          is.null(context$site) ||
+            identical(
+              context$site,
+              "All Monash Sport"
+            )
+        ) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
+          )
+        }
+
+        x <-
+          filter_facility_discounts_by_site(
+            x,
+            context$site
+          )
+
+        year <- executive_snapshot_year()
+
+        if (is.na(year)) {
+          return(
+            x[
+              0,
+              ,
+              drop = FALSE
+            ]
           )
         }
 
@@ -2128,6 +2467,351 @@ mod_executive_dashboard_server <- function(
         )
       
       # -------------------------------------------------------------------
+      # Executive Facility plots
+      # -------------------------------------------------------------------
+
+      output$executive_plot_facility_ranking <-
+        renderPlot(
+          {
+
+            reports <-
+              executive_detailed_site_reports()
+
+            context <-
+              executive_context()
+
+            validate(
+              need(
+                !is.null(reports),
+                paste(
+                  "Upload the relevant Detailed Site Report",
+                  "on the Data page."
+                )
+              ),
+
+              need(
+                !identical(
+                  context$site,
+                  "All Monash Sport"
+                ),
+                paste(
+                  "Select a specific Site to view",
+                  "facility-level performance."
+                )
+              )
+            )
+
+            x <-
+              executive_facility_snapshot_finance()
+
+            validate(
+              need(
+                nrow(x) > 0L,
+                paste(
+                  "No facility finance data is available",
+                  "for the selected site and year."
+                )
+              )
+            )
+
+            metric <-
+              input$metric_facility_ranking
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            values <-
+              facility_finance_values(
+                x,
+                metric,
+                "Actual"
+              )
+
+            validate(
+              need(
+                any(
+                  is.finite(values)
+                ),
+                paste(
+                  "No Actual",
+                  metric,
+                  "values are available for the selected site and year."
+                )
+              )
+            )
+
+            plot_facility_ranking(
+              x,
+              metric
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_facility_performance <-
+        renderPlot(
+          {
+
+            reports <-
+              executive_detailed_site_reports()
+
+            context <-
+              executive_context()
+
+            validate(
+              need(
+                !is.null(reports),
+                paste(
+                  "Upload the relevant Detailed Site Reports",
+                  "on the Data page."
+                )
+              ),
+
+              need(
+                !identical(
+                  context$site,
+                  "All Monash Sport"
+                ),
+                paste(
+                  "Select a specific Site to view",
+                  "facility-level performance."
+                )
+              )
+            )
+
+            x <-
+              executive_facility_trend_finance()
+
+            validate(
+              need(
+                nrow(x) > 0L,
+                paste(
+                  "No facility finance data is available",
+                  "for the selected site and period."
+                )
+              )
+            )
+
+            years <-
+              sort(
+                unique(
+                  x$report_year[
+                    !is.na(
+                      x$report_year
+                    )
+                  ]
+                )
+              )
+
+            validate(
+              need(
+                length(years) >= 2L,
+                paste(
+                  "Multiple Detailed Site Report years are required",
+                  "to show facility performance over time."
+                )
+              )
+            )
+
+            metric <-
+              input$metric_facility_performance
+
+            if (
+              is.null(metric) ||
+                !metric %in% FINANCE_METRICS
+            ) {
+              metric <- "Net Result"
+            }
+
+            values <-
+              facility_finance_values(
+                x,
+                metric,
+                "Actual"
+              )
+
+            validate(
+              need(
+                any(
+                  is.finite(values)
+                ),
+                paste(
+                  "No Actual",
+                  metric,
+                  "values are available for the selected site and period."
+                )
+              )
+            )
+
+            plot_facility_performance_over_time(
+              x,
+              metric
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_facility_discount_mix <-
+        renderPlot(
+          {
+
+            reports <-
+              executive_detailed_site_reports()
+
+            context <-
+              executive_context()
+
+            validate(
+              need(
+                !is.null(reports),
+                paste(
+                  "Upload the relevant Detailed Site Report",
+                  "on the Data page."
+                )
+              ),
+
+              need(
+                !identical(
+                  context$site,
+                  "All Monash Sport"
+                ),
+                paste(
+                  "Select a specific Site to view",
+                  "facility-level discount mix."
+                )
+              )
+            )
+
+            x <-
+              executive_facility_snapshot_discounts()
+
+            validate(
+              need(
+                nrow(x) > 0L,
+                paste(
+                  "No facility discount data is available",
+                  "for the selected site and year."
+                )
+              )
+            )
+
+            complete <-
+              is.finite(
+                x$student_discount
+              ) &
+              is.finite(
+                x$staff_discount
+              ) &
+              is.finite(
+                x$other_discount
+              ) &
+              is.finite(
+                x$total_discount
+              ) &
+              x$total_discount > 0
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "No complete facility discount mix values",
+                  "are available for the selected site and year."
+                )
+              )
+            )
+
+            plot_facility_discount_mix(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+      
+      output$executive_plot_facility_discount_mix <-
+        renderPlot(
+          {
+
+            reports <-
+              executive_detailed_site_reports()
+
+            context <-
+              executive_context()
+
+            validate(
+              need(
+                !is.null(reports),
+                paste(
+                  "Upload the relevant Detailed Site Report",
+                  "on the Data page."
+                )
+              ),
+
+              need(
+                !identical(
+                  context$site,
+                  "All Monash Sport"
+                ),
+                paste(
+                  "Select a specific Site to view",
+                  "facility-level discount mix."
+                )
+              )
+            )
+
+            x <-
+              executive_facility_snapshot_discounts()
+
+            validate(
+              need(
+                nrow(x) > 0L,
+                paste(
+                  "No facility discount data is available",
+                  "for the selected site and year."
+                )
+              )
+            )
+
+            complete <-
+              is.finite(
+                x$student_discount
+              ) &
+              is.finite(
+                x$staff_discount
+              ) &
+              is.finite(
+                x$other_discount
+              ) &
+              is.finite(
+                x$total_discount
+              ) &
+              x$total_discount > 0
+
+            validate(
+              need(
+                any(complete),
+                paste(
+                  "No complete facility discount mix values",
+                  "are available for the selected site and year."
+                )
+              )
+            )
+
+            plot_facility_discount_mix(
+              x
+            )
+          },
+          res = 96,
+          bg = "white"
+        )
+            
+      # -------------------------------------------------------------------
       # Executive Site Values table
       # -------------------------------------------------------------------
 
@@ -2571,27 +3255,136 @@ mod_executive_dashboard_server <- function(
             "All Sites",
             sep = " · "
           )
+        
+        trend_context_label <- if (
+          identical(
+            context$view_mode,
+            "Comparison"
+          )
+        ) {
 
+          paste(
+            "Comparison",
+            paste0(
+              context$year,
+              " vs ",
+              context$comparison_year
+            ),
+            context$site,
+            sep = " · "
+          )
+
+        } else {
+
+          paste(
+            "History through",
+            context$year,
+            context$site,
+            sep = " · "
+          )
+        }
+
+        facility_snapshot_label <- if (
+          identical(
+            context$site,
+            "All Monash Sport"
+          )
+        ) {
+
+          paste(
+            "Select a Site",
+            context$year,
+            sep = " · "
+          )
+
+        } else {
+
+          paste(
+            context$site,
+            context$year,
+            "Facility snapshot",
+            sep = " · "
+          )
+        }
+
+        facility_trend_label <- if (
+          identical(
+            context$site,
+            "All Monash Sport"
+          )
+        ) {
+
+          paste(
+            "Select a Site",
+            context$year,
+            sep = " · "
+          )
+
+        } else if (
+          identical(
+            context$view_mode,
+            "Comparison"
+          )
+        ) {
+
+          paste(
+            context$site,
+            paste0(
+              context$year,
+              " vs ",
+              context$comparison_year
+            ),
+            "Facility trend",
+            sep = " · "
+          )
+
+        } else {
+
+          paste(
+            context$site,
+            "History through",
+            context$year,
+            sep = " · "
+          )
+        }
 
         context_label_overrides <-
           c(
+            annual_performance_trend =
+              trend_context_label,
+
+            revenue_capture =
+              trend_context_label,
+
             site_performance =
               site_snapshot_label,
-        
+
             site_ranking =
+              site_snapshot_label,
+
+            site_budget_performance =
               site_snapshot_label,
 
             site_revenue_opportunity =
               site_snapshot_label,
 
             site_discount_mix =
-              site_snapshot_label
+              site_snapshot_label,
+
+            facility_ranking =
+              facility_snapshot_label,
+
+            facility_performance =
+              facility_trend_label,
+
+            facility_discount_mix =
+              facility_snapshot_label
           )
 
 
         executive_visual_grid_ui(
           visual_ids =
-            selected_visuals$Finance,
+            selected_visuals[[active_focus()]],
 
           context_label =
             context_label,
@@ -2611,7 +3404,7 @@ mod_executive_dashboard_server <- function(
 
         executive_supporting_components_ui(
           visual_ids =
-            selected_visuals$Finance,
+            selected_visuals[[active_focus()]],
           ns = ns
         )
       })
@@ -2660,6 +3453,7 @@ mod_executive_dashboard_server <- function(
           )
         }
 
+        focus <- active_focus()
 
         source_groups <- intersect(
           names(EXECUTIVE_SOURCE_LABELS),
@@ -2713,7 +3507,7 @@ mod_executive_dashboard_server <- function(
 
 
             current_selection <-
-              selected_visuals[[category]]
+              selected_visuals[[focus]]
 
             available_choices <- if (
               available_count > 0L
@@ -3244,13 +4038,14 @@ mod_executive_dashboard_server <- function(
 
           registry <- picker_registry()
           category <- active_category()
+          focus <- active_focus()
 
           if (
             is.null(registry) ||
               nrow(registry) == 0L
           ) {
 
-            selected_visuals[[category]] <- character()
+            selected_visuals[[focus]] <- character()
 
             removeModal()
 
@@ -3290,7 +4085,7 @@ mod_executive_dashboard_server <- function(
           ]
 
 
-          selected_visuals[[category]] <- chosen
+          selected_visuals[[focus]] <- chosen
           removeModal()
         },
         ignoreInit = TRUE
@@ -3306,8 +4101,10 @@ mod_executive_dashboard_server <- function(
 
           selected_visuals = reactive({
             list(
-              Finance =
-                selected_visuals$Finance,
+              Overview =
+                selected_visuals$Overview,
+              Site =
+                selected_visuals$Site,
               Metrics =
                 selected_visuals$Metrics
             )
@@ -3315,6 +4112,9 @@ mod_executive_dashboard_server <- function(
 
           active_category =
             active_category,
+
+          active_focus =
+            active_focus,
 
           registry =
             picker_registry,
