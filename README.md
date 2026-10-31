@@ -536,7 +536,10 @@ docs/
   forecasting.md          # forecasting method, assumptions and checks
 
 report/
-  report.qmd              # project report (Quarto)
+  report.qmd              # project report (Quarto): title, authors and text
+  _quarto.yml             # PDF and website settings
+  _output/                # rendered report.pdf and index.html (website)
+  README.md               # what the other report folders hold
 
 slides/
   slides.qmd              # project presentation (Quarto, Monash theme)
@@ -554,7 +557,9 @@ tests/
   run_tests.R             # regression tests (see Testing)
   run_sample_tests.R      # same, plus parsing every workbook in data/sample
   run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
+  README.md               # what each test file checks and how to run them
   fixtures_site_venues.R  # shared test fixtures
+  helper_parse_cache.R    # parses each sample workbook once per run
   test_*.R                # one file per area
   snapshots/              # accepted key figures for the sample workbooks
 
@@ -586,6 +591,9 @@ The report and slides are Quarto documents. With
 quarto render report/report.qmd
 quarto render slides/slides.qmd
 ```
+
+The report is rendered twice, as a PDF in the Monash report format and as a
+one-page website, both into `report/_output/` (see `report/README.md`).
 
 The slides use the bundled `quarto-monash` theme in `slides/_extensions/` and
 need no R packages. `slides/slides.html` is the rendered, self-contained
