@@ -76,26 +76,29 @@ templates are available from the Data page and in `www/templates/`; see
 ## 3. Upload the reports
 
 1. Open the **Data** page and stay on **Upload & Manage**.
-2. Under **Upload all reports**, select **Choose folder** and pick the shared
+2. In the **Add data** card, select **Choose folder** and pick the shared
    report folder (subfolders are included), or select **Choose files** and
-   select all the workbooks at once. Each file is matched to its report type
-   from its file name, so the naming rules above matter.
+   select the workbooks. Each file is matched to its report type from its file
+   name, so the naming rules above matter. The rules and blank templates are
+   also under **Excel templates and file naming** in the same card.
 3. Keep the page open while the files are parsed. A blue message shows the
-   progress, and the upload buttons are paused until parsing finishes.
-4. Read the summary that appears below the upload cards. It lists how many
-   files were matched to each report type, and any files that were **not
-   recognised** (rename these to follow the naming rules, or upload them
-   through the matching report-type card). Other files in the folder, such as
-   Word documents, are ignored.
-5. Wait until each file shows `ready`. Select **View details** under a file to
-   read any warnings; a `failed` file is left out of the dashboard. If a file
-   was uploaded through the wrong report-type card, its message says which
-   card to use.
+   progress, and the buttons are paused until parsing finishes.
+4. Read the summary under the buttons. It lists how many files were matched
+   to each report type. A workbook whose name was **not recognised** is listed
+   with a **Choose report type** box: pick its type and select **Add**, or
+   **Dismiss** it (renaming the file to follow the rules also works). Other
+   files in the folder, such as Word documents, are ignored.
+5. Wait until each file shows `ready` under **Uploaded files**. Select **View
+   details** under a file to read any warnings; a `failed` file is left out
+   of the dashboard.
 6. Use the other pages. **View Cleaned Data** shows and downloads the
    standardised tables.
 
-To add or replace a single file later, use the card for its report type under
-**Or add files to one report type**.
+To add or replace a file later, choose it (or the whole folder again) in the
+same way. Files already loaded with the same name and size are skipped, so
+only new or changed reports are read. If the folder holds two workbooks with
+the same name (an old copy in a subfolder, say), only the first one is read
+and the summary says so; keep one copy of each report.
 
 Three messages under a `failed` file are common:
 
@@ -121,20 +124,21 @@ original files are never changed.
 Parsing all the reports takes a few minutes in the browser. To skip it next
 time:
 
-1. After the files show `ready`, select **Save current data** in the
-   **Saved data** card. The card first lists what will be saved (files and
-   years per report type).
+1. After the files show `ready`, select **Save current data** at the top of
+   the **Uploaded files** card. The line above the file list says what will be
+   saved (files and years per report type).
 2. Keep the downloaded file in the shared report folder, next to the reports.
    Its name says what it holds, for example
    `monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds`
    (years, number of files, save date). Do not rename it to something vague.
-3. Next time, select **Choose saved file** under **Load saved data** and pick
-   that file. The dashboard is ready in a few seconds, and a summary shows the
-   save date, the files and years for each report type, and the full list of
-   source files.
-4. If a report has changed since, upload the new version as usual; it replaces
-   the saved copy of the same file name. Then save again and delete the older
-   saved file, so the folder holds one up-to-date copy.
+3. Next time, choose the report folder again in **Add data** (or choose just
+   the saved file). The saved data is loaded in a few seconds, and a summary
+   shows the save date, the files and years for each report type, and the full
+   list of source files. Reports that have not changed since are skipped; new
+   or updated reports are read and replace their saved copies.
+4. Save again and delete the older saved file, so the folder holds one
+   up-to-date copy. (If the folder still holds several saved files, they are
+   all loaded, oldest first, so the newest copy of each report is kept.)
 
 The summary turns amber when the saved data is more than 30 days old, as a
 reminder to check for newer reports. If the dashboard has been updated in a

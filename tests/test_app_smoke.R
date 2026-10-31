@@ -297,13 +297,13 @@ smoke_part <- Sys.getenv("MONASH_SPORT_SMOKE_PART", unset = "")
 if (smoke_part %in% c("", "single")) {
   smoke_check("no data")
   smoke_check("Venues Tracking Report only",
-    list(list(`data_upload-venues_reports` = smoke_upload(smoke_venues))))
+    list(list(`data_upload-all_reports` = smoke_upload(smoke_venues))))
   smoke_check("one Detailed Site Report only",
-    list(list(`data_upload-site_reports` = smoke_upload(smoke_site))))
+    list(list(`data_upload-all_reports` = smoke_upload(smoke_site))))
 }
 if (smoke_part %in% c("", "combined")) {
   smoke_check("one year of Monthly Site Report only",
-    list(list(`data_upload-monthly_reports` = smoke_upload(smoke_monthly))))
+    list(list(`data_upload-all_reports` = smoke_upload(smoke_monthly))))
   smoke_check("one file of each type",
     list(list(`data_upload-all_reports` = smoke_upload(c(smoke_monthly, smoke_venues, smoke_site)))))
 }
@@ -329,7 +329,7 @@ if (!smoke_part %in% c("", "full")) {
   })
   smoke_check(
     "full report set loaded from saved data",
-    list(list(`data_upload-saved_data` = data.frame(
+    list(list(`data_upload-all_reports` = data.frame(
       name = "saved.rds",
       size = file.size(smoke_saved),
       type = "application/octet-stream",

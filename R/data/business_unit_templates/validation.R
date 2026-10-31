@@ -27,6 +27,8 @@ empty_business_unit_check_table <- function() {
 }
 
 
+# Checks a visits sheet: present, twelve month headings without duplicates, a YTD Total
+# block, and labelled audience columns including Total.
 validate_business_unit_visit_structure <- function(
   workbook,
   sheet_field,
@@ -126,6 +128,8 @@ validate_business_unit_visit_structure <- function(
 }
 
 
+# Checks an optional memberships or enrollments sheet: not empty, a Month header,
+# and no missing or duplicate month rows in each block.
 validate_business_unit_member_structure <- function(
   workbook,
   sheet_field,
@@ -214,6 +218,8 @@ validate_business_unit_member_structure <- function(
 }
 
 
+# Structure checks of one workbook: the Finance sheet's sections and month rows, then the
+# visit, membership and enrolment sheets.
 validate_business_unit_template_workbook <- function(workbook) {
 
   if (!inherits(workbook, "business_unit_template_workbook")) {
@@ -302,6 +308,7 @@ validate_business_unit_template_workbook <- function(workbook) {
 }
 
 
+# Warning when two files cover the same business unit and year.
 validate_business_unit_template_collection <- function(workbooks) {
 
   if (length(workbooks) == 0L) {
@@ -328,6 +335,8 @@ validate_business_unit_template_collection <- function(workbooks) {
 }
 
 
+# One check row comparing an expected and a reported value, with difference and pass/fail
+# status.
 make_business_unit_check <- function(
   report_year,
   dataset,
@@ -389,6 +398,8 @@ make_business_unit_check <- function(
 }
 
 
+# The single reported value selected by `keep`, with its source cell; NA when there is not
+# exactly one.
 business_unit_check_record <- function(data, keep) {
 
   records <- data[keep, , drop = FALSE]
@@ -413,6 +424,7 @@ business_unit_check_record <- function(data, keep) {
 }
 
 
+# Adds one check to the list `checks`.
 append_business_unit_check <- function(
   checks,
   group_data,
@@ -448,6 +460,8 @@ append_business_unit_check <- function(
 }
 
 
+# Finance checks: Variance = Actual - Budget, business units adding up to the reported
+# totals, and Profit/Loss = Income - Expenses.
 build_business_unit_finance_checks <- function(
   finance,
   validation_tolerance = 0.01
@@ -615,6 +629,7 @@ build_business_unit_finance_checks <- function(
 }
 
 
+# Checks that monthly discounts add up to the reported discount totals.
 build_business_unit_discount_checks <- function(
   discounts,
   validation_tolerance = 0.01
@@ -671,6 +686,7 @@ build_business_unit_discount_checks <- function(
 }
 
 
+# Visit value of one audience (e.g. Students, Total) in a period.
 business_unit_visit_record <- function(data, audience) {
 
   business_unit_check_record(data, data$audience == audience)
@@ -691,6 +707,7 @@ business_unit_group_rows <- function(data, columns) {
 }
 
 
+# Checks that the audience rows add up to the reported Total visits in every period.
 build_business_unit_visit_checks <- function(
   visits,
   validation_tolerance = 0.01
@@ -815,6 +832,7 @@ build_business_unit_visit_checks <- function(
 }
 
 
+# Value of one membership metric; NA when it is not reported exactly once.
 business_unit_member_value <- function(data, metric) {
 
   records <- data[data$metric == metric, , drop = FALSE]
@@ -825,6 +843,7 @@ business_unit_member_value <- function(data, metric) {
 }
 
 
+# Checks that new and active member counts, and enrolments, add up to their reported totals.
 build_business_unit_member_checks <- function(
   data,
   validation_tolerance = 0.01
@@ -962,6 +981,7 @@ build_business_unit_member_checks <- function(
 }
 
 
+# One warning per file and dataset that has failed or incomplete checks.
 validate_business_unit_check_table <- function(checks) {
 
   if (!is.data.frame(checks) || nrow(checks) == 0L) {
@@ -1021,6 +1041,8 @@ validate_business_unit_check_table <- function(checks) {
 }
 
 
+# Warnings for business units whose reported Total Revenue does not match or could not be
+# checked.
 validate_business_unit_total_revenue <- function(total_revenue) {
 
   if (!is.data.frame(total_revenue) || nrow(total_revenue) == 0L) {

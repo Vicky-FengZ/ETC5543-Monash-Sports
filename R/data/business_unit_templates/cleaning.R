@@ -29,6 +29,7 @@ empty_business_unit_template_finance_table <- function() {
 }
 
 
+# Zero-row discount table with the cleaned column types.
 empty_business_unit_template_discount_table <- function() {
 
   data.frame(
@@ -55,6 +56,7 @@ empty_business_unit_template_discount_table <- function() {
 }
 
 
+# Zero-row Total Revenue table, including the validation columns.
 empty_business_unit_template_total_revenue_table <- function() {
 
   data.frame(
@@ -84,6 +86,7 @@ empty_business_unit_template_total_revenue_table <- function() {
 }
 
 
+# Zero-row visits table with the cleaned column types.
 empty_business_unit_template_visit_table <- function() {
 
   data.frame(
@@ -109,6 +112,7 @@ empty_business_unit_template_visit_table <- function() {
 }
 
 
+# Zero-row memberships/enrolments table with the cleaned column types.
 empty_business_unit_template_member_table <- function() {
 
   data.frame(
@@ -133,6 +137,8 @@ empty_business_unit_template_member_table <- function() {
 }
 
 
+# Fund code in brackets at the end of a business unit label, e.g. "Swim School (54321)" ->
+# "54321".
 business_unit_template_fund_code <- function(value) {
 
   if (length(value) == 0L || is.na(value)) {
@@ -146,6 +152,7 @@ business_unit_template_fund_code <- function(value) {
 }
 
 
+# Business unit label without its bracketed fund code.
 business_unit_template_business_unit <- function(value) {
 
   if (length(value) == 0L || is.na(value)) {
@@ -161,6 +168,8 @@ business_unit_template_business_unit <- function(value) {
 }
 
 
+# Adds report unit, campus, site code and fund code to finance rows read with the Monthly Site
+# Report extractor (the Finance sheet has the same layout).
 standardise_business_unit_finance_rows <- function(base, workbook) {
 
   if (!is.data.frame(base) || nrow(base) == 0L) {
@@ -201,6 +210,7 @@ standardise_business_unit_finance_rows <- function(base, workbook) {
 }
 
 
+# Reported TOTAL row of the INCOME and EXPENSES sections, used by the finance checks.
 extract_business_unit_finance_reported_totals <- function(workbook) {
 
   raw_sheet <- workbook$sheets$finance
@@ -332,6 +342,7 @@ extract_business_unit_finance_reported_totals <- function(workbook) {
 }
 
 
+# Cleaned finance table from the Finance sheet.
 clean_business_unit_template_finance <- function(workbook) {
 
   raw_sheet <- workbook$sheets$finance
@@ -378,6 +389,7 @@ clean_business_unit_template_finance <- function(workbook) {
 }
 
 
+# Adds report unit, campus, site code and fund code to discount rows.
 standardise_business_unit_discount_rows <- function(base, workbook) {
 
   if (!is.data.frame(base) || nrow(base) == 0L) {
@@ -417,6 +429,7 @@ standardise_business_unit_discount_rows <- function(base, workbook) {
 }
 
 
+# Reported total row of the DISCOUNTS section, used by the discount checks.
 extract_business_unit_discount_reported_totals <- function(workbook) {
 
   raw_sheet <- workbook$sheets$finance
@@ -482,6 +495,7 @@ extract_business_unit_discount_reported_totals <- function(workbook) {
 }
 
 
+# Cleaned discount table from the Finance sheet.
 clean_business_unit_template_discounts <- function(workbook) {
 
   raw_sheet <- workbook$sheets$finance
@@ -517,6 +531,7 @@ clean_business_unit_template_discounts <- function(workbook) {
 }
 
 
+# Total Revenue checks for each business unit on the Finance sheet.
 clean_business_unit_template_total_revenue <- function(
   workbook,
   monthly_finance_base,
@@ -614,6 +629,7 @@ clean_business_unit_template_total_revenue <- function(
 }
 
 
+# Month number from a label such as "Jan" or "January"; NA otherwise.
 business_unit_template_month_from_label <- function(value) {
 
   key <- normalise_excel_label(value)
@@ -625,12 +641,14 @@ business_unit_template_month_from_label <- function(value) {
 }
 
 
+# Row holding the month headings of a visits sheet.
 find_business_unit_visit_header <- function(raw_sheet) {
 
   find_month_header_row(raw_sheet, 10L)
 }
 
 
+# Column where each month block and the YTD total block start on a visits sheet.
 business_unit_visit_periods <- function(raw_sheet, header_row) {
 
   if (is.na(header_row)) {
@@ -679,6 +697,7 @@ business_unit_visit_periods <- function(raw_sheet, header_row) {
 }
 
 
+# Cleaned visits table (direct or indirect): audience and visits by month and total.
 clean_business_unit_template_visits <- function(
   workbook,
   sheet_field,
@@ -800,6 +819,7 @@ clean_business_unit_template_visits <- function(
 }
 
 
+# Standard membership or enrolment metric name (Target, New Members, Active Members, ...).
 canonical_business_unit_member_metric <- function(value) {
 
   key <- normalise_excel_label(value)
@@ -835,6 +855,7 @@ canonical_business_unit_member_metric <- function(value) {
 }
 
 
+# Cleaned memberships or enrollments table: metric by month.
 clean_business_unit_template_member_sheet <- function(
   workbook,
   sheet_field,
@@ -939,6 +960,7 @@ clean_business_unit_template_member_sheet <- function(
 }
 
 
+# All cleaned tables and checks for one Detailed Site Report workbook.
 clean_business_unit_template_workbook <- function(
   workbook,
   validation_tolerance = 0.01

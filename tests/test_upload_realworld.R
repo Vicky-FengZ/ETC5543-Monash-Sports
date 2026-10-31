@@ -107,13 +107,13 @@ shiny::testServer(
     }
     row_for <- function(data, name) data$uploads[data$uploads$original_name == name, , drop = FALSE]
 
-    first <- upload("monthly_reports", monthly_2025)
+    first <- upload("all_reports", monthly_2025)
     single_rows <- nrow(first$monthly_reports$finance)
     stopifnot(row_for(first, basename(monthly_2025))$status == "ready")
 
     # Another file for the same year is not used, so nothing is counted twice.
     november <- copy_as(monthly_2025, "Monthly Site Report 2025 -November.xlsx")
-    second <- upload("monthly_reports", november)
+    second <- upload("all_reports", november)
     rejected <- row_for(second, "Monthly Site Report 2025 -November.xlsx")
     stopifnot(
       rejected$status == "failed",
@@ -122,8 +122,8 @@ shiny::testServer(
       nrow(second$monthly_reports$finance) == single_rows
     )
 
-    # The same file name still replaces the earlier upload.
-    replaced <- upload("monthly_reports", monthly_2025)
+    # Choosing the same workbook again neither adds nor doubles it.
+    replaced <- upload("all_reports", monthly_2025)
     stopifnot(
       sum(replaced$uploads$status == "ready") == 1L,
       nrow(replaced$monthly_reports$finance) == single_rows
@@ -132,7 +132,7 @@ shiny::testServer(
     # Once the first file is removed, the other one can be used.
     session$setInputs(remove_file = row_for(replaced, basename(monthly_2025))$file_id)
     session$flushReact()
-    after_switch <- upload("monthly_reports", november)
+    after_switch <- upload("all_reports", november)
     stopifnot(
       row_for(after_switch, "Monthly Site Report 2025 -November.xlsx")$status[[
         nrow(row_for(after_switch, "Monthly Site Report 2025 -November.xlsx"))
@@ -141,21 +141,24 @@ shiny::testServer(
     )
 
     # Venues and Detailed Site Reports follow the same rule.
-    upload("venues_reports", venues_2025)
+    upload("all_reports", venues_2025)
     venues_copy <- upload(
-      "venues_reports",
+      "all_reports",
       copy_as(venues_2025, "2025 Venues Tracking Report (2).xlsx")
     )
-    upload("site_reports", aquatics_2025)
+    upload("all_reports", aquatics_2025)
     site_copy <- upload(
-      "site_reports",
+      "all_reports",
       copy_as(aquatics_2025, "Aquatics_Site_Report_2025.xlsx")
     )
     other_unit <- upload(
-      "site_reports",
+      "all_reports",
       sample_file("Business Unit Templates that feed master reports", "2025", "Caulfield Site Report 2025.xlsx")
     )
     stopifnot(
+      nrow(row_for(venues_copy, "2025 Venues Tracking Report (2).xlsx")) == 1L,
+      nrow(row_for(site_copy, "Aquatics_Site_Report_2025.xlsx")) == 1L,
+      nrow(row_for(other_unit, "Caulfield Site Report 2025.xlsx")) == 1L,
       row_for(venues_copy, "2025 Venues Tracking Report (2).xlsx")$status == "failed",
       row_for(site_copy, "Aquatics_Site_Report_2025.xlsx")$status == "failed",
       grepl("Detailed Site Reports for Aquatics 2025",
@@ -168,7 +171,7 @@ shiny::testServer(
     writeLines("not an Excel workbook", broken)
     empty <- file.path(realworld_dir, "Monthly Site Report 2028.xlsx")
     writexl::write_xlsx(list(Sheet1 = data.frame()), empty)
-    bad <- upload("monthly_reports", c(broken, empty))
+    bad <- upload("all_reports", c(broken, empty))
     for (name in basename(c(broken, empty))) {
       row <- row_for(bad, name)
       stopifnot(row$status == "failed", nzchar(row$error_message))
@@ -200,7 +203,7 @@ shiny::testServer(
   mod_data_upload_server,
   {
     session$flushReact()
-    session$setInputs(monthly_reports = upload_frame(monthly_2025))
+    session$setInputs(all_reports = upload_frame(monthly_2025))
     session$flushReact()
     saveRDS(saved_data_payload(), realworld_saved)
   }
@@ -210,10 +213,10 @@ shiny::testServer(
   {
     session$flushReact()
     november <- copy_as(monthly_2025, "Monthly Site Report 2025 -November.xlsx")
-    session$setInputs(monthly_reports = upload_frame(november))
+    session$setInputs(all_reports = upload_frame(november))
     session$flushReact()
     rows_before <- nrow(session$returned()$monthly_reports$finance)
-    session$setInputs(saved_data = upload_frame(realworld_saved, "saved.rds"))
+    session$setInputs(all_reports = upload_frame(realworld_saved, "saved.rds"))
     session$flushReact()
     uploads <- session$returned()$uploads
     notice <- paste(as.character(output$saved_data_notice), collapse = "")

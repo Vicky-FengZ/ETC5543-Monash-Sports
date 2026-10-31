@@ -137,27 +137,30 @@ The Data page has two tasks:
 
 ### Uploading files
 
-The quickest way is **Upload all reports**: choose a whole folder (subfolders
-included) or select every workbook at once. Each file is matched to its
-report family from its file name, using the same naming rules as the
-importers, and the files are parsed one after another. A summary then lists
-the files matched to each family and any that were not recognised; other
-files in the folder are ignored. While files are parsing, the upload buttons
-are paused and a progress message is shown, and a failed transfer is
-explained in plain words.
+Everything is added through the **Add data** card: **Choose files** for
+selected files, or **Choose folder** for a whole folder (subfolders
+included). Both accept report workbooks (`.xlsx`, `.xls`) and saved data files
+(`.rds`, see below), so the same button is used the first time and every
+time after.
 
-To add or replace files of one family, upload them through the matching card:
+- Each workbook is matched to its report family from its file name, using the
+  same naming rules as the importers, and parsed one after another. The
+  matching rules and blank templates are under **Excel templates and file
+  naming** in the same card.
+- A workbook whose name matches no family is not read yet. It is listed with a
+  **Choose report type** box: pick the type and select **Add**, or
+  **Dismiss** it. If the chosen type does not fit the workbook, the error says
+  so.
+- A workbook that is already loaded with the same name and size is skipped,
+  so choosing the whole folder again only reads new or changed reports.
+- Other files in the selection are ignored, and a summary under the buttons
+  lists what was matched, skipped, left for a type or ignored.
 
-| Upload area | Expected workbook |
-|---|---|
-| Monthly Site Reports | Annual Monthly Site Report workbooks used by Overview and site comparison |
-| Detailed Site Reports | Business Unit Template site or program reports |
-| Venues Tracking Reports | Annual Venues Tracking Report workbooks |
-
-Select one or more `.xlsx` or `.xls` files at a time. The module copies each
-file into a temporary session directory, keeps its original filename for
-traceability, and runs the matching import, cleaning and validation pipeline.
-Your original workbook stays unchanged.
+While files are parsing, the buttons are paused and a progress message is
+shown, and a failed transfer is explained in plain words. The module copies
+each workbook into a temporary session directory, keeps its original filename
+for traceability, and runs the matching import, cleaning and validation
+pipeline. Your original workbook stays unchanged.
 
 The module processes one file at a time. The page shows overall parsing
 progress and a status row for each upload:
@@ -199,19 +202,24 @@ its parsed result. Your original Excel file stays unchanged.
 ### Saving and loading parsed data
 
 Parsing every workbook takes several minutes in the browser version, so the
-**Saved data** card at the top of Upload & Manage can keep the result:
+cleaned data can be kept in a file and loaded again:
 
-- **Save current data** downloads one `.rds` file with the cleaned tables,
-  warning notes and a manifest for every `ready` file. Raw workbooks are not
-  included. Before saving, the card lists what will be saved, and the file
-  name records the years, file count and save date, for example
+- **Save current data**, at the top of the **Uploaded files** card, downloads
+  one `.rds` file with the cleaned tables, warning notes and a manifest for
+  every `ready` file. Raw workbooks are not included. A line above the file
+  list says what will be saved, and the file name records the years, file
+  count and save date, for example
   `monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds`.
-- **Load saved data** restores those files in a few seconds without reading
-  the workbooks again. A summary then shows when the data was saved, the
-  files and years per report family, and the list of source files; data saved
-  more than 30 days ago is flagged as possibly out of date.
-- Loaded files behave like uploads: newer workbooks with the same name
-  replace them, they can be removed, and the session can be saved again.
+- Choosing that file in **Add data** restores those files in a few seconds
+  without reading the workbooks again. A summary then shows when the data was
+  saved, the files and years per report family, and the list of source files;
+  data saved more than 30 days ago is flagged as possibly out of date.
+- The saved file can be chosen together with the reports, for example by
+  choosing the report folder that holds it. The saved data is loaded first;
+  reports with the same name and size are skipped, and newer versions replace
+  their saved copies.
+- Loaded files behave like uploads: they can be removed, and the session can
+  be saved again.
 
 Files that are not saved dashboard data, are damaged, or were saved by a
 different version of the cleaned tables are refused with a message, and the
@@ -486,8 +494,10 @@ data checks, limitations, model comparison and testing instructions.
 app.R                     # assembles the navigation and connects the modules
 LICENSE
 renv.lock                 # package versions (restore with renv::restore())
+.renvignore               # folders renv skips (deploy/ and local data)
 
 R/
+  _disable_autoload.R     # app.R sources R/ itself; stops Shiny loading it twice
   config.R                # brand colours, theme, chart palettes, constants
   ui_helpers.R            # shared UI pieces (KPI rows, navbar data status)
   calculations.R          # finance, revenue and facility calculations
@@ -526,7 +536,10 @@ docs/
   forecasting.md          # forecasting method, assumptions and checks
 
 report/
-  report.qmd              # project report (Quarto)
+  report.qmd              # project report (Quarto): title, authors and text
+  _quarto.yml             # PDF and website settings
+  _output/                # rendered report.pdf and index.html (website)
+  README.md               # what the other report folders hold
 
 slides/
   slides.qmd              # project presentation (Quarto, Monash theme)
@@ -538,12 +551,15 @@ deploy/
 
 .github/workflows/
   deploy-shinylive.yml    # publishes _site/ to GitHub Pages on every push
+  tests.yml               # runs the sample test suite on every push
 
 tests/
   run_tests.R             # regression tests (see Testing)
   run_sample_tests.R      # same, plus parsing every workbook in data/sample
   run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
+  README.md               # what each test file checks and how to run them
   fixtures_site_venues.R  # shared test fixtures
+  helper_parse_cache.R    # parses each sample workbook once per run
   test_*.R                # one file per area
   snapshots/              # accepted key figures for the sample workbooks
 
@@ -575,6 +591,9 @@ The report and slides are Quarto documents. With
 quarto render report/report.qmd
 quarto render slides/slides.qmd
 ```
+
+The report is rendered twice, as a PDF in the Monash report format and as a
+one-page website, both into `report/_output/` (see `report/README.md`).
 
 The slides use the bundled `quarto-monash` theme in `slides/_extensions/` and
 need no R packages. `slides/slides.html` is the rendered, self-contained

@@ -1,0 +1,26 @@
+<script>
+// Top bar, reading progress bar and a shadow on the top bar once the page scrolls.
+(function () {
+  var progress = document.querySelector('.site-progress');
+  var nav = document.querySelector('.site-bar');
+  if (!progress || !nav) return;
+  // Quarto places included HTML inside the page grid; the bar belongs at
+  // the very top of the page, above the hero.
+  document.body.insertBefore(nav, document.body.firstChild);
+  document.body.insertBefore(progress, document.body.firstChild);
+  var bar = progress.querySelector('span');
+  var ticking = false;
+  function update() {
+    var doc = document.documentElement;
+    var height = doc.scrollHeight - window.innerHeight;
+    var share = height > 0 ? Math.min(1, window.scrollY / height) : 0;
+    bar.style.transform = 'scaleX(' + share + ')';
+    nav.classList.toggle('is-scrolled', window.scrollY > 8);
+    ticking = false;
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+})();
+</script>

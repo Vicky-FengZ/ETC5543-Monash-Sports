@@ -3,24 +3,30 @@
 IMPORT_METRIC_UNITS <- c("Unknown", "Count", "Currency", "Rate", "Hours", "Text")
 IMPORT_METRIC_AGGREGATIONS <- c("None", "Sum", "Last", "Mean")
 
+# Aggregations that make sense for a unit: none for text or unknown values, and no sum for
+# rates.
 import_allowed_aggregations <- function(unit) {
   if (unit %in% c("Unknown", "Text")) return("None")
   if (unit == "Rate") return(c("None", "Last", "Mean"))
   IMPORT_METRIC_AGGREGATIONS
 }
 
+# Columns of a discount header row that hold discount types (not the label column or total
+# columns).
 discount_value_columns <- function(labels) {
   keys <- normalise_excel_label(labels)
   which(seq_along(keys) > 1L & nzchar(keys) &
     !keys %in% c("discounts", "total", "subtotal", "total discounts"))
 }
 
+# Standard discount type name (Student, Staff, Other); other labels are kept as written.
 canonical_discount_type <- function(label) {
   aliases <- c(students = "Student", student = "Student", staff = "Staff", other = "Other")
   key <- normalise_excel_label(label)
   if (key %in% names(aliases)) unname(aliases[[key]]) else trimws(as.character(label))
 }
 
+# Reads config/metric_definitions.csv and checks every rule's unit and aggregation before use.
 read_import_metric_rules <- function(path = file.path("config", "metric_definitions.csv")) {
   rules <- utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
   required <- c("family", "dataset", "metric", "unit", "aggregation")
@@ -40,6 +46,8 @@ read_import_metric_rules <- function(path = file.path("config", "metric_definiti
 
 IMPORT_METRIC_RULES <- read_import_metric_rules()
 
+# Unit and aggregation for each metric of a dataset, from the rules plus optional overrides;
+# Unknown/None when no rule matches.
 import_metric_definition <- function(family, dataset, metrics, overrides = NULL) {
   rules <- IMPORT_METRIC_RULES
   if (is.data.frame(overrides) && nrow(overrides) > 0L) {
@@ -56,6 +64,7 @@ import_metric_definition <- function(family, dataset, metrics, overrides = NULL)
   )
 }
 
+# Adds unit and aggregation columns to a table that has a metric column.
 define_import_metrics <- function(data, family, dataset, overrides = NULL) {
   if (!is.data.frame(data) || !"metric" %in% names(data)) return(data)
   definitions <- import_metric_definition(family, dataset, data$metric, overrides)
@@ -65,12 +74,14 @@ define_import_metrics <- function(data, family, dataset, overrides = NULL) {
   data
 }
 
+# Metrics of a dataset whose rule says they can be summed.
 import_summable_metrics <- function(data, family, dataset) {
   metrics <- unique(as.character(data$metric))
   definitions <- import_metric_definition(family, dataset, metrics)
   metrics[definitions$aggregation == "Sum"]
 }
 
+# Tables of a report family whose metrics are described in config/metric_definitions.csv.
 import_configurable_tables <- function(family) {
   switch(family,
     site_detail = c("memberships", "enrollments"),
@@ -79,6 +90,7 @@ import_configurable_tables <- function(family) {
   )
 }
 
+# Adds unit and aggregation columns to every configurable table of a report.
 define_import_report_metrics <- function(report, family, overrides = NULL) {
   if (!is.list(report)) return(report)
   for (dataset in intersect(import_configurable_tables(family), names(report))) {
@@ -87,6 +99,7 @@ define_import_report_metrics <- function(report, family, overrides = NULL) {
   report
 }
 
+# One row per metric found in a report's configurable tables, with its unit and aggregation.
 import_metric_catalog <- function(report, family) {
   records <- lapply(import_configurable_tables(family), function(dataset) {
     data <- report[[dataset]]
@@ -102,6 +115,8 @@ import_metric_catalog <- function(report, family) {
   bind_import_tables(records, IMPORT_METRIC_RULES[FALSE, ])
 }
 
+# Zero-row table for values kept as Additional data (found in a sheet but not mapped by a layout
+# rule).
 empty_additional_import_data <- function() {
   data.frame(report_year = integer(), field = character(), raw_value = character(),
     value = double(), interpretation = character(), source_file = character(),
@@ -109,6 +124,8 @@ empty_additional_import_data <- function() {
     stringsAsFactors = FALSE)
 }
 
+# The raw worksheets that were read for a workbook, named by their sheet name, for each report
+# family's workbook structure.
 import_raw_sheets <- function(workbook, family) {
   if (family == "monthly_site") return(workbook$sheets)
   if (family == "site_detail") {
@@ -122,6 +139,8 @@ import_raw_sheets <- function(workbook, family) {
   sheets[!is.na(names(sheets)) & vapply(sheets, is.data.frame, logical(1))]
 }
 
+# Warnings for worksheets that have no layout rule and were therefore not imported (presentation
+# sheets are skipped).
 import_unhandled_sheet_issues <- function(workbook, family, sheets) {
   # Presentation/help/budget inputs are deliberately outside the cleaned data.
   ignored <- c("dashboard", "monthly highlights", "help sheet", "from budget")
@@ -135,6 +154,10 @@ import_unhandled_sheet_issues <- function(workbook, family, sheets) {
   }), empty_import_issue_table())
 }
 
+# Finds values in the supported data area of each imported sheet that no extraction rule
+# captured.
+# Returns them as Additional data (kept for inspection, never added to totals) plus warnings
+# for those values and for sheets without a layout rule.
 audit_import_extensions <- function(report, workbooks, family) {
   additional <- list()
   issues <- list()
@@ -236,6 +259,8 @@ audit_import_extensions <- function(report, workbooks, family) {
     issues = bind_import_tables(issues, empty_import_issue_table()))
 }
 
+# Last import step for every family: adds metric definitions, Additional data and the related
+# warnings.
 finalise_extensible_report <- function(report, workbooks, family) {
   report <- define_import_report_metrics(report, family)
   audit <- audit_import_extensions(report, workbooks, family)

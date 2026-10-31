@@ -36,3 +36,6 @@ deploy/*_log.txt
 
 # Saved dashboard data holds confidential figures
 monash-sport-saved-data*.rds
+
+# Report: Typst file left behind if a PDF render fails
+report/*.typ

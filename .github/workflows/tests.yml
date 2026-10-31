@@ -1,0 +1,36 @@
+# Run the test suite on the synthetic sample workbooks on every push and
+# pull request, with the package versions recorded in renv.lock. A green
+# tick on a commit means the app, its imports and its figures were checked
+# from a clean machine (see "Testing" in README.md).
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sample-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.3"
+          use-public-rspm: true
+
+      # Installs the packages in renv.lock (cached between runs).
+      - uses: r-lib/actions/setup-renv@v2
+
+      - name: Run the sample test suite
+        run: Rscript -e 'source("tests/run_sample_tests.R")'

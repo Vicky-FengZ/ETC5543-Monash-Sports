@@ -16,6 +16,7 @@ require_venues_report_packages <- function() {
 }
 
 
+# Venues Tracking Report workbooks in a folder (and its subfolders), skipping Excel lock files.
 discover_venues_tracking_report_files <- function(
   data_dir = file.path(
     "data",
@@ -73,6 +74,7 @@ discover_venues_tracking_report_files <- function(
 }
 
 
+# Report year from the file name, which must contain exactly one four-digit year.
 extract_venues_tracking_report_year <- function(source_name) {
 
   year_matches <- regmatches(
@@ -100,6 +102,7 @@ extract_venues_tracking_report_year <- function(source_name) {
 }
 
 
+# Reads one worksheet as raw cells (no header row) and caches its text and numbers.
 read_venues_tracking_sheet <- function(path, sheet_name) {
 
   raw_sheet <- suppressMessages(
@@ -128,6 +131,10 @@ read_venues_tracking_sheet <- function(path, sheet_name) {
 }
 
 
+# Name of the sheet matching `expected_name`, optionally ignoring a year prefix ("2025 Casual
+# Hours")
+# or a year comparison suffix ("Court Hire 2024 vs 2025"). NA when absent; stops when several
+# match.
 find_venues_tracking_sheet <- function(
   sheet_names,
   expected_name,
@@ -201,6 +208,8 @@ find_venues_tracking_sheet <- function(
 }
 
 
+# Reads the known sheets of one Venues Tracking Report (finance, attendance, facility hire,
+# membership, online sales, merchandise, court hire, casual hours and wages) as raw cells.
 read_venues_tracking_report_file <- function(
   path,
   source_name = basename(path)
@@ -354,6 +363,10 @@ read_venues_tracking_report_file <- function(
 }
 
 
+# Reads, validates and cleans Venues Tracking Reports into one table per sheet plus their
+# checks.
+# Pass `paths` (with `source_names` for uploads) or a `data_dir` to search. With strict = TRUE
+# a validation error stops the import; with FALSE it is returned in the validation table.
 load_venues_tracking_reports <- function(
   data_dir = file.path(
     "data",
@@ -708,6 +721,7 @@ load_venues_tracking_reports <- function(
 }
 
 
+# Short summary of the imported Venues Tracking Reports when the object is printed.
 print.venues_tracking_report_data <- function(x, ...) {
 
   years <- sort(unique(x$files$report_year))

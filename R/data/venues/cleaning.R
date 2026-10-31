@@ -24,6 +24,8 @@ empty_venues_finance_table <- function() {
 }
 
 
+# Positions of the monthly blocks on the MTD finance sheet: a month label followed by
+# Income, Expenses and Profit/Loss columns.
 find_venues_finance_month_anchors <- function(raw_sheet) {
 
   if (
@@ -106,6 +108,8 @@ find_venues_finance_month_anchors <- function(raw_sheet) {
 }
 
 
+# Finance rows of one monthly block: Income and Expenses (Budget, Actual, Variance) and
+# Profit/Loss for each fund line and the MTD and YTD totals.
 extract_venues_finance_month <- function(
   raw_sheet,
   report_year,
@@ -219,6 +223,7 @@ extract_venues_finance_month <- function(
 }
 
 
+# Cleaned finance table from all monthly blocks of the MTD finance sheet.
 clean_venues_tracking_report_finance <- function(workbook) {
 
   if (!inherits(workbook, "venues_tracking_report_workbook")) {
@@ -299,12 +304,14 @@ venues_month_from_text <- function(value) {
 }
 
 
+# Row holding the month headings of a Venues sheet (at least `minimum_months` months).
 find_venues_month_header <- function(raw_sheet, minimum_months = 6L) {
 
   find_month_header_row(raw_sheet, minimum_months)
 }
 
 
+# Column of each month in a header row.
 find_venues_month_columns <- function(raw_sheet, header_row) {
 
   if (
@@ -342,6 +349,7 @@ find_venues_month_columns <- function(raw_sheet, header_row) {
 }
 
 
+# Standard spelling for labels that vary between years (typos, abbreviations).
 canonical_venues_operational_label <- function(value) {
 
   label <- cell_as_text(
@@ -376,6 +384,7 @@ canonical_venues_operational_label <- function(value) {
 }
 
 
+# Date, month and label of a period: a calendar month, or a reported total such as YTD.
 venues_operational_period <- function(
   report_year,
   period_type,
@@ -424,6 +433,7 @@ empty_venues_attendance_table <- function() {
 }
 
 
+# Attendance area of an activity: Sport Club, Outdoor, All (overall total) or Indoor.
 venues_attendance_area <- function(activity) {
 
   key <- normalise_excel_label(activity)
@@ -447,6 +457,7 @@ venues_attendance_area <- function(activity) {
 }
 
 
+# Attendance records of one sheet row: one per month plus the reported year-to-date total.
 attendance_records_for_row <- function(
   raw_sheet,
   workbook,
@@ -514,6 +525,7 @@ attendance_records_for_row <- function(
 }
 
 
+# Cleaned attendance table: activity, category and row type for every month and the YTD total.
 clean_venues_tracking_report_attendance <- function(workbook) {
 
   raw_sheet <- workbook$attendance_sheet
@@ -696,6 +708,7 @@ empty_venues_facility_hire_table <- function() {
 }
 
 
+# Standard facility name (e.g. "rec hall" -> "Rec Hall").
 canonical_venues_facility <- function(value) {
 
   label <- canonical_venues_operational_label(value)
@@ -733,6 +746,8 @@ canonical_venues_facility <- function(value) {
 }
 
 
+# Facility hire records of one row: revenue and transactions for each month and the reported
+# total.
 facility_hire_records_for_row <- function(
   raw_sheet,
   workbook,
@@ -817,6 +832,7 @@ facility_hire_records_for_row <- function(
 }
 
 
+# Cleaned facility hire table: facility, hire category, revenue and transactions by month.
 clean_venues_tracking_report_facility_hire <- function(workbook) {
 
   raw_sheet <- workbook$facility_hire_sheet
@@ -948,6 +964,7 @@ empty_venues_membership_table <- function() {
 }
 
 
+# Standard membership group name (Fitness, Fitness & Aquatics, Staff Memberships, ...).
 canonical_venues_membership_group <- function(value) {
 
   label <- canonical_venues_operational_label(value)
@@ -973,6 +990,7 @@ canonical_venues_membership_group <- function(value) {
 }
 
 
+# TRUE when a row label starts a membership group rather than naming a membership type.
 is_venues_membership_group <- function(value) {
 
   key <- normalise_excel_label(value)
@@ -987,6 +1005,7 @@ is_venues_membership_group <- function(value) {
 }
 
 
+# Standard membership metric name (New, Renewed, Active, Expired/Cancelled, ...).
 canonical_venues_membership_metric <- function(value) {
 
   key <- normalise_excel_label(value)
@@ -1009,6 +1028,7 @@ canonical_venues_membership_metric <- function(value) {
 }
 
 
+# Membership records of one row: each metric in each monthly or total block.
 membership_records_for_row <- function(
   raw_sheet,
   workbook,
@@ -1070,6 +1090,7 @@ membership_records_for_row <- function(
 }
 
 
+# Cleaned membership table: group, membership type and metric by month and reported total.
 clean_venues_tracking_report_membership <- function(workbook) {
 
   raw_sheet <- workbook$membership_sheet
@@ -1228,6 +1249,7 @@ empty_venues_online_sales_table <- function() {
 }
 
 
+# Header rows of the online sales sections, each with its site and YTD column.
 find_venues_online_sales_headers <- function(raw_sheet) {
 
   if (!is.data.frame(raw_sheet) || nrow(raw_sheet) == 0L) {
@@ -1291,6 +1313,7 @@ find_venues_online_sales_headers <- function(raw_sheet) {
 }
 
 
+# Online sales records of one row: one per month plus the reported YTD total.
 online_sales_records_for_row <- function(
   raw_sheet,
   workbook,
@@ -1365,6 +1388,7 @@ online_sales_records_for_row <- function(
 }
 
 
+# Cleaned online sales table: site, category and value by month and YTD.
 clean_venues_tracking_report_online_sales <- function(workbook) {
 
   raw_sheet <- workbook$online_sales_sheet
@@ -1503,6 +1527,7 @@ empty_venues_merchandise_table <- function() {
 }
 
 
+# Standard merchandise metric: Revenue (MTD, YTD, sales) or Transactions.
 canonical_venues_merchandise_metric <- function(value) {
 
   key <- normalise_excel_label(value)
@@ -1519,6 +1544,8 @@ canonical_venues_merchandise_metric <- function(value) {
 }
 
 
+# Header and metric rows of the merchandise sheet and the columns of each monthly or total
+# block.
 find_venues_merchandise_periods <- function(raw_sheet) {
 
   header_row <- find_venues_month_header(raw_sheet, 10L)
@@ -1602,6 +1629,7 @@ find_venues_merchandise_periods <- function(raw_sheet) {
 }
 
 
+# Merchandise records of one item row: each metric in each period block.
 merchandise_records_for_row <- function(
   raw_sheet,
   workbook,
@@ -1670,6 +1698,7 @@ merchandise_records_for_row <- function(
 }
 
 
+# Cleaned merchandise table: section, item, unit cost and metric by period.
 clean_venues_tracking_report_merchandise <- function(workbook) {
 
   raw_sheet <- workbook$merchandise_sheet
@@ -1790,6 +1819,7 @@ empty_venues_court_hire_table <- function() {
 }
 
 
+# Year from a cell holding only a four-digit year; NA otherwise.
 venues_year_from_text <- function(value) {
 
   if (length(value) == 0L || is.na(value)) {
@@ -1806,6 +1836,8 @@ venues_year_from_text <- function(value) {
 }
 
 
+# Blocks of the Court Hire comparison sheet: month column, previous-year and report-year
+# columns, growth column and court type.
 find_venues_court_hire_layout <- function(raw_sheet, report_year) {
 
   empty_layout <- data.frame(
@@ -1884,6 +1916,8 @@ find_venues_court_hire_layout <- function(raw_sheet, report_year) {
 }
 
 
+# Cleaned court hire table: monthly revenue for the previous and report year and the growth
+# achieved.
 clean_venues_tracking_report_court_hire <- function(workbook) {
 
   raw_sheet <- workbook$court_hire_sheet
@@ -2031,6 +2065,7 @@ empty_venues_casual_hours_table <- function() {
 }
 
 
+# Date in one cell, from an Excel date, a date serial or date text; NA otherwise.
 venues_cell_as_date <- function(raw_sheet, row, column) {
 
   if (
@@ -2086,6 +2121,7 @@ venues_cell_as_date <- function(raw_sheet, row, column) {
 }
 
 
+# cell_as_text() that also accepts a missing (NA) row or column.
 venues_optional_cell_as_text <- function(raw_sheet, row, column) {
 
   if (
@@ -2101,6 +2137,7 @@ venues_optional_cell_as_text <- function(raw_sheet, row, column) {
 }
 
 
+# First column whose label matches one of `candidates`; NA when none.
 venues_first_label_column <- function(labels, candidates) {
 
   matches <- which(labels %in% normalise_excel_label(candidates))
@@ -2109,6 +2146,7 @@ venues_first_label_column <- function(labels, candidates) {
 }
 
 
+# Monthly summary block of the Casual Hours sheet: budgeted, paid and variance columns.
 find_venues_casual_hours_summary_layout <- function(raw_sheet) {
 
   empty_layout <- data.frame(
@@ -2172,6 +2210,7 @@ find_venues_casual_hours_summary_layout <- function(raw_sheet) {
 }
 
 
+# Pay-period detail block of the Casual Hours sheet (roster, fortnight, pay dates, hours).
 find_venues_casual_hours_detail_layout <- function(
   raw_sheet,
   summary_layout
@@ -2277,6 +2316,7 @@ find_venues_casual_hours_detail_layout <- function(
 }
 
 
+# Casual hours records from the monthly summary block.
 casual_hours_summary_records <- function(raw_sheet, workbook, layout) {
 
   if (nrow(layout) != 1L) {
@@ -2354,6 +2394,8 @@ casual_hours_summary_records <- function(raw_sheet, workbook, layout) {
 }
 
 
+# Which months have paid hours recorded in the pay-period rows, so unreported months stay
+# blank rather than zero.
 casual_hours_paid_reporting <- function(raw_sheet, layout) {
 
   empty_result <- list(
@@ -2417,6 +2459,7 @@ casual_hours_paid_reporting <- function(raw_sheet, layout) {
 }
 
 
+# Cleaned casual hours table: budgeted and paid hours per month (monthly summary only).
 clean_venues_tracking_report_casual_hours <- function(workbook) {
 
   raw_sheet <- workbook$casual_hours_sheet
@@ -2540,6 +2583,7 @@ empty_venues_casual_wages_table <- function() {
 }
 
 
+# Block titled "<report year> Casual Salaries" on the Casual Wages sheet and its columns.
 find_venues_casual_wages_layout <- function(raw_sheet, report_year) {
 
   empty_layout <- data.frame(
@@ -2622,6 +2666,7 @@ find_venues_casual_wages_layout <- function(raw_sheet, report_year) {
 }
 
 
+# Cleaned casual wages table: budget, actual and variance per month of the report year.
 clean_venues_tracking_report_casual_wages <- function(workbook) {
 
   raw_sheet <- workbook$casual_wages_sheet

@@ -1,0 +1,25 @@
+<header id="title-block-header" class="quarto-title-block default site-hero">
+  <div class="quarto-title-banner">
+    <div class="quarto-title column-body site-hero-inner">
+      $if(unit)$<p class="site-kicker"><span class="site-kicker-dot"></span>$unit$</p>$endif$
+      $if(title)$<h1 class="title">$title$</h1>$endif$
+      $if(subtitle)$<p class="subtitle lead">$subtitle$</p>$endif$
+      <div class="site-actions">
+        $if(dashboard-url)$<a class="site-button is-primary" href="$dashboard-url$" target="_blank" rel="noopener">Try the dashboard <span aria-hidden="true">&rarr;</span></a>$endif$
+        $if(repo-url)$<a class="site-button" href="$repo-url$" target="_blank" rel="noopener">View the code</a>$endif$
+        <a class="site-button is-quiet" href="report.pdf">Download PDF</a>
+      </div>
+      <dl class="site-facts">
+        $if(by-author)$
+        <div><dt>Team</dt><dd>$for(by-author)$$it.name.literal$$sep$ &amp; $endfor$</dd></div>
+        $endif$
+        $if(organization)$
+        <div><dt>Partner</dt><dd>$organization$</dd></div>
+        $endif$
+        $if(date)$
+        <div><dt>Published</dt><dd>$date$</dd></div>
+        $endif$
+      </dl>
+    </div>
+  </div>
+</header>

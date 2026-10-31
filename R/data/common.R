@@ -31,6 +31,7 @@ normalise_excel_label <- function(x) {
 excel_label_cache <- new.env(hash = TRUE, parent = emptyenv())
 
 
+# Zero-row validation issue table (level, source_file, sheet, message).
 empty_import_issue_table <- function() {
 
   data.frame(
@@ -43,6 +44,7 @@ empty_import_issue_table <- function() {
 }
 
 
+# One validation issue as a one-row data frame; level is "error" or "warning".
 make_import_issue <- function(
   level,
   source_file,
@@ -60,6 +62,7 @@ make_import_issue <- function(
 }
 
 
+# Stacks the non-empty data frames in `tables`, or returns `empty_table` when there are none.
 bind_import_tables <- function(tables, empty_table) {
 
   tables <- Filter(
@@ -116,6 +119,8 @@ records_to_table <- function(records, empty_table) {
 }
 
 
+# Worksheet names across all workbooks, in first-seen order (used to order the preview's sheet
+# tabs).
 workbook_source_sheet_order <- function(workbooks) {
 
   sheet_orders <- lapply(
@@ -135,6 +140,7 @@ workbook_source_sheet_order <- function(workbooks) {
 }
 
 
+# Trimmed text of one cell, with inner whitespace collapsed; NA for blank or out-of-range cells.
 cell_as_text <- function(raw_sheet, row, column) {
 
   if (
@@ -260,6 +266,8 @@ cache_sheet_cells <- function(raw_sheet) {
 }
 
 
+# The text or number matrix stored on a sheet by cache_sheet_cells(), or NULL when the sheet has
+# changed since (different size or rows).
 cached_sheet_cells <- function(raw_sheet, which) {
 
   cache <- attr(raw_sheet, which, exact = TRUE)
@@ -310,6 +318,8 @@ find_month_header_row <- function(raw_sheet, minimum_months) {
 }
 
 
+# Numeric value of one cell. Text such as "$1,200", "(350)" (negative) and "82.8%" (0.828) is
+# converted; NA when it is not a number.
 cell_as_number <- function(raw_sheet, row, column) {
 
   if (
@@ -370,6 +380,8 @@ cell_as_number <- function(raw_sheet, row, column) {
 }
 
 
+# Month number (1-12) from a date, an Excel date serial, a number 1-12 or a month name such as
+# "Jan" or "September"; NA otherwise.
 parse_month_number <- function(value) {
 
   if (length(value) == 0L || is.na(value)) {

@@ -1,6 +1,71 @@
 ---
 title: "Modelling resource and space for Monash Sport"
 subtitle: "ETC5543 Project Report"
-author: "Ayush Pandia, Ziqi Feng"
-format: html
+author:
+  - name: Ayush Pandia
+    affiliation: Monash University
+    email: apan0085@student.monash.edu
+  - name: Ziqi Feng
+    affiliation: Monash University
+    email: vfen0001@student.monash.edu
+organization: Monash Sport
+date: 2026-11-03
+
+# Shown on the website and usable in the text as {{< meta repo-url >}}.
+unit: ETC5543 Business Analytics Creative Activity
+repo-url: https://github.com/Vicky-FengZ/ETC5543-Monash-Sports
+dashboard-url: https://vicky-fengz.github.io/ETC5543-Monash-Sports/
 ---
+
+<!--
+How the report is rendered (PDF and website) is set in _quarto.yml.
+Render both with, in the RStudio Terminal:  quarto render report/report.qmd
+They are written to report/_output/.
+-->
+
+```{r}
+#| label: setup
+#| include: false
+# Software citations: references/packages.bib is rebuilt from the installed
+# packages on each render, so the versions cited match the ones used.
+cited <- c(
+  "base", "shiny", "bslib", "bsicons", "htmltools", "readxl", "writexl",
+  "shinylive", "renv", "knitr", "quarto"
+)
+cited <- cited[vapply(cited, requireNamespace, logical(1), quietly = TRUE)]
+knitr::write_bib(cited, file = "references/packages.bib")
+```
+
+# Abstract {.unnumbered}
+
+<!-- About 200 words, written last: aims, data, methods, main results. -->
+
+# Introduction {#sec-intro}
+
+<!-- Background, the problem, objectives, contributions, links to the
+repository ({{< meta repo-url >}}) and dashboard ({{< meta dashboard-url >}}). -->
+
+# Data {#sec-data}
+
+# System design and methods {#sec-methods}
+
+# The dashboard {#sec-dashboard}
+
+# Evaluation {#sec-evaluation}
+
+# Discussion {#sec-discussion}
+
+# Conclusion {#sec-conclusion}
+
+# Contributions {.unnumbered}
+
+# Use of generative AI {.unnumbered}
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
+
+{{< pagebreak >}}
+
+# Appendix {.appendix .unnumbered}
