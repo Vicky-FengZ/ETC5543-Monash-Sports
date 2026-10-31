@@ -170,7 +170,9 @@ expected_defaults <- c(
   "monthly_income_expenses",
   "annual_performance_trend",
   "budget_vs_actual",
+  "site_performance",
   "site_ranking",
+  "site_budget_performance",
   "site_revenue_opportunity",
   "site_discount_mix",
   "revenue_capture",
@@ -187,7 +189,9 @@ expected_overview_defaults <- c(
 )
 
 expected_site_defaults <- c(
+  "site_performance",
   "site_ranking",
+  "site_budget_performance",
   "site_revenue_opportunity",
   "site_discount_mix",
   "site_values"
@@ -702,9 +706,9 @@ shiny::testServer(
         "Net Result"
       ),
       metric_budget_vs_actual = "Expenses",
-      metric_site_ranking = "Income"
+      metric_site_ranking = "Income",
+      metric_facility_performance = "Expenses"
     )
-
     session$flushReact()
 
     stopifnot(
@@ -725,6 +729,11 @@ shiny::testServer(
       identical(
         input$metric_site_ranking,
         "Income"
+      ),
+
+      identical(
+        input$metric_facility_performance,
+        "Expenses"
       ),
 
       !"metric" %in%

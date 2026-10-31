@@ -77,7 +77,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     focus = "Site",
     source_group = "monthly",
     required_data = "finance",
-    default_selected = FALSE,
+    default_selected = TRUE,
     preferred_size = "wide",
     supports_year_review = TRUE,
     supports_comparison = TRUE
@@ -103,7 +103,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     focus = "Site",
     source_group = "monthly",
     required_data = "finance",
-    default_selected = FALSE,
+    default_selected = TRUE,
     preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
