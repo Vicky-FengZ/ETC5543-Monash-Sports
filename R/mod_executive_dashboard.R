@@ -1276,7 +1276,9 @@ mod_executive_dashboard_server <- function(
             dashboard_data =
               dashboard_data_value(),
             category =
-              active_category()
+              active_category(),
+            context =
+              executive_context()
           )
 
         focus <- active_focus()

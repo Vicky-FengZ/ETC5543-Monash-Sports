@@ -476,6 +476,168 @@ stopifnot(
   )$available
 )
 
+# -------------------------------------------------------------------------
+# Context-aware Executive visual availability
+# -------------------------------------------------------------------------
+
+context_detailed_data <- list(
+
+  site_reports = list(
+
+    finance = data.frame(
+      report_year = c(
+        2025L,
+        2027L,
+        2027L
+      ),
+      report_unit = c(
+        "Aquatics",
+        "Aquatics",
+        "Esports"
+      ),
+      campus = c(
+        "Clayton",
+        "Clayton",
+        "Clayton"
+      ),
+      business_unit = c(
+        "Pool Hire",
+        "Pool Hire",
+        "Esports Arena"
+      ),
+      stringsAsFactors = FALSE
+    )
+  )
+)
+
+
+aquatics_2027_context <- list(
+  view_mode = "Year Review",
+  year = "2027",
+  comparison_year = NULL,
+  site = "Aquatics Clayton"
+)
+
+
+stopifnot(
+  executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      aquatics_2027_context
+  )$available
+)
+
+
+aquatics_2026_context <- list(
+  view_mode = "Year Review",
+  year = "2026",
+  comparison_year = NULL,
+  site = "Aquatics Clayton"
+)
+
+
+aquatics_2026_availability <-
+  executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      aquatics_2026_context
+  )
+
+
+stopifnot(
+  !aquatics_2026_availability$available,
+  grepl(
+    "selected context",
+    aquatics_2026_availability$reason,
+    fixed = TRUE
+  )
+)
+
+
+esports_2027_context <- list(
+  view_mode = "Year Review",
+  year = "2027",
+  comparison_year = NULL,
+  site = "Esports"
+)
+
+
+stopifnot(
+  executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      esports_2027_context
+  )$available
+)
+
+
+esports_2025_context <- list(
+  view_mode = "Year Review",
+  year = "2025",
+  comparison_year = NULL,
+  site = "Esports"
+)
+
+
+stopifnot(
+  !executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      esports_2025_context
+  )$available
+)
+
+
+aquatics_comparison_context <- list(
+  view_mode = "Comparison",
+  year = "2027",
+  comparison_year = "2025",
+  site = "Aquatics Clayton"
+)
+
+
+stopifnot(
+  executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      aquatics_comparison_context
+  )$available
+)
+
+
+missing_comparison_context <- list(
+  view_mode = "Comparison",
+  year = "2027",
+  comparison_year = "2026",
+  site = "Aquatics Clayton"
+)
+
+
+stopifnot(
+  !executive_visual_availability(
+    dashboard_data =
+      context_detailed_data,
+    visual_id =
+      "facility_ranking",
+    context =
+      missing_comparison_context
+  )$available
+)
 
 cat(
   "PASS Executive Dashboard visual registry\n"
@@ -988,6 +1150,404 @@ shiny::testServer(
   }
 )
 
+# -------------------------------------------------------------------------
+# Visual picker respects selected Executive context
+# -------------------------------------------------------------------------
+
+context_picker_data <- shiny::reactiveVal(
+  list(
+
+    monthly_reports = NULL,
+
+    site_reports = list(
+
+      finance = data.frame(
+        report_year = c(
+          2025L,
+          2027L
+        ),
+        report_unit = c(
+          "Aquatics",
+          "Aquatics"
+        ),
+        campus = c(
+          "Clayton",
+          "Clayton"
+        ),
+        business_unit = c(
+          "Pool Hire",
+          "Pool Hire"
+        ),
+        stringsAsFactors = FALSE
+      )
+    ),
+
+    venues_reports = NULL
+  )
+)
+
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = context_picker_data
+  ),
+  {
+
+    # Move to Site focus first.
+    session$setInputs(
+      dashboard_section = "site"
+    )
+
+    session$flushReact()
+
+
+    # Aquatics has Detailed finance data in 2027.
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2027",
+      site = "Aquatics Clayton"
+    )
+
+    session$flushReact()
+
+
+    registry_2027 <- picker_registry()
+
+    facility_2027 <- registry_2027[
+      registry_2027$id ==
+        "facility_ranking",
+      ,
+      drop = FALSE
+    ]
+
+
+    stopifnot(
+      nrow(facility_2027) == 1L,
+      isTRUE(
+        facility_2027$available[[1L]]
+      )
+    )
+
+
+    # The same visual must become unavailable when the selected
+    # year has no Detailed Site Report data.
+    session$setInputs(
+      year = "2026"
+    )
+
+    session$flushReact()
+
+
+    registry_2026 <- picker_registry()
+
+    facility_2026 <- registry_2026[
+      registry_2026$id ==
+        "facility_ranking",
+      ,
+      drop = FALSE
+    ]
+
+
+    stopifnot(
+      nrow(facility_2026) == 1L,
+      !facility_2026$available[[1L]],
+      grepl(
+        "selected context",
+        facility_2026$availability_reason[[1L]],
+        fixed = TRUE
+      )
+    )
+
+
+    # Selecting a site with no Detailed report must also make the
+    # facility visual unavailable.
+    session$setInputs(
+      year = "2027",
+      site = "Esports"
+    )
+
+    session$flushReact()
+
+
+    registry_esports <- picker_registry()
+
+    facility_esports <- registry_esports[
+      registry_esports$id ==
+        "facility_ranking",
+      ,
+      drop = FALSE
+    ]
+
+
+    stopifnot(
+      nrow(facility_esports) == 1L,
+      !facility_esports$available[[1L]]
+    )
+  }
+)
+
+# -------------------------------------------------------------------------
+# Future years and newly discovered sites
+# -------------------------------------------------------------------------
+
+future_executive_data <- shiny::reactiveVal(
+  list(
+
+    monthly_reports = list(
+
+      finance = data.frame(
+        report_year = c(
+          2027L,
+          2028L
+        ),
+        site = c(
+          "Esports",
+          "Esports"
+        ),
+        value = c(
+          100,
+          125
+        ),
+        stringsAsFactors = FALSE
+      ),
+
+      discounts = data.frame(
+        report_year = c(
+          2027L,
+          2028L
+        ),
+        site = c(
+          "Esports",
+          "Esports"
+        ),
+        value = c(
+          10,
+          12
+        ),
+        stringsAsFactors = FALSE
+      )
+    ),
+
+    site_reports = list(
+
+      finance = data.frame(
+        report_year = c(
+          2027L,
+          2028L
+        ),
+        report_unit = c(
+          "Esports",
+          "Esports"
+        ),
+        campus = c(
+          "Clayton",
+          "Clayton"
+        ),
+        business_unit = c(
+          "Esports Arena",
+          "Esports Arena"
+        ),
+        stringsAsFactors = FALSE
+      )
+    ),
+
+    venues_reports = NULL
+  )
+)
+
+future_monthly_fixture <- list(
+
+  finance = data.frame(
+    report_year = c(
+      2028L,
+      2028L
+    ),
+    site = c(
+      "Aquatics Clayton",
+      "Esports"
+    ),
+    value = c(
+      100,
+      200
+    ),
+    stringsAsFactors = FALSE
+  ),
+
+  discounts = data.frame(
+    report_year = c(
+      2028L,
+      2028L
+    ),
+    site = c(
+      "Aquatics Clayton",
+      "Esports"
+    ),
+    value = c(
+      10,
+      20
+    ),
+    stringsAsFactors = FALSE
+  )
+)
+
+
+future_esports_reports <-
+  executive_filter_monthly_reports_by_site(
+    monthly_reports =
+      future_monthly_fixture,
+    site =
+      "Esports"
+  )
+
+
+stopifnot(
+  nrow(
+    future_esports_reports$finance
+  ) == 1L,
+
+  identical(
+    future_esports_reports$finance$site[[1L]],
+    "Esports"
+  ),
+
+  identical(
+    future_esports_reports$finance$report_year[[1L]],
+    2028L
+  ),
+
+  nrow(
+    future_esports_reports$discounts
+  ) == 1L
+)
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = future_executive_data
+  ),
+  {
+
+    session$setInputs(
+      dashboard_section = "site",
+      view_mode = "Year Review",
+      year = "2028",
+      site = "Esports"
+    )
+
+    session$flushReact()
+
+
+    future_context <- executive_context()
+
+
+    stopifnot(
+      identical(
+        future_context$year,
+        "2028"
+      ),
+      identical(
+        future_context$site,
+        "Esports"
+      )
+    )
+
+
+    stopifnot(
+      identical(
+        executive_context_years(
+          future_context
+        ),
+        2028L
+      )
+    )
+
+
+    future_registry <- picker_registry()
+
+
+    future_site_ranking <- future_registry[
+      future_registry$id ==
+        "site_ranking",
+      ,
+      drop = FALSE
+    ]
+
+
+    future_facility_ranking <- future_registry[
+      future_registry$id ==
+        "facility_ranking",
+      ,
+      drop = FALSE
+    ]
+
+
+    stopifnot(
+      nrow(future_site_ranking) == 1L,
+      isTRUE(
+        future_site_ranking$available[[1L]]
+      ),
+
+      nrow(future_facility_ranking) == 1L,
+      isTRUE(
+        future_facility_ranking$available[[1L]]
+      )
+    )
+
+
+    # Future-year comparison must also work without any APP_YEARS
+    # assumption inside the Executive context/availability layer.
+    session$setInputs(
+      view_mode = "Comparison",
+      year = "2028",
+      comparison_year = "2027",
+      site = "Esports"
+    )
+
+    session$flushReact()
+
+
+    future_comparison_context <-
+      executive_context()
+
+
+    stopifnot(
+      identical(
+        executive_context_years(
+          future_comparison_context
+        ),
+        c(
+          2027L,
+          2028L
+        )
+      )
+    )
+
+
+    comparison_registry <-
+      picker_registry()
+
+
+    comparison_facility_ranking <-
+      comparison_registry[
+        comparison_registry$id ==
+          "facility_ranking",
+        ,
+        drop = FALSE
+      ]
+
+
+    stopifnot(
+      nrow(
+        comparison_facility_ranking
+      ) == 1L,
+
+      isTRUE(
+        comparison_facility_ranking$available[[1L]]
+      )
+    )
+  }
+)
 
 cat(
   "PASS Executive Dashboard visual picker\n"

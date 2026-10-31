@@ -621,10 +621,205 @@ executive_dataset_available <- function(
   length(value) > 0L
 }
 
+executive_availability_context_years <- function(
+    context
+) {
+
+  if (
+    is.null(context) ||
+      !is.list(context) ||
+      is.null(context$year)
+  ) {
+    return(integer())
+  }
+
+  years <- context$year
+
+  if (
+    identical(
+      context$view_mode,
+      "Comparison"
+    ) &&
+      !is.null(context$comparison_year)
+  ) {
+
+    years <- c(
+      years,
+      context$comparison_year
+    )
+  }
+
+  years <- suppressWarnings(
+    as.integer(years)
+  )
+
+  sort(
+    unique(
+      years[
+        !is.na(years)
+      ]
+    )
+  )
+}
+
+
+executive_dataset_available_in_context <- function(
+    source_data,
+    dataset,
+    source_group,
+    context = NULL
+) {
+
+  if (
+    !executive_dataset_available(
+      source_data = source_data,
+      dataset = dataset
+    )
+  ) {
+    return(FALSE)
+  }
+
+  if (
+    is.null(context) ||
+      !is.list(context)
+  ) {
+    return(TRUE)
+  }
+
+  value <- source_data[[dataset]]
+
+  if (!is.data.frame(value)) {
+    return(TRUE)
+  }
+
+  rows <- value
+
+  selected_site <- if (
+    !is.null(context$site) &&
+      length(context$site) > 0L
+  ) {
+    trimws(
+      as.character(
+        context$site[[1L]]
+      )
+    )
+  } else {
+    ""
+  }
+
+  use_site_context <-
+    nzchar(selected_site) &&
+    !identical(
+      selected_site,
+      "All Monash Sport"
+    )
+
+  if (
+    use_site_context &&
+      identical(
+        source_group,
+        "monthly"
+      ) &&
+      "site" %in% names(rows)
+  ) {
+
+    site_values <- trimws(
+      as.character(
+        rows$site
+      )
+    )
+
+    rows <- rows[
+      !is.na(site_values) &
+        site_values == selected_site,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (
+    use_site_context &&
+      identical(
+        source_group,
+        "detailed"
+      )
+  ) {
+
+    if (
+      !all(
+        c(
+          "report_unit",
+          "campus"
+        ) %in% names(rows)
+      ) ||
+        !exists(
+          "facility_site_key",
+          mode = "function",
+          inherits = TRUE
+        )
+    ) {
+      return(FALSE)
+    }
+
+    key <- facility_site_key(
+      selected_site,
+      facility_data = rows
+    )
+
+    if (is.null(key)) {
+      return(FALSE)
+    }
+
+    rows <- rows[
+      !is.na(rows$report_unit) &
+        !is.na(rows$campus) &
+        rows$report_unit ==
+          key$report_unit &
+        rows$campus ==
+          key$campus,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  if (nrow(rows) == 0L) {
+    return(FALSE)
+  }
+
+  years <-
+    executive_availability_context_years(
+      context
+    )
+
+  if (
+    length(years) > 0L &&
+      "report_year" %in% names(rows)
+  ) {
+
+    available_years <- suppressWarnings(
+      as.integer(
+        rows$report_year
+      )
+    )
+
+    available_years <- unique(
+      available_years[
+        !is.na(available_years)
+      ]
+    )
+
+    if (!all(years %in% available_years)) {
+      return(FALSE)
+    }
+  }
+
+  TRUE
+}
 
 executive_visual_availability <- function(
     dashboard_data,
-    visual_id
+    visual_id,
+    context = NULL
 ) {
 
   if (
@@ -694,9 +889,11 @@ source_data <- executive_source_data(
     required_data,
     function(dataset) {
 
-      executive_dataset_available(
+      executive_dataset_available_in_context(
         source_data = source_data,
-        dataset = dataset
+        dataset = dataset,
+        source_group = visual$source_group,
+        context = context
       )
     },
     logical(1)
@@ -715,7 +912,11 @@ source_data <- executive_source_data(
         source_available = TRUE,
         missing_data = missing_data,
         reason = paste0(
-          "Required data unavailable: ",
+          if (is.null(context)) {
+            "Required data unavailable: "
+          } else {
+            "Required data unavailable for selected context: "
+          },
           paste(
             missing_data,
             collapse = ", "
@@ -736,7 +937,8 @@ source_data <- executive_source_data(
 
 executive_registry_availability_table <- function(
     dashboard_data,
-    category = NULL
+    category = NULL,
+    context = NULL
 ) {
 
   registry <- executive_registry_table()
@@ -765,7 +967,8 @@ executive_registry_availability_table <- function(
 
       executive_visual_availability(
         dashboard_data = dashboard_data,
-        visual_id = visual_id
+        visual_id = visual_id,
+        context = context
       )
     }
   )

@@ -91,13 +91,36 @@ shiny::testServer(mod_executive_dashboard_server, args = list(data = consistency
     output$kpi_net_result == format_compact_currency(expected$net_actual)
   )
 
-  # One site on the Executive Dashboard matches that site everywhere else.
-  session$setInputs(site = consistency_site)
+  # Site-level Executive figures must be tested in the Site focus.
+  # Change focus first so the module can restore its saved Site context.
+  session$setInputs(
+    dashboard_section = "site"
+  )
+
   session$flushReact()
+
+
+  # Then apply the site-specific context after the focus switch has settled.
+  session$setInputs(
+    view_mode = "Year Review",
+    year = "2025",
+    site = consistency_site
+  )
+
+  session$flushReact()
+
+
   same_values(
     executive_kpi_finance(),
-    site_finance_2025[site_finance_2025$site == consistency_site, , drop = FALSE],
-    paste("Executive Dashboard and site calculation for", consistency_site)
+    site_finance_2025[
+      site_finance_2025$site == consistency_site,
+      ,
+      drop = FALSE
+    ],
+    paste(
+      "Executive Dashboard Site focus and site calculation for",
+      consistency_site
+    )
   )
 })
 
