@@ -1429,6 +1429,72 @@ body {
   width: 100%;
 }
 
+/* Executive Dashboard focus switcher ------------------------------------ */
+
+.executive-dashboard-navigation .shiny-input-radiogroup {
+  width: fit-content;
+  margin-bottom: 8px;
+}
+
+.executive-dashboard-navigation .shiny-options-group {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--ms-grey-3);
+  border-radius: var(--ms-radius);
+  background: var(--ms-blue-tint);
+}
+
+.executive-dashboard-navigation .radio-inline {
+  position: relative;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.executive-dashboard-navigation .radio-inline input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.executive-dashboard-navigation .radio-inline span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  min-height: 38px;
+  padding: 8px 18px;
+  border-radius: var(--ms-radius);
+  color: var(--ms-blueberry);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.executive-dashboard-navigation .radio-inline:hover span {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.executive-dashboard-navigation .radio-inline input:checked + span {
+  background: var(--ms-blueberry);
+  color: #FFFFFF;
+  box-shadow:
+    inset 0 -3px 0 var(--ms-heritage-blue),
+    0 2px 6px rgba(18, 18, 86, 0.16);
+}
+
+.executive-dashboard-navigation .radio-inline input:focus-visible + span {
+  outline: 3px solid rgba(0, 109, 174, 0.28);
+  outline-offset: 2px;
+}
+
 .executive-dashboard-navigation > .nav {
   width: fit-content;
   margin-bottom: 6px;
@@ -2078,11 +2144,34 @@ body {
 .executive-dashboard-heading,
 
 .executive-dashboard-page:fullscreen
-.executive-dashboard-navigation .nav-pills,
-
-.executive-dashboard-page:fullscreen
 .executive-dashboard-filter-bar {
   display: none !important;
+}
+
+.executive-dashboard-page:fullscreen
+.executive-dashboard-navigation {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.executive-dashboard-page:fullscreen
+.executive-dashboard-navigation .shiny-input-radiogroup {
+  margin-bottom: 0;
+}
+
+.executive-dashboard-page:fullscreen
+.executive-dashboard-navigation .shiny-options-group {
+  padding: 3px;
+  gap: 3px;
+}
+
+.executive-dashboard-page:fullscreen
+.executive-dashboard-navigation .radio-inline span {
+  min-width: 92px;
+  min-height: 30px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
 }
 
 .executive-dashboard-page:fullscreen

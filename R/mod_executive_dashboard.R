@@ -315,6 +315,64 @@ executive_context_years <- function(
   )
 }
 
+executive_context_trend_years <- function(
+    context,
+    available_years
+  ) {
+
+    available_years <-
+      suppressWarnings(
+        as.integer(
+          available_years
+        )
+      )
+
+    available_years <-
+      sort(
+        unique(
+          available_years[
+            !is.na(available_years)
+          ]
+        )
+      )
+
+    if (
+      is.null(context) ||
+        is.null(context$year)
+    ) {
+      return(integer())
+    }
+
+    selected_year <-
+      suppressWarnings(
+        as.integer(
+          context$year[[1L]]
+        )
+      )
+
+    if (is.na(selected_year)) {
+      return(integer())
+    }
+
+    if (
+      identical(
+        context$view_mode,
+        "Comparison"
+      )
+    ) {
+
+      return(
+        executive_context_years(
+          context
+        )
+      )
+    }
+
+    available_years[
+      available_years <= selected_year
+    ]
+  }
+
 executive_visual_metric_control_ui <- function(
     visual_id,
     ns
@@ -763,20 +821,25 @@ mod_executive_dashboard_ui <- function(id) {
         )
       ),
 
-      # Finance / Metrics switcher ----------------------------------------
+      # Executive Dashboard focus switcher -------------------------------
       div(
         class = "executive-dashboard-navigation",
 
-        navset_pill(
-          id = ns("dashboard_section"),
+        radioButtons(
+          ns("dashboard_section"),
+          label = NULL,
+          choices = c(
+            "Overview" = "finance",
+            "Site" = "site",
+            "Metrics" = "metrics"
+          ),
           selected = "finance",
+          inline = TRUE
+        )
+      ),
 
-          nav_panel(
-            "Finance",
-            value = "finance",
-
-            div(
-              class = "pt-3",
+      div(
+        class = "pt-3",
 
               # Dashboard controls ----------------------------------------
               div(
@@ -1005,38 +1068,9 @@ mod_executive_dashboard_ui <- function(id) {
                 ns("finance_supporting_components")
               )
             )
-          ),
-
-          nav_panel(
-            "Metrics",
-              value = "metrics",
-
-              div(
-                class = "pt-3",
-
-                card(
-                  full_screen = TRUE,
-
-                  card_header(
-                    "Metrics Dashboard"
-                  ),
-
-                  placeholder_chart(
-                    "Operational and participation metrics",
-                    paste(
-                      "Direct Visits, Indirect Visits, memberships,",
-                      "enrolments and venue metrics will be added",
-                      "as those dashboard sections are completed."
-                    )
-                  )
-                )
-              )
-            )
           )
         )
-      )
-    )
-  }
+      }
 
 mod_executive_dashboard_server <- function(
     id,
@@ -1090,6 +1124,19 @@ mod_executive_dashboard_server <- function(
         "Finance"
       })
 
+      active_focus <- reactive({
+
+        switch(
+          input$dashboard_section,
+
+          site = "Site",
+
+          metrics = "Metrics",
+
+          "Overview"
+        )
+      })
+
 
       # -------------------------------------------------------------------
       # Selected visuals
@@ -1099,14 +1146,22 @@ mod_executive_dashboard_server <- function(
 
       selected_visuals <- reactiveValues(
 
-        Finance =
+        Overview =
           executive_default_visual_ids(
-            "Finance"
+            category = "Finance",
+            focus = "Overview"
+          ),
+
+        Site =
+          executive_default_visual_ids(
+            category = "Finance",
+            focus = "Site"
           ),
 
         Metrics =
           executive_default_visual_ids(
-            "Metrics"
+            category = "Metrics",
+            focus = "Metrics"
           )
       )
 
@@ -1117,12 +1172,21 @@ mod_executive_dashboard_server <- function(
 
       picker_registry <- reactive({
 
-        executive_registry_availability_table(
-          dashboard_data =
-            dashboard_data_value(),
-          category =
-            active_category()
-        )
+        registry <-
+          executive_registry_availability_table(
+            dashboard_data =
+              dashboard_data_value(),
+            category =
+              active_category()
+          )
+
+        focus <- active_focus()
+
+        registry[
+          registry$focus == focus,
+          ,
+          drop = FALSE
+        ]
       })
 
       # -------------------------------------------------------------------
@@ -1256,7 +1320,11 @@ mod_executive_dashboard_server <- function(
             executive_scoped_monthly_reports()
           )
 
-        years <- executive_selected_years()
+        years <-
+          executive_context_trend_years(
+            context = executive_context(),
+            available_years = x$report_year
+          )
 
         if (length(years) == 0L) {
           return(x[0, , drop = FALSE])
@@ -1379,7 +1447,11 @@ mod_executive_dashboard_server <- function(
             executive_scoped_monthly_reports()
           )
 
-        years <- executive_selected_years()
+        years <-
+          executive_context_trend_years(
+            context = executive_context(),
+            available_years = x$report_year
+          )
 
         if (length(years) == 0L) {
           return(x[0, , drop = FALSE])
@@ -2571,14 +2643,51 @@ mod_executive_dashboard_server <- function(
             "All Sites",
             sep = " · "
           )
+        
+        trend_context_label <- if (
+          identical(
+            context$view_mode,
+            "Comparison"
+          )
+        ) {
+
+          paste(
+            "Comparison",
+            paste0(
+              context$year,
+              " vs ",
+              context$comparison_year
+            ),
+            context$site,
+            sep = " · "
+          )
+
+        } else {
+
+          paste(
+            "History through",
+            context$year,
+            context$site,
+            sep = " · "
+          )
+        }
 
 
         context_label_overrides <-
           c(
+            annual_performance_trend =
+              trend_context_label,
+
+            revenue_capture =
+              trend_context_label,
+
             site_performance =
               site_snapshot_label,
-        
+
             site_ranking =
+              site_snapshot_label,
+
+            site_budget_performance =
               site_snapshot_label,
 
             site_revenue_opportunity =
@@ -2591,7 +2700,7 @@ mod_executive_dashboard_server <- function(
 
         executive_visual_grid_ui(
           visual_ids =
-            selected_visuals$Finance,
+            selected_visuals[[active_focus()]],
 
           context_label =
             context_label,
@@ -2611,7 +2720,7 @@ mod_executive_dashboard_server <- function(
 
         executive_supporting_components_ui(
           visual_ids =
-            selected_visuals$Finance,
+            selected_visuals[[active_focus()]],
           ns = ns
         )
       })
@@ -2660,6 +2769,7 @@ mod_executive_dashboard_server <- function(
           )
         }
 
+        focus <- active_focus()
 
         source_groups <- intersect(
           names(EXECUTIVE_SOURCE_LABELS),
@@ -2713,7 +2823,7 @@ mod_executive_dashboard_server <- function(
 
 
             current_selection <-
-              selected_visuals[[category]]
+              selected_visuals[[focus]]
 
             available_choices <- if (
               available_count > 0L
@@ -3244,13 +3354,14 @@ mod_executive_dashboard_server <- function(
 
           registry <- picker_registry()
           category <- active_category()
+          focus <- active_focus()
 
           if (
             is.null(registry) ||
               nrow(registry) == 0L
           ) {
 
-            selected_visuals[[category]] <- character()
+            selected_visuals[[focus]] <- character()
 
             removeModal()
 
@@ -3290,7 +3401,7 @@ mod_executive_dashboard_server <- function(
           ]
 
 
-          selected_visuals[[category]] <- chosen
+          selected_visuals[[focus]] <- chosen
           removeModal()
         },
         ignoreInit = TRUE
@@ -3306,8 +3417,10 @@ mod_executive_dashboard_server <- function(
 
           selected_visuals = reactive({
             list(
-              Finance =
-                selected_visuals$Finance,
+              Overview =
+                selected_visuals$Overview,
+              Site =
+                selected_visuals$Site,
               Metrics =
                 selected_visuals$Metrics
             )
@@ -3315,6 +3428,9 @@ mod_executive_dashboard_server <- function(
 
           active_category =
             active_category,
+
+          active_focus =
+            active_focus,
 
           registry =
             picker_registry,
