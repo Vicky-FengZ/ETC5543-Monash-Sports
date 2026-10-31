@@ -294,25 +294,10 @@ body {
   margin: 0 auto;
 }
 
-/* Upload all reports, locking and plain-language upload messages. */
+/* Add data card, locking and plain-language upload messages. */
 .basic-upload-all-card {
   margin-bottom: 18px;
   border-color: var(--ms-blue-tint-border);
-}
-
-.basic-upload-all-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.basic-upload-recommended {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--ms-blue-tint);
-  color: var(--ms-monash-blue-dark);
-  font-size: 0.72rem;
-  font-weight: 600;
 }
 
 .basic-upload-all-card .shiny-input-container {
@@ -320,11 +305,12 @@ body {
   margin-bottom: 8px;
 }
 
-.basic-upload-section-label {
-  margin: 4px 0 10px;
-  color: var(--ms-text-secondary);
-  font-size: 0.9rem;
-  font-weight: 600;
+.basic-upload-all-card > .card-body {
+  gap: 12px;
+}
+
+.basic-upload-all-card .bslib-grid {
+  margin-bottom: 0;
 }
 
 .basic-upload-banner {
@@ -392,25 +378,6 @@ body {
   color: #B91C1C;
 }
 
-.basic-saved-data-card {
-  margin-bottom: 18px;
-}
-
-.basic-saved-data-card .basic-upload-all-header small {
-  font-weight: 400;
-}
-
-.basic-saved-data-column > strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.basic-saved-data-column .shiny-input-container {
-  width: 100%;
-  margin-bottom: 8px;
-}
-
-.basic-saved-data-summary,
 .basic-saved-data-manifest ul {
   margin: 6px 0 10px;
   padding-left: 18px;
@@ -464,42 +431,76 @@ body {
   color: var(--ms-text-secondary);
 }
 
-.basic-upload-source-card {
-  height: 100%;
-}
-
-.basic-upload-source-card > .card-body {
-  height: 100%;
-  display: flex;
-}
-
-.basic-upload-zone {
-  width: 100%;
-  min-height: 310px;
-  padding: 24px 20px;
-  border: 2px dashed var(--ms-grey-border);
-  border-radius: var(--ms-radius);
-  background: var(--ms-surface-subtle);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.basic-upload-zone h5 {
-  margin: 14px 0 7px;
-}
-
 .basic-upload-description {
-  min-height: 3rem;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   color: var(--ms-grey-1);
 }
 
-.basic-upload-zone .form-group {
-  width: 100%;
-  margin-bottom: 5px;
+/* Messages under the Add data buttons. Empty outputs must stay displayed:
+   Shiny does not render outputs that are hidden. */
+.basic-upload-feedback .basic-upload-notice {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+/* Collapsed help under Add data: naming rules and blank templates. */
+.basic-upload-help {
+  margin-top: 0;
+  border-top: 1px solid var(--ms-grey-3);
+  padding-top: 10px;
+}
+
+.basic-upload-help summary {
+  cursor: pointer;
+  color: var(--ms-monash-blue-dark);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.basic-upload-help-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 0.88rem;
+}
+
+.basic-upload-help-body ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.basic-upload-help-body .basic-template-download {
+  margin-top: 0;
+}
+
+/* Workbooks whose names were not recognised: pick a report type. */
+.basic-upload-assign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.basic-upload-assign-name {
+  flex: 1 1 220px;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.basic-upload-assign .form-select {
+  width: auto;
+  min-width: 210px;
+}
+
+/* What Save current data will keep, above the file list. */
+.basic-saved-data-strip {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface-subtle);
+  font-size: 0.88rem;
 }
 
 .basic-upload-empty {
@@ -518,10 +519,17 @@ body {
 
 .basic-upload-status-card-header {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
   width: 100%;
+}
+
+.basic-upload-status-card-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .basic-upload-status-card-header strong {
@@ -1358,15 +1366,15 @@ body {
 
   .basic-upload-status-card-header {
     align-items: flex-start;
-    gap: 4px;
+    gap: 8px;
+  }
+
+  .basic-upload-help-body {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .data-section-navigation .nav-pills .nav-link {
     padding-inline: 10px;
-  }
-
-  .basic-upload-zone {
-    min-height: 280px;
   }
 
   .cleaned-preview-data-header {

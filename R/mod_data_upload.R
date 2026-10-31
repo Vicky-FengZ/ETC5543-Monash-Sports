@@ -32,21 +32,15 @@ classify_report_upload <- function(file_names) {
 }
 
 
-# Hint added to a failed file when its name suggests another upload area.
-basic_upload_mismatch_hint <- function(file_name, report_type) {
-
-  guessed <- classify_report_upload(file_name)
-
-  if (is.na(guessed) || identical(guessed, report_type)) {
+# Hint added to a failed workbook whose report type the user chose (its name
+# matched no type), in case the wrong type was picked.
+basic_upload_type_hint <- function(report_type, chosen = FALSE) {
+  if (!isTRUE(chosen)) {
     return("")
   }
-
   paste0(
-    " The file name looks like one of the ",
-    BASIC_UPLOAD_REPORT_TYPES[[guessed]],
-    "; try Upload all reports or the ",
-    BASIC_UPLOAD_REPORT_TYPES[[guessed]],
-    " area."
+    " Check that ", BASIC_UPLOAD_REPORT_TYPES[[report_type]],
+    " is the right report type for this workbook."
   )
 }
 
@@ -65,7 +59,18 @@ basic_upload_script <- function() {
 
   function setLocked(area, locked) {
     area.classList.toggle('is-locked', locked);
-    area.querySelectorAll('input[type=file]').forEach(function (input) { input.disabled = locked; });
+    area.querySelectorAll('input[type=file], .basic-upload-assign select, .basic-upload-assign button')
+      .forEach(function (input) { input.disabled = locked; });
+  }
+
+  // Browsers fire no change event when the same files are chosen again, so
+  // the selection is cleared once the server has read it. Choosing an
+  // updated report with the same name (or retrying a failed upload) then
+  // works as expected.
+  function clearSelection(area) {
+    area.querySelectorAll('input[type=file]').forEach(function (input) {
+      try { input.value = ''; } catch (error) {}
+    });
   }
 
   function showBanner(area, kind, title, text) {
@@ -90,7 +95,10 @@ basic_upload_script <- function() {
     var area = areaOf(input);
     area.querySelectorAll('.progress-bar').forEach(function (bar) { delete bar.dataset.uploadFailed; });
     setLocked(area, true);
-    if (input.closest('.basic-saved-data-card')) {
+    var saved = Array.prototype.every.call(input.files, function (file) {
+      return /\\.rds$/i.test(file.name);
+    });
+    if (saved) {
       showBanner(area, 'busy', 'Loading saved data\u2026',
         'Keep this page open. Other uploads are paused until this finishes.');
       return;
@@ -99,6 +107,26 @@ basic_upload_script <- function() {
       'Uploading and parsing ' + count + (count === 1 ? ' file' : ' files') + '\u2026',
       'Keep this page open. Other uploads are paused until this finishes; ' +
       'large batches can take a few minutes.');
+  });
+
+  // A workbook whose name was not recognised: parse it as the chosen type.
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest ? event.target.closest('.basic-upload-assign button') : null;
+    if (!button || button.disabled || !window.Shiny) return;
+    var row = button.closest('.basic-upload-assign');
+    if (button.dataset.action === 'dismiss') {
+      Shiny.setInputValue(button.dataset.input, { id: row.dataset.fileId, action: 'dismiss' },
+        { priority: 'event' });
+      return;
+    }
+    var select = row.querySelector('select');
+    if (!select.value) { select.focus(); return; }
+    var area = areaOf(row);
+    setLocked(area, true);
+    showBanner(area, 'busy', 'Parsing ' + row.dataset.fileName + '\u2026',
+      'Keep this page open. Other uploads are paused until this finishes.');
+    Shiny.setInputValue(button.dataset.input,
+      { id: row.dataset.fileId, action: 'add', type: select.value }, { priority: 'event' });
   });
 
   // Shiny marks a failed transfer with a red progress bar reading 'error'.
@@ -113,6 +141,7 @@ basic_upload_script <- function() {
       if (!failed) return;
       bar.dataset.uploadFailed = '1';
       setLocked(area, false);
+      clearSelection(area);
       showBanner(area, 'error', 'The upload did not finish.',
         'These files did not reach the dashboard and were not parsed. Wait until ' +
         'any parsing has finished, then select the files again.');
@@ -143,6 +172,7 @@ basic_upload_script <- function() {
       var area = document.getElementById(message.area);
       if (!area) return;
       setLocked(area, false);
+      clearSelection(area);
       var banner = area.querySelector('.basic-upload-banner');
       if (banner && banner.classList.contains('is-busy')) banner.hidden = true;
     });
@@ -2018,48 +2048,51 @@ basic_cleaned_export_filename <- function(report_type, years = character()) {
 }
 
 
-# Upload card for one report type: file picker, description and template download link.
-basic_upload_card <- function(
-  ns,
-  title,
-  input_id,
-  heading,
-  description,
-  icon,
-  template_filename = NULL
-) {
-  card(
-    class = "basic-upload-source-card",
-    card_header(title),
-    card_body(
+# Collapsed help under the Add data card: how files are recognised by name,
+# and the blank Excel templates for each report type.
+basic_upload_naming_help <- function() {
+  template <- function(file_name, label) {
+    tags$li(tags$a(
+      class = "basic-template-download",
+      href = paste0("templates/", utils::URLencode(file_name)),
+      download = file_name,
+      bs_icon("file-earmark-arrow-down"),
+      label
+    ))
+  }
+
+  tags$details(
+    class = "basic-upload-help",
+    tags$summary("Excel templates and file naming"),
+    div(
+      class = "basic-upload-help-body",
       div(
-        class = "basic-upload-zone",
-        bs_icon(icon, size = "38px"),
-        h5(heading),
-        p(class = "basic-upload-description", description),
-        fileInput(
-          ns(input_id),
-          label = NULL,
-          multiple = TRUE,
-          accept = c(".xlsx", ".xls"),
-          buttonLabel = "Browse Files",
-          placeholder = "No files selected"
+        tags$strong("How files are recognised"),
+        tags$ul(
+          tags$li("Monthly Site Reports start with \"Monthly Site Report\", e.g. Monthly Site Report 2025 -December.xlsx"),
+          tags$li("Detailed Site Reports contain \"Site Report\" or \"Program Report\", e.g. Aquatics Site Report 2025.xlsx"),
+          tags$li("Venues Tracking Reports contain \"Venues Tracking Report\", e.g. 2025 Venues Tracking Report.xlsx")
         ),
         tags$small(
           class = "text-secondary",
-          "Files are parsed immediately and kept for this session only."
-        ),
-        if (!is.null(template_filename)) tags$a(
-          class = "basic-template-download",
-          href = paste0("templates/", utils::URLencode(template_filename)),
-          download = template_filename,
-          bs_icon("file-earmark-arrow-down"),
-          "Download Excel template"
+          paste(
+            "Each name needs exactly one four-digit year. A workbook with another",
+            "name is listed after you choose it, with a box to pick its report type."
+          )
+        )
+      ),
+      div(
+        tags$strong("Blank templates"),
+        tags$ul(
+          template("Monthly Site Report 2026.xlsx", "Monthly Site Report"),
+          template("New Sport Site Report 2026.xlsx", "Detailed Site Report"),
+          template("2026 Venues Tracking Report.xlsx", "Venues Tracking Report")
         )
       )
     )
   )
 }
+
 
 
 # UI ----------------------------------------------------------------------
@@ -2104,8 +2137,9 @@ mod_data_upload_ui <- function(id) {
                 tags$small(
                   paste(
                     "Refreshing or closing the dashboard clears these uploads.",
-                    "Use Save current data to keep the cleaned data on your",
-                    "computer. Your original Excel files are never modified."
+                    "Use Save current data under Uploaded files to keep the",
+                    "cleaned data on your computer. Your original Excel files",
+                    "are never modified."
                   )
                 )
               )
@@ -2121,73 +2155,24 @@ mod_data_upload_ui <- function(id) {
                 hidden = NA
               ),
               card(
-                class = "basic-saved-data-card",
-                card_header(
-                  div(
-                    class = "basic-upload-all-header",
-                    tags$strong("Saved data"),
-                    tags$small(
-                      class = "text-secondary",
-                      "Skip re-reading the Excel reports next time"
-                    )
-                  )
-                ),
-                card_body(
-                  layout_columns(
-                    div(
-                      class = "basic-saved-data-column",
-                      tags$strong("Load saved data"),
-                      p(
-                        class = "basic-upload-description",
-                        paste(
-                          "Open a file made with Save current data. Its reports",
-                          "appear below in seconds, and you can still add newer",
-                          "reports on top."
-                        )
-                      ),
-                      fileInput(
-                        ns("saved_data"),
-                        label = NULL,
-                        multiple = FALSE,
-                        accept = ".rds",
-                        buttonLabel = "Choose saved file",
-                        placeholder = "No file selected"
-                      ),
-                      uiOutput(ns("saved_data_notice"))
-                    ),
-                    div(
-                      class = "basic-saved-data-column",
-                      tags$strong("Save current data"),
-                      uiOutput(ns("saved_data_actions"))
-                    ),
-                    col_widths = breakpoints(sm = c(12, 12), lg = c(6, 6))
-                  )
-                )
-              ),
-              card(
                 class = "basic-upload-all-card",
-                card_header(
-                  div(
-                    class = "basic-upload-all-header",
-                    tags$strong("Upload all reports"),
-                    span(class = "basic-upload-recommended", "Recommended")
-                  )
-                ),
+                card_header(tags$strong("Add data")),
                 card_body(
                   p(
                     class = "basic-upload-description",
                     paste(
-                      "Select every report workbook at once, or choose the folder",
-                      "that holds them. Each file is matched to its report type",
-                      "from its file name and parsed one after another."
+                      "Choose the report workbooks, or the folder that holds",
+                      "them. Each workbook is matched to its report type from its",
+                      "file name. A saved data file (.rds, made with Save current",
+                      "data) can be chosen here too, alone or with newer reports."
                     )
                   ),
                   layout_columns(
                     fileInput(
                       ns("all_reports"),
-                      label = "Workbooks",
+                      label = "Files",
                       multiple = TRUE,
-                      accept = c(".xlsx", ".xls"),
+                      accept = c(".xlsx", ".xls", ".rds"),
                       buttonLabel = "Choose files",
                       placeholder = "No files selected"
                     ),
@@ -2209,76 +2194,38 @@ mod_data_upload_ui <- function(id) {
                     )$allTags(),
                     col_widths = breakpoints(sm = c(12, 12), lg = c(6, 6))
                   ),
-                  tags$small(
-                    class = "text-secondary",
-                    paste(
-                      "File names must contain the report name and one four-digit",
-                      "year, e.g. Monthly Site Report 2025 -December.xlsx."
-                    )
-                  )
+                  div(
+                    class = "basic-upload-feedback",
+                    uiOutput(ns("upload_notice")),
+                    uiOutput(ns("pending_files")),
+                    uiOutput(ns("saved_data_notice"))
+                  ),
+                  basic_upload_naming_help()
                 )
               ),
-              div(
-                class = "basic-upload-section-label",
-                "Or add files to one report type"
-              ),
-              layout_columns(
-                basic_upload_card(
-                  ns = ns,
-                  title = "Monthly Site Reports",
-                  input_id = "monthly_reports",
-                  heading = "Overview and site comparison",
-                  description = paste(
-                    "Upload one or more annual Monthly Site Report",
-                    "workbooks."
-                  ),
-                  icon = "cloud-arrow-up",
-                  template_filename = "Monthly Site Report 2026.xlsx"
+              card(
+                class = "basic-upload-status-card",
+                full_screen = TRUE,
+                card_header(
+                  div(
+                    class = "basic-upload-status-card-header",
+                    div(
+                      tags$strong("Uploaded files"),
+                      tags$small(
+                        paste(
+                          "Follow parsing progress or use the remove action beside",
+                          "a file. Original Excel files remain unchanged."
+                        )
+                      )
+                    ),
+                    uiOutput(ns("saved_data_button"), inline = TRUE)
+                  )
                 ),
-                basic_upload_card(
-                  ns = ns,
-                  title = "Detailed Site Reports",
-                  input_id = "site_reports",
-                  heading = "Site detail",
-                  description = paste(
-                    "Upload Business Unit Template site or program",
-                    "reports."
-                  ),
-                  icon = "building",
-                  template_filename = "New Sport Site Report 2026.xlsx"
-                ),
-                basic_upload_card(
-                  ns = ns,
-                  title = "Venues Tracking Reports",
-                  input_id = "venues_reports",
-                  heading = "Venues operations",
-                  description = paste(
-                    "Upload annual Venues Tracking Report workbooks."
-                  ),
-                  icon = "activity",
-                  template_filename = "2026 Venues Tracking Report.xlsx"
-                ),
-                col_widths = c(4, 4, 4)
+                card_body(
+                  uiOutput(ns("saved_data_actions")),
+                  uiOutput(ns("file_status"))
+                )
               )
-            ),
-            uiOutput(ns("upload_notice")),
-            br(),
-            card(
-              class = "basic-upload-status-card",
-              full_screen = TRUE,
-              card_header(
-                div(
-                  class = "basic-upload-status-card-header",
-                  tags$strong("Uploaded files"),
-                  tags$small(
-                    paste(
-                      "Follow parsing progress or use the remove action beside",
-                      "a file. Original Excel files remain unchanged."
-                    )
-                  )
-                )
-              ),
-              card_body(uiOutput(ns("file_status")))
             )
           )
         ),
@@ -2539,7 +2486,8 @@ mod_data_upload_server <- function(
         upload_info,
         progress = NULL,
         offset = 0L,
-        total = NULL
+        total = NULL,
+        chosen_type = FALSE
       ) {
         if (!is.data.frame(upload_info) || nrow(upload_info) == 0L) {
           return(invisible(NULL))
@@ -2654,7 +2602,7 @@ mod_data_upload_server <- function(
           if (inherits(parsed, "error")) {
             message <- paste0(
               conditionMessage(parsed),
-              basic_upload_mismatch_hint(row$original_name[[1L]], report_type)
+              basic_upload_type_hint(report_type, chosen_type)
             )
             update_registry_row(
               file_id,
@@ -2681,7 +2629,7 @@ mod_data_upload_server <- function(
                 warning_count = issues$warnings,
                 error_message = paste0(
                   issues$first_error,
-                  basic_upload_mismatch_hint(row$original_name[[1L]], report_type)
+                  basic_upload_type_hint(report_type, chosen_type)
                 )
               )
             } else {
@@ -2765,12 +2713,45 @@ mod_data_upload_server <- function(
         )
       }
 
-      process_single_type <- function(report_type, upload_info) {
-        on.exit(finish_upload(), add = TRUE)
-        upload_notice(NULL)
-        process_upload_batch(report_type, upload_info)
+      # Workbooks whose names match no report type wait here until the user
+      # picks a type for them (or dismisses them).
+      pending_files <- reactiveVal(data.frame(
+        pending_id = character(),
+        name = character(),
+        size = double(),
+        stored_path = character(),
+        stringsAsFactors = FALSE
+      ))
+
+      add_pending_files <- function(upload_info) {
+        if (nrow(upload_info) == 0L) {
+          return(invisible(NULL))
+        }
+        pending <- pending_files()
+        names <- as.character(upload_info$name)
+        unlink(pending$stored_path[tolower(pending$name) %in% tolower(names)])
+        pending <- pending[!tolower(pending$name) %in% tolower(names), , drop = FALSE]
+        ids <- paste0("pending-", format(Sys.time(), "%Y%m%d%H%M%OS6"), "-",
+          seq_along(names), "-", sample.int(999999L, length(names), replace = TRUE))
+        paths <- file.path(
+          session_directory,
+          paste0(ids, ".", tolower(tools::file_ext(names)))
+        )
+        copied <- file.copy(upload_info$datapath, paths, overwrite = TRUE)
+        pending_files(rbind(pending, data.frame(
+          pending_id = ids[copied],
+          name = names[copied],
+          size = as.numeric(upload_info$size)[copied],
+          stored_path = paths[copied],
+          stringsAsFactors = FALSE
+        )))
+        invisible(NULL)
       }
 
+      # One entry point for everything the user chooses: saved data files are
+      # loaded first, so newer workbooks in the same selection replace their
+      # saved copies; workbooks already loaded with the same name and size are
+      # skipped; the rest are parsed by the report type their name matches.
       process_all_reports <- function(upload_info) {
         on.exit(finish_upload(), add = TRUE)
 
@@ -2779,36 +2760,65 @@ mod_data_upload_server <- function(
         }
 
         names <- as.character(upload_info$name)
-        types <- classify_report_upload(names)
+        saved <- grepl("\\.rds$", names, ignore.case = TRUE)
         excel <- grepl("\\.(xlsx|xls)$", names, ignore.case = TRUE) &
           !startsWith(names, "~$")
-        matched <- !is.na(types)
-        order <- names(BASIC_UPLOAD_REPORT_TYPES)
-        counts <- vapply(order, function(type) sum(types %in% type), integer(1))
+        # A folder can hold two workbooks with the same name in different
+        # subfolders (an old copy, say). Only the first one is read, so the
+        # outcome does not depend on which copy happens to come last.
+        repeated <- excel & duplicated(tolower(trimws(names)))
+        types <- classify_report_upload(names)
+        matched <- !is.na(types) & !repeated
 
+        # The notices describe the latest selection only.
+        saved_data_notice(NULL)
+        load_saved_files(upload_info[saved, , drop = FALSE])
+
+        ready <- registry()
+        ready <- ready[ready$status == "ready", , drop = FALSE]
+        file_key <- function(type, name, size) {
+          paste(type, tolower(trimws(name)), round(as.numeric(size)), sep = "|")
+        }
+        unchanged <- matched &
+          file_key(types, names, upload_info$size) %in%
+            file_key(ready$report_type, ready$original_name, ready$size)
+        to_parse <- matched & !unchanged
+        unrecognised <- excel & is.na(types) & !repeated
+        # An unrecognised workbook that was given a type earlier (or came
+        # from saved data) and has not changed is not asked about again.
+        known <- unrecognised &
+          file_key("", names, upload_info$size) %in%
+            file_key("", ready$original_name, ready$size)
+        unrecognised <- unrecognised & !known
+        add_pending_files(upload_info[unrecognised, , drop = FALSE])
+
+        order <- names(BASIC_UPLOAD_REPORT_TYPES)
         upload_notice(list(
-          counts = counts,
-          unrecognised = names[excel & !matched],
-          ignored = sum(!excel)
+          counts = vapply(order, function(type) sum(to_parse & types %in% type), integer(1)),
+          unchanged = sum(unchanged) + sum(known),
+          unrecognised = nrow(pending_files()),
+          repeated = sum(repeated),
+          saved = sum(saved),
+          ignored = sum(!excel & !saved)
         ))
 
-        if (!any(matched)) {
+        if (!any(to_parse)) {
           return(invisible(NULL))
         }
 
-        progress <- Progress$new(session = session, min = 0, max = sum(matched))
+        progress <- Progress$new(session = session, min = 0, max = sum(to_parse))
         on.exit(progress$close(), add = TRUE)
         offset <- 0L
 
         for (type in order) {
-          rows <- which(types %in% type)
+          rows <- which(to_parse & types %in% type)
           if (length(rows) == 0L) next
           process_upload_batch(
             type,
             upload_info[rows, , drop = FALSE],
             progress = progress,
             offset = offset,
-            total = sum(matched)
+            total = sum(to_parse)
           )
           offset <- offset + length(rows)
         }
@@ -2816,21 +2826,6 @@ mod_data_upload_server <- function(
         invisible(NULL)
       }
 
-      observeEvent(
-        input$monthly_reports,
-        process_single_type("monthly_site", input$monthly_reports),
-        ignoreInit = TRUE
-      )
-      observeEvent(
-        input$site_reports,
-        process_single_type("site_detail", input$site_reports),
-        ignoreInit = TRUE
-      )
-      observeEvent(
-        input$venues_reports,
-        process_single_type("venues_tracking", input$venues_reports),
-        ignoreInit = TRUE
-      )
       observeEvent(
         input$all_reports,
         process_all_reports(input$all_reports),
@@ -2842,31 +2837,146 @@ mod_data_upload_server <- function(
         ignoreInit = TRUE
       )
 
+      # A type chosen (or "Dismiss") for a workbook whose name was not
+      # recognised: list(id, action = "add" | "dismiss", type).
+      observeEvent(
+        input$assign_file,
+        {
+          on.exit(finish_upload(), add = TRUE)
+          request <- input$assign_file
+          pending <- pending_files()
+          row <- pending[pending$pending_id %in% request$id, , drop = FALSE]
+          if (nrow(row) != 1L) {
+            return()
+          }
+          pending_files(pending[pending$pending_id != row$pending_id, , drop = FALSE])
+          on.exit(unlink(row$stored_path), add = TRUE)
+          notice <- upload_notice()
+          if (!is.null(notice)) {
+            notice$unrecognised <- nrow(pending_files())
+            upload_notice(notice)
+          }
+
+          type <- as.character(request$type)
+          if (!identical(request$action, "add") || length(type) != 1L ||
+              !type %in% names(BASIC_UPLOAD_REPORT_TYPES)) {
+            return()
+          }
+          process_upload_batch(type, data.frame(
+            name = row$name,
+            size = row$size,
+            type = "application/octet-stream",
+            datapath = row$stored_path,
+            stringsAsFactors = FALSE
+          ), chosen_type = TRUE)
+        },
+        ignoreInit = TRUE
+      )
+
+      output$pending_files <- renderUI({
+        pending <- pending_files()
+        if (nrow(pending) == 0L) {
+          return(NULL)
+        }
+        choices <- c("Choose report type" = "", stats::setNames(
+          names(BASIC_UPLOAD_REPORT_TYPES),
+          unname(BASIC_UPLOAD_REPORT_TYPES)
+        ))
+
+        div(
+          class = "basic-upload-notice is-warning basic-upload-pending",
+          role = "status",
+          bs_icon("question-circle"),
+          div(
+            tags$strong(paste(
+              "Choose the report type for",
+              if (nrow(pending) == 1L) "this workbook" else "these workbooks"
+            )),
+            p(if (nrow(pending) == 1L) {
+              paste(
+                "Its file name does not match a report type, so it has not been",
+                "read yet. Pick a type and select Add, or dismiss the file."
+              )
+            } else {
+              paste(
+                "Their file names do not match a report type, so they have not",
+                "been read yet. Pick a type and select Add, or dismiss a file."
+              )
+            }),
+            lapply(seq_len(nrow(pending)), function(index) {
+              div(
+                class = "basic-upload-assign",
+                `data-file-id` = pending$pending_id[[index]],
+                `data-file-name` = pending$name[[index]],
+                span(class = "basic-upload-assign-name", pending$name[[index]]),
+                tags$select(
+                  class = "form-select form-select-sm",
+                  `aria-label` = paste("Report type for", pending$name[[index]]),
+                  lapply(seq_along(choices), function(choice) {
+                    tags$option(value = unname(choices[[choice]]), names(choices)[[choice]])
+                  })
+                ),
+                tags$button(
+                  type = "button",
+                  class = "btn btn-primary btn-sm",
+                  `data-action` = "add",
+                  `data-input` = session$ns("assign_file"),
+                  "Add"
+                ),
+                tags$button(
+                  type = "button",
+                  class = "btn btn-link btn-sm",
+                  `data-action` = "dismiss",
+                  `data-input` = session$ns("assign_file"),
+                  "Dismiss"
+                )
+              )
+            })
+          )
+        )
+      })
+
       # Saved data ------------------------------------------------------
 
+      # One notice per saved data file in the latest selection.
       saved_data_notice <- reactiveVal(NULL)
+      add_saved_data_notice <- function(notice) {
+        saved_data_notice(c(saved_data_notice(), list(notice)))
+      }
 
       client_utc_offset <- function() {
         root <- tryCatch(session$rootScope(), error = function(error) NULL)
         if (is.null(root)) NULL else root$input$monash_client_utc_offset
       }
 
-      load_saved_data <- function(upload_info) {
-        on.exit(finish_upload(), add = TRUE)
-        upload_notice(NULL)
-
+      # Loads the saved data files of one selection, oldest save first, so
+      # that when two saved files hold the same report the newer copy wins
+      # (the browser lists files by name, not by date).
+      load_saved_files <- function(upload_info) {
         if (!is.data.frame(upload_info) || nrow(upload_info) == 0L) {
           return(invisible(NULL))
         }
+        contents <- lapply(seq_len(nrow(upload_info)), function(index) {
+          tryCatch(read_basic_saved_data(upload_info$datapath[[index]]), error = identity)
+        })
+        saved_times <- vapply(contents, function(saved) {
+          time <- if (inherits(saved, "error")) NA_real_ else
+            suppressWarnings(as.numeric(saved$saved_at)[1L])
+          if (is.na(time)) -Inf else time
+        }, numeric(1))
+        for (index in order(saved_times)) {
+          load_saved_data(as.character(upload_info$name[[index]]), contents[[index]])
+        }
+        invisible(NULL)
+      }
 
-        saved <- tryCatch(
-          read_basic_saved_data(upload_info$datapath[[1L]]),
-          error = identity
-        )
+      # Adds one saved data file (already read, or the error from reading it)
+      # to the session.
+      load_saved_data <- function(file_name, saved) {
         if (inherits(saved, "error")) {
-          saved_data_notice(list(
+          add_saved_data_notice(list(
             error = conditionMessage(saved),
-            file_name = as.character(upload_info$name[[1L]])
+            file_name = file_name
           ))
           return(invisible(NULL))
         }
@@ -2947,8 +3057,8 @@ mod_data_upload_server <- function(
         }
         warning_details(notes)
 
-        saved_data_notice(list(
-          file_name = as.character(upload_info$name[[1L]]),
+        add_saved_data_notice(list(
+          file_name = file_name,
           saved_at = saved$saved_at,
           files = files,
           replaced = length(replaced_ids),
@@ -2957,22 +3067,19 @@ mod_data_upload_server <- function(
         invisible(NULL)
       }
 
-      observeEvent(
-        input$saved_data,
-        load_saved_data(input$saved_data),
-        ignoreInit = TRUE
-      )
-
       saved_data_payload <- reactive({
         build_basic_saved_data(registry(), parsed_results(), warning_details())
       })
 
       output$saved_data_notice <- renderUI({
-        notice <- saved_data_notice()
-
-        if (is.null(notice)) {
+        notices <- saved_data_notice()
+        if (length(notices) == 0L) {
           return(NULL)
         }
+        tagList(lapply(notices, saved_data_notice_ui))
+      })
+
+      saved_data_notice_ui <- function(notice) {
 
         if (!is.null(notice$error)) {
           return(div(
@@ -3051,59 +3158,50 @@ mod_data_upload_server <- function(
             tags$small(class = "text-secondary", paste("From", notice$file_name))
           )
         )
+      }
+
+      # Save current data: the button sits in the Uploaded files header and
+      # a line above the file list says what the saved file will contain.
+      output$saved_data_button <- renderUI({
+        if (nrow(saved_data_payload()$files) == 0L) {
+          return(tags$button(
+            type = "button",
+            class = "btn btn-outline-secondary btn-sm",
+            disabled = "disabled",
+            title = "Upload or load reports first",
+            bs_icon("download"),
+            "Save current data"
+          ))
+        }
+        downloadButton(
+          session$ns("download_saved_data"),
+          "Save current data",
+          icon = bs_icon("download"),
+          class = "btn btn-primary btn-sm"
+        )
       })
 
       output$saved_data_actions <- renderUI({
         files <- saved_data_payload()$files
+        if (nrow(files) == 0L) {
+          return(NULL)
+        }
         pending <- sum(registry()$status %in% c("queued", "parsing"))
 
-        if (nrow(files) == 0L) {
-          return(tagList(
-            p(
-              class = "basic-upload-description",
-              paste(
-                "Upload or load reports first. Saving keeps the cleaned data",
-                "of every ready file in one small file on your computer."
-              )
-            ),
-            tags$button(
-              type = "button",
-              class = "btn btn-outline-secondary",
-              disabled = "disabled",
-              bs_icon("download"),
-              "Save current data"
-            )
-          ))
-        }
-
-        tagList(
-          p(
-            class = "basic-upload-description",
-            paste0(
-              "Will save ", nrow(files),
-              if (nrow(files) == 1L) " ready file" else " ready files",
-              ". The file name shows the years, file count and save date."
-            )
-          ),
-          tags$ul(
-            class = "basic-saved-data-summary",
-            lapply(basic_saved_data_summary_text(files), tags$li)
-          ),
-          if (pending > 0L) {
-            p(class = "basic-upload-description", "Files still parsing are not included.")
-          },
-          downloadButton(
-            session$ns("download_saved_data"),
-            "Save current data",
-            icon = bs_icon("download"),
-            class = "btn btn-primary"
-          ),
+        div(
+          class = "basic-saved-data-strip",
+          tags$span(paste0(
+            "Save current data keeps the cleaned data of ", nrow(files),
+            if (nrow(files) == 1L) " ready file: " else " ready files: ",
+            paste(basic_saved_data_summary_text(files), collapse = "; "),
+            if (pending > 0L) ". Files still parsing are not included." else "."
+          )),
           tags$small(
             class = "basic-saved-data-caution",
             paste(
-              "The saved file holds the same confidential figures as the",
-              "reports. Keep it where the original reports are stored and do",
-              "not email or share it outside the team."
+              "The file name shows the years, file count and save date. It holds",
+              "the same confidential figures as the reports: keep it where the",
+              "reports are stored and do not share it outside the team."
             )
           )
         )
@@ -3142,10 +3240,13 @@ mod_data_upload_server <- function(
             ),
             "."
           )
+        } else if (notice$saved > 0L || notice$unchanged > 0L) {
+          "No new report workbooks to read in this selection."
         } else {
           "No report workbooks were recognised in this selection."
         }
-        problems <- length(notice$unrecognised) > 0L || length(counts) == 0L
+        problems <- notice$unrecognised > 0L || isTRUE(notice$repeated > 0L) ||
+          (length(counts) == 0L && notice$saved == 0L && notice$unchanged == 0L)
 
         div(
           class = paste(
@@ -3156,23 +3257,40 @@ mod_data_upload_server <- function(
           bs_icon(if (problems) "exclamation-triangle" else "check2-circle"),
           div(
             tags$strong(matched_text),
-            if (length(notice$unrecognised) > 0L) {
-              p(
-                paste0(
-                  "Not recognised, so not uploaded: ",
-                  paste(notice$unrecognised, collapse = ", "),
-                  ". Rename these files to include the report name and one",
-                  " four-digit year (see the user guide), or upload them",
-                  " through the matching report type below."
-                )
-              )
+            if (notice$unchanged > 0L) {
+              p(paste0(
+                notice$unchanged,
+                if (notice$unchanged == 1L) " workbook was" else " workbooks were",
+                " already loaded with the same name and size, so ",
+                if (notice$unchanged == 1L) "it was" else "they were",
+                " not read again."
+              ))
+            },
+            if (notice$unrecognised > 0L) {
+              p(paste0(
+                notice$unrecognised,
+                if (notice$unrecognised == 1L) {
+                  " workbook was not recognised from its file name and is"
+                } else {
+                  " workbooks were not recognised from their file names and are"
+                },
+                " waiting for a report type below."
+              ))
+            },
+            if (isTRUE(notice$repeated > 0L)) {
+              p(paste0(
+                notice$repeated,
+                if (notice$repeated == 1L) " workbook has" else " workbooks have",
+                " the same name as another file in this selection, so only the ",
+                "first copy was used. Keep one copy of each report in the folder."
+              ))
             },
             if (notice$ignored > 0L) {
               p(
                 paste0(
                   notice$ignored,
                   if (notice$ignored == 1L) " other file was" else " other files were",
-                  " ignored because they are not Excel workbooks."
+                  " ignored because they are not Excel workbooks or saved data."
                 )
               )
             }

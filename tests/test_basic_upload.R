@@ -8,10 +8,17 @@ source(file.path("R", "mod_data_upload.R"))
 
 ui_html <- as.character(mod_data_upload_ui("basic-upload-test"))
 stopifnot(
-  lengths(regmatches(
-    ui_html,
-    gregexpr("basic-upload-source-card", ui_html, fixed = TRUE)
-  )) == 3L,
+  grepl("basic-upload-test-all_reports\"", ui_html, fixed = TRUE),
+  grepl("basic-upload-test-all_reports_folder", ui_html, fixed = TRUE),
+  grepl("basic-upload-test-pending_files", ui_html, fixed = TRUE),
+  grepl("basic-upload-test-saved_data_button", ui_html, fixed = TRUE),
+  grepl("Excel templates and file naming", ui_html, fixed = TRUE),
+  # One entry point: no per-type or separate saved-data file pickers.
+  !grepl("basic-upload-test-monthly_reports", ui_html, fixed = TRUE),
+  !grepl("basic-upload-test-saved_data\"", ui_html, fixed = TRUE),
+  # Add data comes before the Uploaded files list.
+  regexpr("basic-upload-test-all_reports\"", ui_html, fixed = TRUE) <
+    regexpr("basic-upload-test-file_status", ui_html, fixed = TRUE),
   grepl("data-section-navigation", ui_html, fixed = TRUE),
   grepl("Upload &amp; Manage", ui_html, fixed = TRUE),
   grepl("View Cleaned Data", ui_html, fixed = TRUE),
@@ -648,7 +655,7 @@ shiny::testServer(
     writeBin(charToRaw("synthetic upload"), upload_path)
 
     session$setInputs(
-      monthly_reports = data.frame(
+      all_reports = data.frame(
         name = "Monthly Site Report 2099.xlsx",
         size = file.info(upload_path)$size,
         type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -772,7 +779,7 @@ shiny::testServer(
       failed_replacement_path
     )
     session$setInputs(
-      monthly_reports = data.frame(
+      all_reports = data.frame(
         name = "Monthly Site Report 2099.xlsx",
         size = file.info(failed_replacement_path)$size,
         type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -802,7 +809,7 @@ shiny::testServer(
       successful_replacement_path
     )
     session$setInputs(
-      monthly_reports = data.frame(
+      all_reports = data.frame(
         name = "Monthly Site Report 2099.xlsx",
         size = file.info(successful_replacement_path)$size,
         type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -845,7 +852,7 @@ shiny::testServer(
     failed_path <- tempfile(fileext = ".xlsx")
     writeBin(charToRaw("synthetic failed upload"), failed_path)
     session$setInputs(
-      site_reports = data.frame(
+      all_reports = data.frame(
         name = "Synthetic Site Report 2099.xlsx",
         size = file.info(failed_path)$size,
         type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -889,9 +896,9 @@ stopifnot(
     c("monthly_site", "site_detail", "site_detail", "site_detail",
       "venues_tracking", NA, NA, NA, NA)
   ),
-  identical(basic_upload_mismatch_hint("Aquatics Site Report 2025.xlsx", "site_detail"), ""),
-  grepl("Venues Tracking Reports",
-    basic_upload_mismatch_hint("2025 Venues Tracking Report.xlsx", "monthly_site"),
+  identical(basic_upload_type_hint("site_detail"), ""),
+  grepl("Check that Venues Tracking Reports is the right report type",
+    basic_upload_type_hint("venues_tracking", chosen = TRUE),
     fixed = TRUE)
 )
 
@@ -926,28 +933,146 @@ shiny::testServer(
       setequal(uploaded$report_type, c("monthly_site", "venues_tracking")),
       all(uploaded$status == "ready"),
       grepl("Matched 2 files", notice, fixed = TRUE),
-      grepl("Unrelated notes 2099.xlsx", notice, fixed = TRUE),
       grepl("1 other file was ignored", notice, fixed = TRUE)
     )
 
-    # A file uploaded to the wrong area fails with a hint to the right one.
-    session$setInputs(
-      site_reports = data.frame(
-        name = "2099 Venues Tracking Report.xlsx",
-        size = file.info(paths[[2L]])$size,
-        type = "application/octet-stream",
-        datapath = paths[[2L]],
-        stringsAsFactors = FALSE
-      )
-    )
-    session$flushReact()
-    failed <- session$returned()$uploads
-    failed <- failed[failed$status == "failed", , drop = FALSE]
+    # The unrecognised workbook waits for a report type. A wrongly chosen
+    # type fails with a hint; Dismiss drops a waiting file.
+    pending <- pending_files()
     stopifnot(
-      nrow(failed) == 1L,
-      grepl("try Upload all reports", failed$error_message[[1L]], fixed = TRUE)
+      identical(pending$name, "Unrelated notes 2099.xlsx"),
+      grepl("1 workbook was not recognised", notice, fixed = TRUE),
+      grepl("Unrelated notes 2099.xlsx",
+        paste(as.character(output$pending_files), collapse = ""), fixed = TRUE)
     )
+    session$setInputs(assign_file = list(id = pending$pending_id, action = "add", type = "site_detail"))
+    session$flushReact()
+    assigned <- session$returned()$uploads
+    assigned <- assigned[assigned$original_name == "Unrelated notes 2099.xlsx", , drop = FALSE]
+    stopifnot(
+      nrow(pending_files()) == 0L,
+      nrow(assigned) == 1L,
+      assigned$status == "failed",
+      grepl("Synthetic parser failure", assigned$error_message, fixed = TRUE),
+      grepl("Check that Detailed Site Reports is the right report type",
+        assigned$error_message, fixed = TRUE),
+      !grepl("not recognised", paste(as.character(output$upload_notice), collapse = ""), fixed = TRUE)
+    )
+
+    other <- tempfile(fileext = ".xlsx")
+    writeBin(charToRaw("other"), other)
+    session$setInputs(all_reports = data.frame(
+      name = "Board pack 2099.xlsx", size = file.info(other)$size,
+      type = "application/octet-stream", datapath = other, stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    stopifnot(identical(pending_files()$name, "Board pack 2099.xlsx"))
+    before <- session$returned()$uploads
+    session$setInputs(assign_file = list(id = pending_files()$pending_id, action = "dismiss"))
+    session$flushReact()
+    stopifnot(
+      nrow(pending_files()) == 0L,
+      identical(session$returned()$uploads, before),
+      is.null(output$pending_files)
+    )
+    unlink(other)
     unlink(paths)
+  }
+)
+
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    path <- tempfile(fileext = ".xlsx")
+    writeBin(charToRaw("synthetic upload"), path)
+    session$setInputs(all_reports = data.frame(
+      name = "Budget notes 2099.xlsx", size = file.info(path)$size,
+      type = "application/octet-stream", datapath = path, stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    stopifnot(nrow(session$returned()$uploads) == 0L)
+    session$setInputs(assign_file = list(
+      id = pending_files()$pending_id, action = "add", type = "monthly_site"
+    ))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    stopifnot(
+      nrow(uploads) == 1L,
+      uploads$status == "ready",
+      uploads$report_type == "monthly_site",
+      uploads$original_name == "Budget notes 2099.xlsx",
+      nrow(session$returned()$monthly_reports$finance) == 30L
+    )
+
+    # Choosing the folder again does not ask about that workbook again.
+    session$setInputs(all_reports = data.frame(
+      name = "Budget notes 2099.xlsx", size = file.info(path)$size,
+      type = "application/octet-stream", datapath = path, stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    stopifnot(
+      nrow(pending_files()) == 0L,
+      nrow(session$returned()$uploads) == 1L,
+      grepl("1 workbook was already loaded",
+        paste(as.character(output$upload_notice), collapse = ""), fixed = TRUE)
+    )
+    unlink(path)
+  }
+)
+
+# Selections in a row: waiting workbooks stay listed and the notice counts
+# them all; a name repeated in one selection is read once; a damaged saved
+# file does not stop the workbooks chosen with it, and its message is
+# cleared by the next selection.
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    choose <- function(names, contents = rep("synthetic upload", length(names))) {
+      paths <- vapply(seq_along(names), function(index) {
+        path <- tempfile(fileext = paste0(".", tools::file_ext(names[[index]])))
+        writeBin(charToRaw(contents[[index]]), path)
+        path
+      }, character(1))
+      session$setInputs(all_reports = data.frame(
+        name = names, size = file.info(paths)$size,
+        type = "application/octet-stream", datapath = paths, stringsAsFactors = FALSE
+      ))
+      session$flushReact()
+      paste(as.character(output$upload_notice), collapse = "")
+    }
+
+    choose("Notes A 2099.xlsx")
+    notice <- choose(c("Notes B 2099.xlsx", "2099 Venues Tracking Report.xlsx"))
+    stopifnot(
+      identical(sort(pending_files()$name), c("Notes A 2099.xlsx", "Notes B 2099.xlsx")),
+      grepl("Matched 1 file", notice, fixed = TRUE),
+      grepl("2 workbooks were not recognised", notice, fixed = TRUE)
+    )
+
+    notice <- choose(
+      c("Monthly Site Report 2099.xlsx", "Monthly Site Report 2099.xlsx"),
+      c("synthetic upload", "synthetic upload, old copy")
+    )
+    monthly <- session$returned()$uploads
+    monthly <- monthly[monthly$report_type == "monthly_site", , drop = FALSE]
+    stopifnot(
+      nrow(monthly) == 1L,
+      monthly$size == nchar("synthetic upload"),
+      grepl("1 workbook has the same name as another file", notice, fixed = TRUE)
+    )
+
+    choose(c("bad.rds", "Monthly Site Report 2098.xlsx"), c("not an rds file", "synthetic upload"))
+    stopifnot(
+      grepl("bad.rds was not loaded",
+        paste(as.character(output$saved_data_notice), collapse = ""), fixed = TRUE),
+      "Monthly Site Report 2098.xlsx" %in% session$returned()$uploads$original_name
+    )
+    choose("Notes C 2099.xlsx")
+    stopifnot(is.null(output$saved_data_notice))
   }
 )
 
@@ -981,11 +1106,10 @@ shiny::testServer(
   args = list(parsers = fake_parsers),
   {
     session$flushReact()
-    stopifnot(grepl(
-      "Upload or load reports first",
-      paste(as.character(output$saved_data_actions), collapse = ""),
-      fixed = TRUE
-    ))
+    stopifnot(
+      is.null(output$saved_data_actions),
+      grepl("disabled", paste(as.character(output$saved_data_button), collapse = ""), fixed = TRUE)
+    )
 
     paths <- replicate(2L, tempfile(fileext = ".xlsx"))
     for (path in paths) writeBin(charToRaw("synthetic upload"), path)
@@ -1011,9 +1135,10 @@ shiny::testServer(
         basic_saved_data_filename(payload$files, as.POSIXct("2026-10-31 12:00:00")),
         "monash-sport-saved-data_2098-2099_2-files_saved-2026-10-31.rds"
       ),
-      grepl("Will save 2 ready files", actions, fixed = TRUE),
+      grepl("keeps the cleaned data of 2 ready files", actions, fixed = TRUE),
       grepl("Monthly Site Reports: 1 file (2098–2099)", actions, fixed = TRUE),
-      grepl("download_saved_data", actions, fixed = TRUE)
+      grepl("download_saved_data",
+        paste(as.character(output$saved_data_button), collapse = ""), fixed = TRUE)
     )
 
     saveRDS(payload, saved_state$path)
@@ -1028,7 +1153,7 @@ shiny::testServer(
   {
     session$flushReact()
     load_file <- function(path, name = "saved.rds") {
-      session$setInputs(saved_data = data.frame(
+      session$setInputs(all_reports = data.frame(
         name = name,
         size = file.info(path)$size,
         type = "application/octet-stream",
@@ -1056,18 +1181,31 @@ shiny::testServer(
       grepl("Synthetic warning", paste(as.character(output$file_status), collapse = ""), fixed = TRUE)
     )
 
-    # A newer upload of the same report replaces the saved copy.
+    # The same workbook chosen again (same name and size) is not read again.
     path <- tempfile(fileext = ".xlsx")
     writeBin(charToRaw("synthetic upload"), path)
-    session$setInputs(monthly_reports = data.frame(
-      name = "Monthly Site Report 2099.xlsx",
-      size = file.info(path)$size,
-      type = "application/octet-stream",
-      datapath = path,
-      stringsAsFactors = FALSE
-    ))
-    session$flushReact()
-    uploads <- session$returned()$uploads
+    choose <- function(file) {
+      session$setInputs(all_reports = data.frame(
+        name = "Monthly Site Report 2099.xlsx",
+        size = file.info(file)$size,
+        type = "application/octet-stream",
+        datapath = file,
+        stringsAsFactors = FALSE
+      ))
+      session$flushReact()
+      session$returned()$uploads
+    }
+    uploads <- choose(path)
+    stopifnot(
+      nrow(uploads) == 2L,
+      is.na(uploads$stored_path[uploads$report_type == "monthly_site"]),
+      grepl("already loaded with the same name and size",
+        paste(as.character(output$upload_notice), collapse = ""), fixed = TRUE)
+    )
+
+    # A newer version of the same report (different size) replaces the saved copy.
+    writeBin(charToRaw("synthetic upload, updated"), path)
+    uploads <- choose(path)
     stopifnot(
       nrow(uploads) == 2L,
       !is.na(uploads$stored_path[uploads$report_type == "monthly_site"])
@@ -1126,6 +1264,74 @@ shiny::testServer(
       )
     }
     unlink(c(path, not_rds))
+  }
+)
+# A folder holding the saved file and the reports: the saved data is loaded,
+# unchanged reports are skipped and only the changed one is read.
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    unchanged <- tempfile(fileext = ".xlsx")
+    changed <- tempfile(fileext = ".xlsx")
+    writeBin(charToRaw("synthetic upload"), unchanged)
+    writeBin(charToRaw("synthetic upload, updated"), changed)
+    files <- c(saved_state$path, unchanged, changed)
+    session$setInputs(all_reports = data.frame(
+      name = c("saved.rds", "Monthly Site Report 2099.xlsx", "2099 Venues Tracking Report.xlsx"),
+      size = file.info(files)$size,
+      type = "application/octet-stream",
+      datapath = files,
+      stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    notice <- paste(as.character(output$upload_notice), collapse = "")
+    stopifnot(
+      nrow(uploads) == 2L,
+      all(uploads$status == "ready"),
+      is.na(uploads$stored_path[uploads$report_type == "monthly_site"]),
+      !is.na(uploads$stored_path[uploads$report_type == "venues_tracking"]),
+      grepl("Matched 1 file: 1 Venues Tracking Reports", notice, fixed = TRUE),
+      grepl("1 workbook was already loaded", notice, fixed = TRUE),
+      grepl("Saved data loaded", paste(as.character(output$saved_data_notice), collapse = ""), fixed = TRUE)
+    )
+    unlink(c(unchanged, changed))
+  }
+)
+
+# Two saved files in one selection: they load oldest save first, so the
+# newer copy of a report is kept whatever order the browser lists them in.
+shiny::testServer(
+  mod_data_upload_server,
+  args = list(parsers = fake_parsers),
+  {
+    session$flushReact()
+    older <- readRDS(saved_state$path)
+    older$saved_at <- older$saved_at - 10 * 24 * 60 * 60
+    older$files$size <- older$files$size + 100
+    older_path <- tempfile(fileext = ".rds")
+    saveRDS(older, older_path)
+    files <- c(saved_state$path, older_path)
+    session$setInputs(all_reports = data.frame(
+      name = c("a-newer.rds", "b-older.rds"),
+      size = file.info(files)$size,
+      type = "application/octet-stream",
+      datapath = files,
+      stringsAsFactors = FALSE
+    ))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    newer <- readRDS(saved_state$path)
+    notice <- paste(as.character(output$saved_data_notice), collapse = "")
+    stopifnot(
+      nrow(uploads) == 2L,
+      all(uploads$status == "ready"),
+      setequal(uploads$size, newer$files$size),
+      lengths(regmatches(notice, gregexpr("Saved data loaded", notice, fixed = TRUE))) == 2L
+    )
+    unlink(older_path)
   }
 )
 unlink(saved_state$path)
