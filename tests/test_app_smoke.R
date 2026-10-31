@@ -7,6 +7,8 @@
 
 smoke_app <- new.env()
 sys.source("app.R", envir = smoke_app)
+# app.R sourced R/mod_data_upload.R again; reuse earlier parses (tests only).
+if (exists("install_test_parse_cache")) install_test_parse_cache()
 
 smoke_decode <- function(text) {
   for (pair in list(c("&amp;", "&"), c("&lt;", "<"), c("&gt;", ">"), c("&quot;", "\""), c("&#39;", "'"))) {
@@ -85,6 +87,12 @@ smoke_output_ids <- function(html) {
   unique(ids[!is.na(ids)])
 }
 
+smoke_plot_ids <- function(html) {
+  tags <- regmatches(html, gregexpr("<[^>]*shiny-(plot|image)-output[^>]*>", html))[[1L]]
+  ids <- vapply(tags, smoke_attribute, character(1), name = "id", USE.NAMES = FALSE)
+  unique(ids[!is.na(ids)])
+}
+
 smoke_text <- function(value) {
   if (is.list(value) && !is.null(value$html)) value <- value$html
   if (!is.character(value)) return("")
@@ -145,6 +153,7 @@ updateNumericInput <- function(session = getDefaultReactiveDomain(), inputId, la
 smoke_ui <- paste(as.character(smoke_app$ui), collapse = "")
 smoke_static_outputs <- smoke_output_ids(smoke_ui)
 smoke_static_inputs <- smoke_default_inputs(smoke_ui)
+smoke_static_plots <- smoke_plot_ids(smoke_ui)
 stopifnot(
   length(smoke_static_outputs) > 50L,
   !is.null(smoke_static_inputs[["overview-to_year"]]),
@@ -194,24 +203,31 @@ smoke_check <- function(label, steps = list()) {
     # Pass 1: page controls at their defaults. Pass 2: controls and outputs
     # created by rendered UI (for example the Site Detail filters).
     # Updates sent by the server are applied every pass, as in a browser.
+    # Charts are drawn once, in the final pass: they create no controls.
     set_inputs <- character()
     outputs <- smoke_static_outputs
+    plots <- smoke_static_plots
     pending <- smoke_static_inputs
     for (pass in 1:4) {
       pending <- pending[!names(pending) %in% set_inputs]
       updates <- as.list(smoke_updates)
       rm(list = ls(smoke_updates), envir = smoke_updates)
       pending[names(updates)] <- updates
+      if (pass > 1L && length(pending) == 0L && !found_outputs) {
+        break
+      }
       if (length(pending) > 0L) {
         do.call(session$setInputs, pending)
         session$flushReact()
         set_inputs <- unique(c(set_inputs, names(pending)))
       }
-      rendered <- render_all(outputs)
+      rendered <- render_all(setdiff(outputs, plots))
       html <- paste(vapply(rendered, function(r) {
         if (is.list(r$value) && is.character(r$value$html)) r$value$html else ""
       }, character(1)), collapse = "")
+      found_outputs <- !all(smoke_output_ids(html) %in% outputs)
       outputs <- unique(c(outputs, smoke_output_ids(html)))
+      plots <- unique(c(plots, smoke_plot_ids(html)))
       pending <- smoke_default_inputs(html)
     }
     rendered <- render_all(outputs)
@@ -274,20 +290,30 @@ smoke_site <- smoke_sample(
 )
 stopifnot(file.exists(c(smoke_monthly, smoke_venues, smoke_site)))
 
-smoke_check("no data")
-smoke_check("Venues Tracking Report only",
-  list(list(`data_upload-venues_reports` = smoke_upload(smoke_venues))))
-smoke_check("one Detailed Site Report only",
-  list(list(`data_upload-site_reports` = smoke_upload(smoke_site))))
-smoke_check("one year of Monthly Site Report only",
-  list(list(`data_upload-monthly_reports` = smoke_upload(smoke_monthly))))
-smoke_check("one file of each type",
-  list(list(`data_upload-all_reports` = smoke_upload(c(smoke_monthly, smoke_venues, smoke_site)))))
+# MONASH_SPORT_SMOKE_PART = "single", "combined" or "full" runs one part
+# (tests/run_tests.R runs the parts side by side); unset runs all of them.
+smoke_part <- Sys.getenv("MONASH_SPORT_SMOKE_PART", unset = "")
+
+if (smoke_part %in% c("", "single")) {
+  smoke_check("no data")
+  smoke_check("Venues Tracking Report only",
+    list(list(`data_upload-venues_reports` = smoke_upload(smoke_venues))))
+  smoke_check("one Detailed Site Report only",
+    list(list(`data_upload-site_reports` = smoke_upload(smoke_site))))
+}
+if (smoke_part %in% c("", "combined")) {
+  smoke_check("one year of Monthly Site Report only",
+    list(list(`data_upload-monthly_reports` = smoke_upload(smoke_monthly))))
+  smoke_check("one file of each type",
+    list(list(`data_upload-all_reports` = smoke_upload(c(smoke_monthly, smoke_venues, smoke_site)))))
+}
 
 # Full report set (sample or real), then the same data loaded from a saved
 # file in a fresh session. Runs with run_sample_tests.R / run_full_tests.R.
 smoke_root <- Sys.getenv("MONASH_SPORT_REAL_DATA_ROOT", unset = "")
-if (nzchar(smoke_root)) {
+if (!smoke_part %in% c("", "full")) {
+  # The full report set runs in the "full" part.
+} else if (nzchar(smoke_root)) {
   smoke_all <- list.files(smoke_root, "\\.xlsx$", recursive = TRUE, full.names = TRUE)
   smoke_all <- smoke_all[!is.na(classify_report_upload(basename(smoke_all)))]
   smoke_saved <- tempfile(fileext = ".rds")

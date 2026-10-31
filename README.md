@@ -593,7 +593,7 @@ They cover data import helpers, uploads and validation, every dashboard
 page's calculations (Overview, Site Comparison, Site Detail, Venues
 Operations, Forecasting, Executive Dashboard), chart helpers, and a smoke
 test that draws every Site Detail and Venues chart. The run ends with
-`ALL TESTS PASSED`. Two tests check the app as it is used:
+`ALL TESTS PASSED`. Three tests check the app as it is used:
 
 - `test_upload_realworld.R` runs the real importers on the sample workbooks
   for situations met in practice: two files for the same report year (the
@@ -608,10 +608,15 @@ test that draws every Site Detail and Venues chart. The run ends with
   Dashboard, Site Comparison and the Forecasting history show the same
   income, expenses, net result and budget variance.
 
-The full suite adds three steps that parse a complete set of workbooks and
-take several minutes: `test_real_upload_parsers.R`, `test_key_numbers.R`
-and the full-set part of `test_app_smoke.R` (which also loads the set from
-saved data). Run it on the synthetic workbooks in `data/sample/`:
+The test files run in groups on several R processes at once, so the run
+takes about a minute on a machine with eight or more processor cores. To run
+them one after another in the current session, for example while debugging,
+first run `Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`.
+
+The full suite adds three steps that parse a complete set of workbooks:
+`test_real_upload_parsers.R`, `test_key_numbers.R` and the full-set part of
+`test_app_smoke.R` (which also loads the set from saved data). It takes
+about three minutes. Run it on the synthetic workbooks in `data/sample/`:
 
 ```r
 source("tests/run_sample_tests.R")
