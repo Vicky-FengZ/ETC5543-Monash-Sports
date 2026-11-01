@@ -859,6 +859,117 @@ stopifnot(
   ) == 0L
 )
 
+# Executive Site choices come from the uploaded Monthly Site Reports.
+
+dynamic_site_reports <- list(
+
+  finance = data.frame(
+    site = c(
+      "Aquatics Clayton",
+      "Esports",
+      "Aquatics Clayton",
+      ""
+    ),
+    stringsAsFactors = FALSE
+  ),
+
+  discounts = data.frame(
+    site = c(
+      "Caulfield",
+      "Esports",
+      NA_character_
+    ),
+    stringsAsFactors = FALSE
+  ),
+
+  total_revenue = data.frame(
+    site = c(
+      "Aquatics Clayton",
+      "Wellness Hub"
+    ),
+    stringsAsFactors = FALSE
+  )
+)
+
+
+stopifnot(
+
+  identical(
+    executive_site_choices(
+      dynamic_site_reports
+    ),
+    c(
+      "All Monash Sport",
+      "Aquatics Clayton",
+      "Caulfield",
+      "Esports",
+      "Wellness Hub"
+    )
+  ),
+
+  identical(
+    executive_site_choices(
+      NULL
+    ),
+    "All Monash Sport"
+  ),
+
+  identical(
+    executive_site_choices(
+      list(
+        finance =
+          data.frame(
+            value = 1,
+            stringsAsFactors = FALSE
+          )
+      )
+    ),
+    "All Monash Sport"
+  )
+)
+
+# Executive Site selection is reconciled when uploaded sites change.
+
+stopifnot(
+
+  # Keep a selected site while it is still available.
+  identical(
+    executive_reconcile_site_selection(
+      site = "Esports",
+      choices = c(
+        "All Monash Sport",
+        "Aquatics Clayton",
+        "Esports"
+      )
+    ),
+    "Esports"
+  ),
+
+  # A removed site falls back safely.
+  identical(
+    executive_reconcile_site_selection(
+      site = "Esports",
+      choices = c(
+        "All Monash Sport",
+        "Aquatics Clayton"
+      )
+    ),
+    "All Monash Sport"
+  ),
+
+  # Missing browser state also falls back safely.
+  identical(
+    executive_reconcile_site_selection(
+      site = NULL,
+      choices = c(
+        "All Monash Sport",
+        "Aquatics Clayton"
+      )
+    ),
+    "All Monash Sport"
+  )
+)
+
 # Executive year selection is reconciled when available data changes.
 
   stopifnot(
@@ -1078,6 +1189,10 @@ dynamic_selector_data <- shiny::reactiveVal(
           2029L,
           2030L
         ),
+        site = c(
+          "Aquatics Clayton",
+          "Aquatics Clayton"
+        ),
         value = c(
           100,
           200
@@ -1276,6 +1391,10 @@ shiny::testServer(
             report_year = c(
               2029L,
               2030L
+            ),
+            site = c(
+              "Aquatics Clayton",
+              "Aquatics Clayton"
             ),
             value = c(
               100,
@@ -1491,6 +1610,10 @@ picker_test_data <- shiny::reactiveVal(
         report_year = c(
           2025L,
           2026L
+        ),
+        site = c(
+          "Aquatics Clayton",
+          "Aquatics Clayton"
         ),
         value = c(
           1,
@@ -1998,7 +2121,27 @@ shiny::testServer(
 context_picker_data <- shiny::reactiveVal(
   list(
 
-    monthly_reports = NULL,
+    monthly_reports = list(
+
+      finance = data.frame(
+        report_year = c(
+          2026L,
+          2027L,
+          2027L
+        ),
+        site = c(
+          "Aquatics Clayton",
+          "Aquatics Clayton",
+          "Esports"
+        ),
+        value = c(
+          1,
+          1,
+          1
+        ),
+        stringsAsFactors = FALSE
+      )
+    ),
 
     site_reports = list(
 
@@ -2279,7 +2422,37 @@ shiny::testServer(
     session$flushReact()
 
 
-    future_context <- executive_context()
+    stopifnot(
+      identical(
+        available_executive_sites(),
+        c(
+          "All Monash Sport",
+          "Esports"
+        )
+      )
+    )
+
+
+    future_site_selector_html <-
+      output$site_selector$html
+
+
+    stopifnot(
+      grepl(
+        "All Monash Sport",
+        future_site_selector_html,
+        fixed = TRUE
+      ),
+
+      grepl(
+        "Esports",
+        future_site_selector_html,
+        fixed = TRUE
+      )
+    )
+
+    future_context <-
+      executive_context()
 
 
     stopifnot(
@@ -2293,7 +2466,6 @@ shiny::testServer(
       )
     )
 
-
     stopifnot(
       identical(
         executive_context_years(
@@ -2303,9 +2475,164 @@ shiny::testServer(
       )
     )
 
+    # ---------------------------------------------------------------------
+    # Removing the selected Site must clear stale Executive scope.
+    # ---------------------------------------------------------------------
+
+    future_executive_data(
+      list(
+
+        monthly_reports = list(
+
+          finance = data.frame(
+            report_year = 2028L,
+            site = "Aquatics Clayton",
+            value = 100,
+            stringsAsFactors = FALSE
+          ),
+
+          discounts = data.frame(
+            report_year = 2028L,
+            site = "Aquatics Clayton",
+            value = 10,
+            stringsAsFactors = FALSE
+          )
+        ),
+
+        site_reports = NULL,
+
+        venues_reports = NULL
+      )
+    )
+
+    session$flushReact()
+
+
+    stopifnot(
+      identical(
+        available_executive_sites(),
+        c(
+          "All Monash Sport",
+          "Aquatics Clayton"
+        )
+      )
+    )
+
+
+    removed_site_selector_html <-
+      output$site_selector$html
+
+
+    stopifnot(
+      grepl(
+        "All Monash Sport",
+        removed_site_selector_html,
+        fixed = TRUE
+      ),
+
+      !grepl(
+        "Esports",
+        removed_site_selector_html,
+        fixed = TRUE
+      )
+    )
+
+
+    # Explicitly simulate stale browser state.
+    session$setInputs(
+      site = "Esports"
+    )
+
+    session$flushReact()
+
+
+    removed_site_context <-
+      executive_context()
+
+
+    stopifnot(
+      identical(
+        removed_site_context$site,
+        "All Monash Sport"
+      )
+    )
+
+    # Restore the future-site fixture for the remaining tests.
+
+      future_executive_data(
+        list(
+
+          monthly_reports = list(
+
+            finance = data.frame(
+              report_year = c(
+                2027L,
+                2028L
+              ),
+              site = c(
+                "Esports",
+                "Esports"
+              ),
+              value = c(
+                100,
+                125
+              ),
+              stringsAsFactors = FALSE
+            ),
+
+            discounts = data.frame(
+              report_year = c(
+                2027L,
+                2028L
+              ),
+              site = c(
+                "Esports",
+                "Esports"
+              ),
+              value = c(
+                10,
+                12
+              ),
+              stringsAsFactors = FALSE
+            )
+          ),
+
+          site_reports = list(
+
+            finance = data.frame(
+              report_year = c(
+                2027L,
+                2028L
+              ),
+              report_unit = c(
+                "Esports",
+                "Esports"
+              ),
+              campus = c(
+                "Clayton",
+                "Clayton"
+              ),
+              business_unit = c(
+                "Esports Arena",
+                "Esports Arena"
+              ),
+              stringsAsFactors = FALSE
+            )
+          ),
+
+          venues_reports = NULL
+        )
+      )
+
+      session$flushReact()
+
+      session$setInputs(
+        site = "Esports"
+      )
+
+      session$flushReact()
 
     future_registry <- picker_registry()
-
 
     future_site_ranking <- future_registry[
       future_registry$id ==
@@ -2313,7 +2640,6 @@ shiny::testServer(
       ,
       drop = FALSE
     ]
-
 
     future_facility_ranking <- future_registry[
       future_registry$id ==
@@ -2387,9 +2713,81 @@ shiny::testServer(
         comparison_facility_ranking$available[[1L]]
       )
     )
-  }
-)
 
-cat(
-  "PASS Executive Dashboard visual picker\n"
-)
+    # ---------------------------------------------------------------------
+    # Dynamic Site scope remains independent across focus round trips.
+    # ---------------------------------------------------------------------
+
+    session$setInputs(
+      dashboard_section = "metrics"
+    )
+
+    session$flushReact()
+
+    future_metrics_context <-
+      executive_context()
+
+    stopifnot(
+      identical(
+        active_focus(),
+        "Metrics"
+      ),
+
+      identical(
+        future_metrics_context$site,
+        "All Venues"
+      )
+    )
+
+
+    session$setInputs(
+      dashboard_section = "finance"
+    )
+
+    session$flushReact()
+
+    future_overview_context <-
+      executive_context()
+
+    stopifnot(
+      identical(
+        active_focus(),
+        "Overview"
+      ),
+
+      identical(
+        future_overview_context$site,
+        "All Monash Sport"
+      )
+    )
+
+
+    session$setInputs(
+      dashboard_section = "site"
+    )
+
+    session$flushReact()
+
+    future_site_round_trip_context <-
+      executive_context()
+
+    stopifnot(
+      identical(
+        active_focus(),
+        "Site"
+      ),
+
+      identical(
+        future_site_round_trip_context$site,
+        "Esports"
+      ),
+
+      "Esports" %in%
+        available_executive_sites()
+    )
+      }
+    )
+
+  cat(
+    "PASS Executive Dashboard visual picker\n"
+  )

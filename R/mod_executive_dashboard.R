@@ -263,6 +263,145 @@ executive_available_years <- function(
   integer()
 }
 
+executive_site_choices <- function(
+    monthly_reports
+) {
+
+  site_values <- unlist(
+    lapply(
+      c(
+        "finance",
+        "discounts",
+        "total_revenue"
+      ),
+      function(table_name) {
+
+        if (
+          is.null(monthly_reports) ||
+            !is.list(monthly_reports) ||
+            !table_name %in%
+              names(monthly_reports)
+        ) {
+          return(character())
+        }
+
+        table_data <-
+          monthly_reports[[table_name]]
+
+        if (
+          is.null(table_data) ||
+            !is.data.frame(table_data) ||
+            nrow(table_data) == 0L ||
+            !"site" %in%
+              names(table_data)
+        ) {
+          return(character())
+        }
+
+        sites <- trimws(
+          as.character(
+            table_data$site
+          )
+        )
+
+        sites[
+          !is.na(sites) &
+            nzchar(sites)
+        ]
+      }
+    ),
+    use.names = FALSE
+  )
+
+  site_values <- unique(
+    site_values
+  )
+
+  if (length(site_values) == 0L) {
+    return(
+      "All Monash Sport"
+    )
+  }
+
+  known_sites <-
+    SITE_NAMES[
+      SITE_NAMES %in%
+        site_values
+    ]
+
+  discovered_sites <-
+    sort(
+      setdiff(
+        site_values,
+        SITE_NAMES
+      )
+    )
+
+  c(
+    "All Monash Sport",
+    known_sites,
+    discovered_sites
+  )
+}
+
+executive_reconcile_site_selection <- function(
+    site,
+    choices
+) {
+
+  choices <- unique(
+    as.character(
+      choices
+    )
+  )
+
+  choices <- choices[
+    !is.na(choices) &
+      nzchar(
+        trimws(choices)
+      )
+  ]
+
+  fallback <- if (
+    "All Monash Sport" %in% choices
+  ) {
+    "All Monash Sport"
+  } else if (
+    length(choices) > 0L
+  ) {
+    choices[[1L]]
+  } else {
+    "All Monash Sport"
+  }
+
+  if (
+    is.null(site) ||
+      length(site) == 0L ||
+      is.na(site[[1L]]) ||
+      !nzchar(
+        trimws(
+          as.character(
+            site[[1L]]
+          )
+        )
+      )
+  ) {
+    return(fallback)
+  }
+
+  current_site <-
+    as.character(
+      site[[1L]]
+    )
+
+  if (current_site %in% choices) {
+    return(current_site)
+  }
+
+  fallback
+}
+
+
 executive_comparison_year_choices <- function(
     year,
     years
@@ -746,7 +885,7 @@ executive_visual_card_ui <- function(
       nzchar(context_label[[1L]])
   ) {
 
-    subtitle_ui <- div(
+    subtitle_ui <- shiny::div(
       class = "chart-header-subtitle",
       context_label[[1L]]
     )
@@ -758,7 +897,7 @@ executive_visual_card_ui <- function(
     ns = ns
   )
 
-  card(
+  bslib::card(
     class = paste(
       "executive-visual-card",
 
@@ -874,7 +1013,7 @@ executive_visual_grid_ui <- function(
     return(NULL)
   }
 
-  div(
+  shiny::div(
     class = "executive-dashboard-grid",
 
     tagList(
@@ -910,7 +1049,7 @@ executive_site_values_card_ui <- function(
     ns
 ) {
 
-  card(
+  bslib::card(
     class = "executive-dashboard-table-card",
     full_screen = TRUE,
 
@@ -963,7 +1102,7 @@ executive_key_insights_card_ui <- function(
   ns
 ) {
 
-  card(
+  bslib::card(
     class = "executive-insights-card",
     full_screen = TRUE,
 
@@ -1040,7 +1179,7 @@ executive_supporting_components_ui <- function(
     "executive-dashboard-bottom-grid"
   }
 
-  div(
+  shiny::div(
     class = layout_class,
     tagList(
       components
@@ -1050,9 +1189,9 @@ executive_supporting_components_ui <- function(
 
 mod_executive_dashboard_ui <- function(id) {
 
-  ns <- NS(id)
+  ns <- shiny::NS(id)
 
-  nav_panel(
+  bslib::nav_panel(
     "Executive Dashboard",
     icon = bs_icon("grid-1x2"),
 
@@ -1134,14 +1273,8 @@ mod_executive_dashboard_ui <- function(id) {
                     condition =
                       "input.dashboard_section == 'site'",
 
-                    selectInput(
-                      ns("site"),
-                      "Site",
-                      choices = c(
-                        "All Monash Sport",
-                        SITE_NAMES
-                      ),
-                      selected = "All Monash Sport"
+                    uiOutput(
+                      ns("site_selector")
                     ),
 
                     ns = ns
@@ -1216,7 +1349,7 @@ mod_executive_dashboard_server <- function(
     data = NULL
 ) {
 
-  moduleServer(
+  shiny::moduleServer(
     id,
     function(input, output, session) {
 
@@ -1293,6 +1426,21 @@ mod_executive_dashboard_server <- function(
             dashboard_data_value(),
           focus =
             active_focus()
+        )
+      })
+
+      available_executive_sites <- reactive({
+
+        monthly_reports <-
+          executive_source_data(
+            dashboard_data =
+              dashboard_data_value(),
+            source_group =
+              "monthly"
+          )
+
+        executive_site_choices(
+          monthly_reports
         )
       })
 
@@ -1560,6 +1708,61 @@ mod_executive_dashboard_server <- function(
         )
       })
 
+      output$site_selector <- renderUI({
+
+        choices <-
+          available_executive_sites()
+
+        context <-
+          dashboard_contexts$Site
+
+        current_site <- isolate(
+          input$site
+        )
+
+        context_site <- if (
+          !is.null(context) &&
+            !is.null(context$site) &&
+            length(context$site) > 0L
+        ) {
+          context$site
+        } else {
+          "All Monash Sport"
+        }
+
+        candidate_site <- if (
+          !is.null(current_site) &&
+            length(current_site) > 0L &&
+            !is.na(current_site[[1L]]) &&
+            nzchar(
+              as.character(
+                current_site[[1L]]
+              )
+            )
+        ) {
+          current_site
+        } else {
+          context_site
+        }
+
+        selected_site <-
+          executive_reconcile_site_selection(
+            site =
+              candidate_site,
+            choices =
+              choices
+          )
+
+        selectInput(
+          ns("site"),
+          "Site",
+          choices =
+            choices,
+          selected =
+            selected_site
+        )
+      })
+
       # -------------------------------------------------------------------
       # Selected visuals
       # -------------------------------------------------------------------
@@ -1819,7 +2022,12 @@ mod_executive_dashboard_server <- function(
 
           } else {
 
-            input$site
+            executive_reconcile_site_selection(
+              site =
+                input$site,
+              choices =
+                available_executive_sites()
+            )
           }
 
         list(
