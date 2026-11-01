@@ -859,6 +859,212 @@ stopifnot(
   ) == 0L
 )
 
+# Executive year selection is reconciled when available data changes.
+
+  stopifnot(
+
+    # Keep the current year when it is still available.
+    identical(
+      executive_reconcile_year_selection(
+        year = "2029",
+        years = c(
+          2028L,
+          2029L,
+          2030L
+        )
+      ),
+      "2029"
+    ),
+
+    # If the selected year disappears, use the latest available year.
+    identical(
+      executive_reconcile_year_selection(
+        year = "2027",
+        years = c(
+          2028L,
+          2029L,
+          2030L
+        )
+      ),
+      "2030"
+    ),
+
+    # A missing selection also defaults to the latest available year.
+    identical(
+      executive_reconcile_year_selection(
+        year = NULL,
+        years = c(
+          2028L,
+          2029L,
+          2030L
+        )
+      ),
+      "2030"
+    ),
+
+    # An empty browser value behaves like no selection.
+    identical(
+      executive_reconcile_year_selection(
+        year = "",
+        years = c(
+          2028L,
+          2029L,
+          2030L
+        )
+      ),
+      "2030"
+    ),
+
+    # No uploaded years means there is no valid selection.
+    identical(
+      executive_reconcile_year_selection(
+        year = "2030",
+        years = integer()
+      ),
+      ""
+    )
+  )
+
+# Executive comparison selection is reconciled when data changes.
+
+stopifnot(
+
+  # Keep the comparison year when it is still valid.
+  identical(
+    executive_reconcile_comparison_year(
+      year = "2030",
+      comparison_year = "2028",
+      years = c(
+        2028L,
+        2029L,
+        2030L
+      )
+    ),
+    "2028"
+  ),
+
+  # If the comparison year disappears, select the default valid comparison.
+  identical(
+    executive_reconcile_comparison_year(
+      year = "2030",
+      comparison_year = "2028",
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "2029"
+  ),
+
+  # Missing comparison selection also receives a valid default.
+  identical(
+    executive_reconcile_comparison_year(
+      year = "2030",
+      comparison_year = NULL,
+      years = c(
+        2028L,
+        2029L,
+        2030L
+      )
+    ),
+    "2029"
+  ),
+
+  # The current year can never also be the comparison year.
+  identical(
+    executive_reconcile_comparison_year(
+      year = "2030",
+      comparison_year = "2030",
+      years = c(
+        2028L,
+        2029L,
+        2030L
+      )
+    ),
+    "2029"
+  ),
+
+  # With only one available year, comparison is impossible.
+  identical(
+    executive_reconcile_comparison_year(
+      year = "2030",
+      comparison_year = "2029",
+      years = 2030L
+    ),
+    ""
+  )
+)
+
+# Executive View mode is reconciled against available years.
+
+stopifnot(
+
+  # Comparison remains valid when at least two years exist.
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = "Comparison",
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "Comparison"
+  ),
+
+  # Year Review remains valid when multiple years exist.
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = "Year Review",
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "Year Review"
+  ),
+
+  # Comparison is impossible when only one year remains.
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = "Comparison",
+      years = 2030L
+    ),
+    "Year Review"
+  ),
+
+  # No data also falls back safely to Year Review.
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = "Comparison",
+      years = integer()
+    ),
+    "Year Review"
+  ),
+
+  # Missing or invalid browser state also falls back safely.
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = NULL,
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "Year Review"
+  ),
+
+  identical(
+    executive_reconcile_view_mode(
+      view_mode = "Something Else",
+      years = c(
+        2029L,
+        2030L
+      )
+    ),
+    "Year Review"
+  )
+)
+
 # The Executive module uses the correct dynamic year family
 # for each dashboard focus.
 
@@ -965,6 +1171,255 @@ shiny::testServer(
       )
     )
 
+    # Removing the selected year must reconcile the Year selector
+    # to the latest year that is still available.
+
+    dynamic_selector_data(
+      list(
+
+        monthly_reports = list(
+
+          finance = data.frame(
+            report_year = 2029L,
+            value = 100,
+            stringsAsFactors = FALSE
+          )
+        ),
+
+        site_reports = NULL,
+
+        venues_reports = list(
+
+          attendance = data.frame(
+            report_year = c(
+              2028L,
+              2031L
+            ),
+            value = c(
+              1000,
+              1200
+            ),
+            stringsAsFactors = FALSE
+          )
+        )
+      )
+    )
+
+    session$flushReact()
+
+    reconciled_year_selector_html <-
+      output$year_selector$html
+
+    reconciled_view_selector_html <-
+      output$view_mode_selector$html
+
+    stopifnot(
+      grepl(
+        "2029",
+        reconciled_year_selector_html,
+        fixed = TRUE
+      ),
+
+      !grepl(
+        "2030",
+        reconciled_year_selector_html,
+        fixed = TRUE
+      ),
+
+      grepl(
+        "Year Review",
+        reconciled_view_selector_html,
+        fixed = TRUE
+      ),
+
+      !grepl(
+        "Comparison",
+        reconciled_view_selector_html,
+        fixed = TRUE
+      )
+    )
+
+
+    # Even if stale browser state still says Comparison,
+    # the server context must fall back to Year Review.
+
+    session$setInputs(
+      view_mode = "Comparison",
+      comparison_year = "2028"
+    )
+
+    session$flushReact()
+
+    single_year_context <-
+      executive_context()
+
+    stopifnot(
+      identical(
+        single_year_context$view_mode,
+        "Year Review"
+      ),
+
+      is.null(
+        single_year_context$comparison_year
+      )
+    )
+
+
+    # Restore the original fixture for the remaining focus tests.
+
+    dynamic_selector_data(
+      list(
+
+        monthly_reports = list(
+
+          finance = data.frame(
+            report_year = c(
+              2029L,
+              2030L
+            ),
+            value = c(
+              100,
+              200
+            ),
+            stringsAsFactors = FALSE
+          )
+        ),
+
+        site_reports = NULL,
+
+        venues_reports = list(
+
+          attendance = data.frame(
+            report_year = c(
+              2028L,
+              2031L
+            ),
+            value = c(
+              1000,
+              1200
+            ),
+            stringsAsFactors = FALSE
+          )
+        )
+      )
+    )
+
+    session$flushReact()
+
+    # ---------------------------------------------------------------------
+    # Removed comparison years must reconcile to a valid remaining year.
+    # ---------------------------------------------------------------------
+
+    # First make 2028 a genuinely available comparison year.
+    dynamic_selector_data(
+      list(
+
+        monthly_reports = list(
+
+          finance = data.frame(
+            report_year = c(
+              2028L,
+              2029L,
+              2030L
+            ),
+            value = c(
+              50,
+              100,
+              200
+            ),
+            stringsAsFactors = FALSE
+          )
+        ),
+
+        site_reports = NULL,
+
+        venues_reports = list(
+
+          attendance = data.frame(
+            report_year = c(
+              2028L,
+              2031L
+            ),
+            value = c(
+              1000,
+              1200
+            ),
+            stringsAsFactors = FALSE
+          )
+        )
+      )
+    )
+
+    session$flushReact()
+
+
+    session$setInputs(
+      year = "2030",
+      comparison_year = "2028"
+    )
+
+    session$flushReact()
+
+
+    # Now remove 2028 while keeping the current year 2030.
+    dynamic_selector_data(
+      list(
+
+        monthly_reports = list(
+
+          finance = data.frame(
+            report_year = c(
+              2029L,
+              2030L
+            ),
+            value = c(
+              100,
+              200
+            ),
+            stringsAsFactors = FALSE
+          )
+        ),
+
+        site_reports = NULL,
+
+        venues_reports = list(
+
+          attendance = data.frame(
+            report_year = c(
+              2028L,
+              2031L
+            ),
+            value = c(
+              1000,
+              1200
+            ),
+            stringsAsFactors = FALSE
+          )
+        )
+      )
+    )
+
+    session$flushReact()
+
+
+    reconciled_comparison_selector_html <-
+      output$comparison_year_selector$html
+
+
+    stopifnot(
+      grepl(
+        'value="2029" selected',
+        reconciled_comparison_selector_html,
+        fixed = TRUE
+      ),
+
+      !grepl(
+        'value="2028"',
+        reconciled_comparison_selector_html,
+        fixed = TRUE
+      )
+    )
+
     session$setInputs(
       dashboard_section = "site"
     )
@@ -1033,12 +1488,26 @@ picker_test_data <- shiny::reactiveVal(
     monthly_reports = list(
 
       finance = data.frame(
-        value = 1,
+        report_year = c(
+          2025L,
+          2026L
+        ),
+        value = c(
+          1,
+          1
+        ),
         stringsAsFactors = FALSE
       ),
 
       discounts = data.frame(
-        value = 1,
+        report_year = c(
+          2025L,
+          2026L
+        ),
+        value = c(
+          1,
+          1
+        ),
         stringsAsFactors = FALSE
       )
     ),

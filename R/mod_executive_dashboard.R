@@ -303,6 +303,133 @@ executive_comparison_year_choices <- function(
   )
 }
 
+executive_reconcile_year_selection <- function(
+    year,
+    years
+) {
+
+  years <-
+    reporting_normalize_years(
+      years
+    )
+
+  if (length(years) == 0L) {
+    return("")
+  }
+
+  current_year <- if (
+    !is.null(year) &&
+      length(year) > 0L &&
+      !is.na(year[[1L]]) &&
+      nzchar(
+        as.character(
+          year[[1L]]
+        )
+      )
+  ) {
+    as.character(
+      year[[1L]]
+    )
+  } else {
+    ""
+  }
+
+  if (
+    current_year %in%
+      as.character(years)
+  ) {
+    return(current_year)
+  }
+
+  as.character(
+    reporting_latest_year(
+      years
+    )
+  )
+}
+
+executive_reconcile_comparison_year <- function(
+    year,
+    comparison_year,
+    years
+) {
+
+  choices <-
+    executive_comparison_year_choices(
+      year = year,
+      years = years
+    )
+
+  if (length(choices) == 0L) {
+    return("")
+  }
+
+  current_comparison <- if (
+    !is.null(comparison_year) &&
+      length(comparison_year) > 0L &&
+      !is.na(comparison_year[[1L]]) &&
+      nzchar(
+        as.character(
+          comparison_year[[1L]]
+        )
+      )
+  ) {
+    as.character(
+      comparison_year[[1L]]
+    )
+  } else {
+    ""
+  }
+
+  if (current_comparison %in% choices) {
+    return(current_comparison)
+  }
+
+  executive_default_comparison_year(
+    year = year,
+    years = years
+  )
+}
+
+executive_reconcile_view_mode <- function(
+    view_mode,
+    years
+) {
+
+  years <-
+    reporting_normalize_years(
+      years
+    )
+
+  if (length(years) < 2L) {
+    return("Year Review")
+  }
+
+  current_view <- if (
+    !is.null(view_mode) &&
+      length(view_mode) > 0L &&
+      !is.na(view_mode[[1L]])
+  ) {
+    as.character(
+      view_mode[[1L]]
+    )
+  } else {
+    ""
+  }
+
+  if (
+    current_view %in%
+      c(
+        "Year Review",
+        "Comparison"
+      )
+  ) {
+    return(current_view)
+  }
+
+  "Year Review"
+}
+
 executive_filter_monthly_reports_by_site <- function(
     monthly_reports,
     site
@@ -980,14 +1107,8 @@ mod_executive_dashboard_ui <- function(id) {
 
                 layout_columns(
 
-                  selectInput(
-                    ns("view_mode"),
-                    "View",
-                    choices = c(
-                      "Year Review",
-                      "Comparison"
-                    ),
-                    selected = "Year Review"
+                  uiOutput(
+                    ns("view_mode_selector")
                   ),
 
                   div(
@@ -1242,6 +1363,73 @@ mod_executive_dashboard_server <- function(
       # Dynamic Executive year selector
       # -------------------------------------------------------------------
 
+      output$view_mode_selector <- renderUI({
+
+        years <-
+          available_executive_years()
+
+        focus <-
+          active_focus()
+
+        context <- if (
+          !is.null(focus) &&
+            focus %in%
+              c(
+                "Overview",
+                "Site",
+                "Metrics"
+              )
+        ) {
+
+          dashboard_contexts[[focus]]
+
+        } else {
+
+          NULL
+        }
+
+        context_view <- if (
+          !is.null(context) &&
+            !is.null(context$view_mode) &&
+            length(context$view_mode) > 0L
+        ) {
+          as.character(
+            context$view_mode[[1L]]
+          )
+        } else {
+          "Year Review"
+        }
+
+        selected_view <-
+          executive_reconcile_view_mode(
+            view_mode =
+              context_view,
+            years =
+              years
+          )
+
+        view_choices <- if (
+          length(years) >= 2L
+        ) {
+          c(
+            "Year Review",
+            "Comparison"
+          )
+        } else {
+          "Year Review"
+        }
+
+        selectInput(
+          ns("view_mode"),
+          "View",
+          choices =
+            view_choices,
+          selected =
+            selected_view
+        )
+      })
+
+
       output$year_selector <- renderUI({
 
         years <-
@@ -1284,39 +1472,25 @@ mod_executive_dashboard_server <- function(
           NULL
         }
 
-
         context_year <- if (
           !is.null(context) &&
             !is.null(context$year) &&
             length(context$year) > 0L
         ) {
-
           as.character(
             context$year[[1L]]
           )
-
         } else {
-
           ""
         }
 
-
-        selected_year <- if (
-          context_year %in%
-            as.character(years)
-        ) {
-
-          context_year
-
-        } else {
-
-          as.character(
-            reporting_latest_year(
+        selected_year <-
+          executive_reconcile_year_selection(
+            year =
+              context_year,
+            years =
               years
-            )
           )
-        }
-
 
         selectInput(
           ns("year"),
@@ -1360,31 +1534,20 @@ mod_executive_dashboard_server <- function(
           )
         }
 
-
         current_value <- isolate(
           input$comparison_year
         )
 
 
-        selected_value <- if (
-          !is.null(current_value) &&
-            length(current_value) > 0L &&
-            current_value %in% choices
-        ) {
-
-          as.character(
-            current_value[[1L]]
-          )
-
-        } else {
-
-          executive_default_comparison_year(
+        selected_value <-
+          executive_reconcile_comparison_year(
             year =
               selected_year,
+            comparison_year =
+              current_value,
             years =
               years
           )
-        }
 
 
         selectInput(
@@ -1611,11 +1774,19 @@ mod_executive_dashboard_server <- function(
 
       executive_context <- reactive({
 
+        effective_view_mode <-
+          executive_reconcile_view_mode(
+            view_mode =
+              input$view_mode,
+            years =
+              available_executive_years()
+          )
+
         comparison_year <- NULL
 
         if (
           identical(
-            input$view_mode,
+            effective_view_mode,
             "Comparison"
           )
         ) {
@@ -1653,7 +1824,7 @@ mod_executive_dashboard_server <- function(
 
         list(
           view_mode =
-            input$view_mode,
+            effective_view_mode,
 
           year =
             input$year,
