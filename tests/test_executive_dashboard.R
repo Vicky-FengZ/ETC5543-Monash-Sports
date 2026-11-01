@@ -1906,8 +1906,32 @@ shiny::testServer(
       )
 
       session$flushReact()
+    
+      stopifnot(
+        identical(
+          dashboard_contexts$Overview$site,
+          "All Monash Sport"
+        ),
+
+        identical(
+          dashboard_contexts$Overview$year,
+          "2026"
+        ),
+
+        identical(
+          dashboard_contexts$Overview$view_mode,
+          "Comparison"
+        ),
+
+        identical(
+          dashboard_contexts$Overview$comparison_year,
+          "2025"
+        )
+      )
 
       session$setInputs(
+        view_mode = "Year Review",
+        year = "2026",
         site = "Aquatics Clayton"
       )
 
@@ -2002,6 +2026,23 @@ shiny::testServer(
 
     session$flushReact()
 
+    stopifnot(
+      identical(
+        dashboard_contexts$Site$site,
+        "Aquatics Clayton"
+      ),
+
+      identical(
+        dashboard_contexts$Site$view_mode,
+        "Year Review"
+      ),
+
+      identical(
+        dashboard_contexts$Site$year,
+        "2026"
+      )
+    )
+
     metrics_scope_context <-
       executive_context()
 
@@ -2052,6 +2093,18 @@ shiny::testServer(
       )
 
       session$flushReact()
+    
+      stopifnot(
+        identical(
+          dashboard_contexts$Metrics$site,
+          "All Venues"
+        ),
+
+        identical(
+          dashboard_contexts$Metrics$view_mode,
+          "Year Review"
+        )
+      )
 
       site_round_trip_context <-
         executive_context()
@@ -2064,6 +2117,11 @@ shiny::testServer(
 
         identical(
           site_round_trip_context$site,
+          "Aquatics Clayton"
+        ),
+
+        identical(
+          dashboard_contexts$Site$site,
           "Aquatics Clayton"
         )
       )

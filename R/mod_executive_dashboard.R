@@ -1468,7 +1468,7 @@ mod_executive_dashboard_server <- function(
           view_mode = "Year Review",
           year = "",
           comparison_year = NULL,
-          site = "All Monash Sport"
+          site = "All Venues"
         )
       )
 
@@ -1477,35 +1477,118 @@ mod_executive_dashboard_server <- function(
       )
 
       save_dashboard_context <- function(
-        focus
-    ) {
+          focus
+      ) {
 
-      context <-
-        dashboard_contexts[[focus]]
+        if (
+          is.null(focus) ||
+            length(focus) == 0L ||
+            !focus %in%
+              c(
+                "Overview",
+                "Site",
+                "Metrics"
+              )
+        ) {
+          return(
+            invisible(NULL)
+          )
+        }
 
-      if (!is.null(input$view_mode)) {
-        context$view_mode <-
-          input$view_mode
+
+        focus_years <-
+          executive_available_years(
+            dashboard_data =
+              dashboard_data_value(),
+            focus =
+              focus
+          )
+
+
+        selected_year <-
+          executive_reconcile_year_selection(
+            year =
+              input$year,
+            years =
+              focus_years
+          )
+
+
+        selected_view_mode <-
+          executive_reconcile_view_mode(
+            view_mode =
+              input$view_mode,
+            years =
+              focus_years
+          )
+
+
+        comparison_year <-
+          executive_reconcile_comparison_year(
+            year =
+              selected_year,
+            comparison_year =
+              input$comparison_year,
+            years =
+              focus_years
+          )
+
+
+        selected_site <-
+          if (
+            identical(
+              focus,
+              "Overview"
+            )
+          ) {
+
+            "All Monash Sport"
+
+          } else if (
+            identical(
+              focus,
+              "Metrics"
+            )
+          ) {
+
+            "All Venues"
+
+          } else {
+
+            monthly_reports <-
+              executive_source_data(
+                dashboard_data =
+                  dashboard_data_value(),
+                source_group =
+                  "monthly"
+              )
+
+            executive_reconcile_site_selection(
+              site =
+                input$site,
+              choices =
+                executive_site_choices(
+                  monthly_reports
+                )
+            )
+          }
+
+
+        dashboard_contexts[[focus]] <-
+          list(
+            view_mode =
+              selected_view_mode,
+            year =
+              selected_year,
+            comparison_year =
+              comparison_year,
+            site =
+              selected_site
+          )
+
+
+        invisible(NULL)
       }
-
-      if (!is.null(input$year)) {
-        context$year <-
-          input$year
-      }
-
-      if (!is.null(input$comparison_year)) {
-        context$comparison_year <-
-          input$comparison_year
-      }
-
-      if (!is.null(input$site)) {
-        context$site <-
-          input$site
-      }
-
-      dashboard_contexts[[focus]] <-
-        context
-    }
       
       # -------------------------------------------------------------------
       # Dynamic Executive year selector
@@ -1824,34 +1907,22 @@ mod_executive_dashboard_server <- function(
             )
 
 
-          context_year <-
-            as.character(
-              context$year
-            )
-
-
-          selected_year <- if (
-            length(focus_years) > 0L &&
-              context_year %in%
-                as.character(focus_years)
-          ) {
-
-            context_year
-
-          } else if (
-            length(focus_years) > 0L
-          ) {
-
-            as.character(
-              reporting_latest_year(
+          selected_year <-
+            executive_reconcile_year_selection(
+              year =
+                context$year,
+              years =
                 focus_years
-              )
             )
 
-          } else {
 
-            ""
-          }
+          selected_view_mode <-
+            executive_reconcile_view_mode(
+              view_mode =
+                context$view_mode,
+              years =
+                focus_years
+            )
 
 
           comparison_choices <-
@@ -1864,39 +1935,27 @@ mod_executive_dashboard_server <- function(
 
 
           comparison_year <-
-            context$comparison_year
+            executive_reconcile_comparison_year(
+              year =
+                selected_year,
+              comparison_year =
+                context$comparison_year,
+              years =
+                focus_years
+            )
 
 
-          if (
+          comparison_choices_ui <- if (
             length(comparison_choices) == 0L
           ) {
 
-            comparison_choices_ui <-
-              c(
-                "No comparison available" = ""
-              )
-
-            comparison_year <- ""
+            c(
+              "No comparison available" = ""
+            )
 
           } else {
 
-            comparison_choices_ui <-
-              comparison_choices
-
-            if (
-              is.null(comparison_year) ||
-                !comparison_year %in%
-                  comparison_choices
-            ) {
-
-              comparison_year <-
-                executive_default_comparison_year(
-                  year =
-                    selected_year,
-                  years =
-                    focus_years
-                )
-            }
+            comparison_choices
           }
 
           freezeReactiveValue(
@@ -1918,7 +1977,7 @@ mod_executive_dashboard_server <- function(
             session,
             "view_mode",
             selected =
-              context$view_mode
+              selected_view_mode
           )
 
           updateSelectInput(
