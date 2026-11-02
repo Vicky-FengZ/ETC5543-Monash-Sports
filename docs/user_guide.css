@@ -1,0 +1,7 @@
+/* Look of the HTML user guide: Monash brand colours (see dashboard_design.md). */
+h1, h2, h3, .title { color: #121256; }
+.subtitle { color: #006DAE; }
+a { color: #006DAE; }
+figure img, p > img { border: 1px solid #D5DBE1; border-radius: 4px; }
+figcaption { color: #5B6670; font-size: 0.9em; }
+table { font-size: 0.95em; }

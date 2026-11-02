@@ -30,5 +30,17 @@ for (folder in c("R", "www", "config")) {
 stopifnot(!dir.exists(file.path(stage, "data")))
 
 shinylive::export(stage, site)
+
+# Publish the rendered user guide next to the app (not inside it, so it does
+# not add to the app's loading time). Render it first with
+# `quarto render docs/user_guide.qmd`; the navbar links to user_guide.html.
+guide <- file.path(project, "docs", c("user_guide.html", "user_guide.pdf"))
+guide <- guide[file.exists(guide)]
+if (length(guide)) {
+  file.copy(guide, site, overwrite = TRUE)
+  cat("User guide copied:", paste(basename(guide), collapse = ", "), "\n")
+} else {
+  warning("docs/user_guide.html not found; the navbar User guide link will not work.")
+}
 cat("\nFiles in build:", length(list.files(site, recursive = TRUE)), "\n")
 cat("BUILD DONE\n")

@@ -2596,8 +2596,30 @@ body {
 .navbar-data-status-slot {
   display: flex;
   align-items: center;
+  gap: 8px;
   height: 100%;
   padding: 0 8px;
+}
+
+/* Navbar link to the user guide, styled like the data-status chip. */
+.navbar .navbar-guide-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  color: #FFFFFF;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.navbar .navbar-guide-link:hover,
+.navbar .navbar-guide-link:focus-visible {
+  border-color: #ABF5F9;
+  color: #ABF5F9;
 }
 
 @media (min-width: 1400px) {
@@ -2847,8 +2869,13 @@ body {
     padding: 6px 9px;
   }
 
-  .navbar-data-status-text {
+  .navbar-data-status-text,
+  .navbar-guide-link-text {
     display: none;
+  }
+
+  .navbar .navbar-guide-link {
+    padding: 6px 9px;
   }
 }
 

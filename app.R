@@ -96,11 +96,21 @@ ui <- page_navbar(
 
   mod_data_upload_ui("data_upload"),
 
-  # Loaded report years, shown on the right of the navbar.
+  # Loaded report years and the user guide link, on the right of the navbar.
+  # The guide opens in a new tab so uploaded data stay loaded here.
   nav_item(
     div(
       class = "navbar-data-status-slot",
-      uiOutput("data_status", inline = TRUE)
+      uiOutput("data_status", inline = TRUE),
+      tags$a(
+        class = "navbar-guide-link",
+        href = USER_GUIDE_URL,
+        target = "_blank",
+        rel = "noopener",
+        title = "Open the user guide in a new tab",
+        bs_icon("book"),
+        span(class = "navbar-guide-link-text", "User guide")
+      )
     )
   )
 )

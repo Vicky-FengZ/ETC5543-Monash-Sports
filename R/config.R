@@ -211,3 +211,9 @@ prototype_venues_areas <- function(year) {
 
   choices
 }
+
+
+# User guide, published next to the dashboard on GitHub Pages by
+# deploy/build_shinylive.R (source: docs/user_guide.qmd). An absolute URL, so
+# the link also works when the dashboard runs from RStudio.
+USER_GUIDE_URL <- "https://vicky-fengz.github.io/ETC5543-Monash-Sports/user_guide.html"

@@ -15,8 +15,12 @@ uploaded reports never leave your computer).
 **Who this repository is for**
 
 - **Monash Sport staff** using the dashboard with their own reports: start
-  with the [user guide](docs/user_guide.md), which explains how to run the
-  dashboard, store the report workbooks and upload them.
+  with the [user guide](docs/user_guide.pdf) (PDF; also as a web page,
+  `docs/user_guide.html`), a step-by-step guide for non-technical users
+  covering every page, forecasting and common problems.
+- **Maintainers** looking after the code: see the
+  [maintainer guide](docs/maintainer_guide.md) for running the dashboard from
+  RStudio, testing on the real reports and publishing a new version.
 - **Reviewers and other readers** without access to the confidential reports:
   follow the [Quick start](#quick-start) with the synthetic workbooks in
   `data/sample/` and run `tests/run_sample_tests.R` (see [Testing](#testing)).
@@ -86,7 +90,7 @@ successful imports.
 
 The Monash Sport source workbooks are **confidential and are not included**
 in this repository. Monash Sport staff can find how to store and upload them
-in the [user guide](docs/user_guide.md). Everyone else can use the synthetic
+in the [user guide](docs/user_guide.pdf). Everyone else can use the synthetic
 sample workbooks described below.
 
 ### Synthetic sample data
@@ -529,7 +533,11 @@ data/
   sample/                 # synthetic workbooks with the report layouts (random values)
 
 docs/
-  user_guide.md           # for Monash Sport staff: running, storing and uploading reports
+  user_guide.qmd          # for Monash Sport staff: step-by-step guide (Quarto source)
+  user_guide.pdf, .html   # rendered user guide
+  user_guide.css          # look of the HTML user guide
+  images/user_guide/      # screenshots used in the user guide (synthetic data)
+  maintainer_guide.md     # for maintainers: RStudio, full tests, publishing
   dashboard_design.md     # brand colours, typography and layout rules
   data_dictionary.md      # every cleaned table and column
   excel_templates.md      # how to fill in and extend the templates
@@ -556,7 +564,7 @@ deploy/
 tests/
   run_tests.R             # regression tests (see Testing)
   run_sample_tests.R      # same, plus parsing every workbook in data/sample
-  run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
+  run_full_tests.R        # same, on the original reports (see docs/maintainer_guide.md)
   README.md               # what each test file checks and how to run them
   fixtures_site_venues.R  # shared test fixtures
   helper_parse_cache.R    # parses each sample workbook once per run
@@ -649,7 +657,7 @@ rerun with `Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = "true")`, review
 the differences in the file and keep it.
 
 Monash Sport maintainers with the original reports can run the same suite on
-them; see section 6 of the [user guide](docs/user_guide.md).
+them; see section 2 of the [maintainer guide](docs/maintainer_guide.md).
 
 ## Performance and website deployment
 
