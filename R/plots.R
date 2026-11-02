@@ -7986,3 +7986,264 @@ plot_executive_site_enrolments <- function(site_enrolments) {
     annotations = annotations, show_legend = FALSE
   )
 }
+
+# -------------------------------------------------------------------------
+# Executive Venues: fixed four-chart presentation (Year Review/Comparison)
+# -------------------------------------------------------------------------
+# Inputs are already annualised with Venues Operations helpers in the module.
+# Never plot raw workbook summary and detail rows together, and never turn
+# unreported values into zeros. These plots contain no in-plot legends.
+
+# Shared data preparation for attendance, hire revenue and merchandise.
+# Preserve source labels; require one resolved value per category and year.
+# Returned row/category order is also used by the module's hover readouts.
+executive_venues_chart_rows <- function(data, category_col, value_col,
+                                        description, top_n = 8L) {
+  required <- c("report_year", category_col, value_col)
+  if (!is.data.frame(data) || !all(required %in% names(data))) {
+    stop(paste0(description, " requires: ",
+                paste(required, collapse = ", ")), call. = FALSE)
+  }
+
+  rows <- data.frame(
+    report_year = suppressWarnings(as.integer(data$report_year)),
+    category = trimws(as.character(data[[category_col]])),
+    value = suppressWarnings(as.numeric(data[[value_col]])),
+    stringsAsFactors = FALSE
+  )
+  rows <- rows[!is.na(rows$report_year) & !is.na(rows$category) &
+                 nzchar(rows$category), , drop = FALSE]
+  if (nrow(rows) == 0L || !any(is.finite(rows$value))) {
+    stop(paste0("No reported ", description, " values are available."),
+         call. = FALSE)
+  }
+  if (anyDuplicated(rows[c("report_year", "category")])) {
+    stop(paste0("Duplicate ", description, " category/year records. ",
+                "Resolve report totals before plotting."), call. = FALSE)
+  }
+
+  years <- sort(unique(rows$report_year))
+  if (length(years) > 2L) {
+    stop("The Executive Venues presentation supports at most two years.",
+         call. = FALSE)
+  }
+  categories <- unique(rows$category)
+  score <- vapply(categories, function(label) {
+    values <- rows$value[rows$category == label]
+    values <- values[is.finite(values)]
+    if (length(values) == 0L) -Inf else max(abs(values))
+  }, numeric(1))
+  
+  categories <- categories[order(-score, categories)]
+
+  # Facility Hire: keep seven leading facilities and combine
+  # all remaining facilities into one category.
+  # Apply the same grouping in charts and hover readouts.
+  if (
+    identical(category_col, "facility") &&
+    is.finite(top_n) &&
+    top_n >= 2L &&
+    length(categories) > top_n
+  ) {
+
+    keep <- head(categories, as.integer(top_n) - 1L)
+    remaining <- setdiff(categories, keep)
+
+    other_label <- "Other Facilities"
+
+    # Prevent a collision with an existing source category.
+    while (other_label %in% categories) {
+      other_label <- paste0(other_label, " (combined)")
+    }
+
+    other_rows <- lapply(years, function(year) {
+
+      values <- rows$value[
+        rows$report_year == year &
+          rows$category %in% remaining
+      ]
+
+      values <- values[is.finite(values)]
+
+      # Missing reporting data must not become zero.
+      if (length(values) == 0L) {
+        return(NULL)
+      }
+
+      data.frame(
+        report_year = as.integer(year),
+        category = other_label,
+        value = sum(values),
+        stringsAsFactors = FALSE
+      )
+    })
+
+    other_rows <- Filter(Negate(is.null), other_rows)
+
+    rows <- rows[
+      rows$category %in% keep,
+      ,
+      drop = FALSE
+    ]
+
+    if (length(other_rows) > 0L) {
+      rows <- rbind(rows, do.call(rbind, other_rows))
+      categories <- c(keep, other_label)
+    } else {
+      categories <- keep
+    }
+
+  } else {
+
+    # Existing behaviour for attendance and merchandise.
+    if (is.finite(top_n) && top_n > 0L) {
+      categories <- head(categories, as.integer(top_n))
+    }
+
+    rows <- rows[
+      rows$category %in% categories,
+      ,
+      drop = FALSE
+    ]
+  }
+
+  # Keep the same category order for plotting and hover.
+  rows <- rows[
+    order(match(rows$category, categories), rows$report_year),
+    ,
+    drop = FALSE
+  ]
+
+  rownames(rows) <- NULL
+  rows
+}
+
+# One or two years of categories. Category labels are rows, years are colours.
+# On Comparison, the older year uses the secondary colour and the newer year
+# uses the primary colour. The matching legend belongs in the card header.
+executive_venues_plot_comparison_bars <- function(rows, currency = FALSE) {
+  years <- sort(unique(rows$report_year))
+  categories <- unique(rows$category)
+  n <- length(categories)
+  if (!n || length(years) < 1L || length(years) > 2L) {
+    stop("Executive Venues requires one or two reporting years.", call. = FALSE)
+  }
+  values <- matrix(NA_real_, nrow = n, ncol = length(years))
+  for (i in seq_len(nrow(rows))) {
+    values[match(rows$category[[i]], categories),
+           match(rows$report_year[[i]], years)] <- rows$value[[i]]
+  }
+  available <- values[is.finite(values)]
+  if (length(available) == 0L) {
+    stop("There are no reported values to plot.", call. = FALSE)
+  }
+
+  low <- min(c(0, available))
+  high <- max(c(0, available))
+  span <- max(high - low, 1)
+  xlimits <- c(low - if (low < 0) span * 0.08 else 0,
+               high + span * 0.10)
+  ticks <- pretty(c(low, high), n = 4)
+  ticks <- ticks[ticks >= xlimits[[1L]] & ticks <= xlimits[[2L]]]
+  longest <- max(nchar(categories))
+  left <- if (longest > 35L) 12.5 else if (longest > 24L) 10.2 else 7.8
+  old_par <- graphics::par(mar = c(3.8, left, 0.7, 0.8),
+                           xaxs = "i", yaxs = "i", family = "sans")
+  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::plot(NA_real_, xlim = xlimits, ylim = c(0.45, n + 0.55),
+                 axes = FALSE, type = "n", xlab = "", ylab = "")
+  graphics::abline(v = ticks, col = CHART_COLOURS[["grid"]], lwd = 1)
+  graphics::abline(v = 0, col = CHART_COLOURS[["muted"]], lwd = 1)
+  positions <- rev(seq_len(n))
+  colours <- if (length(years) == 1L) {
+    CHART_COLOURS[["primary"]]
+  } else {
+    c(CHART_COLOURS[["secondary"]], CHART_COLOURS[["primary"]])
+  }
+  for (i in seq_len(n)) {
+    for (j in seq_along(years)) {
+      value <- values[i, j]
+      if (!is.finite(value)) next
+      if (length(years) == 1L) {
+        bottom <- positions[[i]] - 0.31
+        top <- positions[[i]] + 0.31
+      } else if (j == 1L) {
+        bottom <- positions[[i]] + 0.04
+        top <- positions[[i]] + 0.39
+      } else {
+        bottom <- positions[[i]] - 0.39
+        top <- positions[[i]] - 0.04
+      }
+      graphics::rect(min(0, value), bottom, max(0, value), top,
+                     col = colours[[j]], border = NA)
+    }
+  }
+  graphics::axis(2, at = positions, labels = categories, las = 1,
+                 tick = FALSE, cex.axis = if (n > 8L) 0.60 else 0.69,
+                 col.axis = CHART_COLOURS[["muted"]])
+  graphics::axis(1, at = ticks,
+                 labels = if (currency) format_compact_currency(ticks) else
+                   executive_site_format_count(ticks),
+                 tick = FALSE, cex.axis = 0.72,
+                 col.axis = CHART_COLOURS[["muted"]])
+  invisible(NULL)
+}
+
+# Attendance source: venues_operations_attendance_section_totals(), with
+# activity/area rows combined by ACTIVITY only after the helper resolves YTD.
+# Expected columns: report_year, activity, value.
+plot_executive_venues_attendance <- function(activity_data) {
+  rows <- executive_venues_chart_rows(activity_data, "activity", "value",
+                                      "attendance by activity")
+  executive_venues_plot_comparison_bars(rows, currency = FALSE)
+}
+
+# Facility Hire source: venues_operations_facility_hire_by_facility(...,
+# metric = "Revenue"). Transactions remain available for hover and summary.
+# Expected columns: report_year, facility, revenue, [transactions].
+plot_executive_venues_facility_hire <- function(facility_data) {
+  rows <- executive_venues_chart_rows(facility_data, "facility", "revenue",
+                                      "facility hire revenue")
+  executive_venues_plot_comparison_bars(rows, currency = TRUE)
+}
+
+# Workforce source: venues_operations_workforce_annual_value() for both
+# "Budget" and "Actual" in each reporting year. Do not infer missing budget.
+# Expected columns: report_year, budget, actual, [paid_hours].
+plot_executive_venues_wages <- function(wages_data) {
+  required <- c("report_year", "budget", "actual")
+  if (!is.data.frame(wages_data) ||
+      !all(required %in% names(wages_data))) {
+    stop("Workforce wages requires report_year, budget and actual.",
+         call. = FALSE)
+  }
+  rows <- wages_data
+  rows$report_year <- suppressWarnings(as.integer(rows$report_year))
+  rows$budget <- suppressWarnings(as.numeric(rows$budget))
+  rows$actual <- suppressWarnings(as.numeric(rows$actual))
+  rows <- rows[!is.na(rows$report_year), , drop = FALSE]
+  if (nrow(rows) == 0L || nrow(rows) > 2L ||
+      anyDuplicated(rows$report_year) ||
+      !any(is.finite(c(rows$budget, rows$actual)))) {
+    stop("No unique, reported annual workforce wages are available.",
+         call. = FALSE)
+  }
+  rows <- rows[order(-rows$report_year), , drop = FALSE]
+  executive_site_plot_pair_bars(
+    values_a = rows$budget,
+    values_b = rows$actual,
+    labels = as.character(rows$report_year),
+    legend_labels = c("Budget", "Actual"),
+    currency = TRUE,
+    show_legend = FALSE
+  )
+}
+
+# Merchandise source: venues_operations_merchandise_breakdown(...,
+# metric = "Revenue", section = "All Sections"). Uses original section labels.
+# Expected columns: report_year, section, revenue, [transactions].
+plot_executive_venues_merchandise <- function(merchandise_data) {
+  rows <- executive_venues_chart_rows(merchandise_data, "section", "revenue",
+                                      "merchandise revenue")
+  executive_venues_plot_comparison_bars(rows, currency = TRUE)
+}

@@ -1506,3 +1506,558 @@ shiny::testServer(mod_executive_dashboard_server,
             grepl("Most visits", insights, fixed = TRUE))
 })
 cat("PASS Sites legends, exact-value hover and site-specific insights\n")
+
+
+# -------------------------------------------------------------------------
+# Executive Venues: layout, hover controls and facility coverage
+# -------------------------------------------------------------------------
+
+venues_ns <- shiny::NS("test-venues")
+
+# Check the four presentation charts and hover controls.
+venues_ui <- paste(
+  as.character(
+    executive_venues_dashboard_ui(
+      venues_ns,
+      "Year Review · 2025 · All Venues",
+      2025L
+    )
+  ),
+  collapse = ""
+)
+
+venues_chart_ids <- c(
+  "venues_attendance",
+  "venues_facility_hire",
+  "venues_wages",
+  "venues_merchandise"
+)
+
+for (chart_id in venues_chart_ids) {
+
+  stopifnot(
+    grepl(
+      paste0("executive_plot_", chart_id),
+      venues_ui,
+      fixed = TRUE
+    ),
+    grepl(
+      paste0("executive_hover_", chart_id),
+      venues_ui,
+      fixed = TRUE
+    ),
+    grepl(
+      paste0("executive_hover_value_", chart_id),
+      venues_ui,
+      fixed = TRUE
+    )
+  )
+}
+
+# Check that Comparison displays both reporting years.
+venues_comparison_ui <- paste(
+  as.character(
+    executive_venues_dashboard_ui(
+      venues_ns,
+      "Comparison · 2025 vs 2024 · All Venues",
+      c(2024L, 2025L)
+    )
+  ),
+  collapse = ""
+)
+
+stopifnot(
+  grepl("2024", venues_comparison_ui, fixed = TRUE),
+  grepl("2025", venues_comparison_ui, fixed = TRUE)
+)
+
+# Check the Operational Summary and Key Insights cards.
+venues_support_ui <- paste(
+  as.character(
+    executive_venues_supporting_ui(venues_ns)
+  ),
+  collapse = ""
+)
+
+stopifnot(
+  grepl("venues_summary_table", venues_support_ui, fixed = TRUE),
+  grepl("venues_key_insights", venues_support_ui, fixed = TRUE)
+)
+
+cat("PASS Venues layout, comparison and hover controls\n")
+
+
+# -------------------------------------------------------------------------
+# Facility Hire: all reported facilities must be represented
+# -------------------------------------------------------------------------
+
+facility_test <- expand.grid(
+  report_year = c(2024L, 2025L),
+  facility = paste0("Facility ", 1:10),
+  KEEP.OUT.ATTRS = FALSE,
+  stringsAsFactors = FALSE
+)
+
+facility_test$revenue <- (
+  as.integer(sub("Facility ", "", facility_test$facility)) *
+    100 *
+    ifelse(facility_test$report_year == 2024L, 0.5, 1)
+)
+
+facility_chart_rows <- executive_venues_chart_rows(
+  facility_test,
+  "facility",
+  "revenue",
+  "facility hire regression"
+)
+
+# Seven individual facilities plus one combined category.
+stopifnot(
+  length(unique(facility_chart_rows$category)) == 8L,
+  "Other Facilities" %in% facility_chart_rows$category
+)
+
+# Every year's chart values must reconcile to the input.
+for (year in c(2024L, 2025L)) {
+
+  source_total <- sum(
+    facility_test$revenue[
+      facility_test$report_year == year
+    ]
+  )
+
+  chart_total <- sum(
+    facility_chart_rows$value[
+      facility_chart_rows$report_year == year
+    ]
+  )
+
+  stopifnot(
+    isTRUE(all.equal(source_total, chart_total))
+  )
+}
+
+cat("PASS Venues facility-hire chart coverage\n")
+
+
+# -------------------------------------------------------------------------
+# Executive Venues: KPI calculations and missing-data regression
+# -------------------------------------------------------------------------
+
+# Reuse the existing validated Venues Operations test fixture.
+venues_kpi_fixture <- make_venues_fixture()
+
+# Add merchandise data with Section Totals and Item details.
+# Item values must not be added again to their Section Totals.
+venues_kpi_fixture$merchandise <- data.frame(
+  report_year = rep(2025L, 6L),
+  date = as.Date(rep(NA_character_, 6L)),
+  period_type = rep("YTD", 6L),
+  section = c(
+    "Retail", "Retail", "Equipment",
+    "Retail", "Retail", "Equipment"
+  ),
+  item = c(
+    NA, "Cap", NA,
+    NA, "Cap", NA
+  ),
+  row_type = c(
+    "Section Total", "Item", "Section Total",
+    "Section Total", "Item", "Section Total"
+  ),
+  metric = c(
+    "Revenue", "Revenue", "Revenue",
+    "Transactions", "Transactions", "Transactions"
+  ),
+  value = c(300, 180, 125, 30, 10, 5),
+  stringsAsFactors = FALSE
+)
+
+venues_kpi_data <- shiny::reactiveVal(
+  list(venues_reports = venues_kpi_fixture)
+)
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(data = venues_kpi_data),
+  {
+
+    session$setInputs(dashboard_section = "metrics")
+    session$flushReact()
+
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2025"
+    )
+    session$flushReact()
+
+    stopifnot(
+      identical(active_focus(), "Metrics"),
+      identical(executive_selected_years(), 2025L)
+    )
+
+    # ---------------------------------------------------------------
+    # Verify all four headline KPIs against known source values.
+    # ---------------------------------------------------------------
+
+    values <- executive_venues_kpis_for_year(2025L)
+
+    stopifnot(
+      # Reported attendance YTD takes priority over monthly sums.
+      isTRUE(all.equal(values$total_attendance, 3800)),
+
+      # Courts 5000 + Rooms 1500, excluding Courts detail rows.
+      isTRUE(all.equal(values$hire_revenue, 6500)),
+
+      # Reported casual wage total, not monthly amounts added again.
+      isTRUE(all.equal(values$actual_wages, 2100)),
+
+      # Retail 300 + Equipment 125, excluding Retail item detail.
+      isTRUE(all.equal(values$merchandise_sales, 425)),
+
+      # Supporting measures.
+      isTRUE(all.equal(values$hire_transactions, 130)),
+      isTRUE(all.equal(values$paid_hours, 205)),
+      isTRUE(all.equal(values$wage_variance, 50))
+    )
+
+    # ---------------------------------------------------------------
+    # Verify that the KPI cards display the expected values.
+    # ---------------------------------------------------------------
+
+    specs <- executive_kpi_specs()
+
+    stopifnot(
+      identical(
+        vapply(specs, `[[`, character(1), "title"),
+        c(
+          "Total Attendance",
+          "Facility Hire Revenue",
+          "Casual Wages",
+          "Merchandise Revenue"
+        )
+      ),
+
+      identical(specs[[1L]]$value, "3,800"),
+
+      identical(
+        specs[[2L]]$value,
+        format_compact_currency(6500)
+      ),
+
+      identical(
+        specs[[3L]]$value,
+        format_compact_currency(2100)
+      ),
+
+      identical(
+        specs[[4L]]$value,
+        format_compact_currency(425)
+      )
+    )
+
+    # ---------------------------------------------------------------
+    # Verify merchandise chart totals reconcile to the KPI.
+    # ---------------------------------------------------------------
+
+    merchandise_rows <- executive_venues_merchandise_rows()
+
+    stopifnot(
+      nrow(merchandise_rows) == 2L,
+      isTRUE(all.equal(
+        sum(merchandise_rows$revenue),
+        values$merchandise_sales
+      ))
+    )
+
+    # Wage budget is absent from this fixture.
+    # Missing data must stay NA, not become zero.
+    wage_rows <- executive_venues_wages_rows()
+
+    stopifnot(
+      nrow(wage_rows) == 1L,
+      is.na(wage_rows$budget[[1L]]),
+      isTRUE(all.equal(wage_rows$actual[[1L]], 2100))
+    )
+  }
+)
+
+cat("PASS Venues KPI values and merchandise reconciliation\n")
+
+
+# -------------------------------------------------------------------------
+# Missing merchandise data must not be displayed as zero.
+# -------------------------------------------------------------------------
+
+venues_missing_fixture <- make_venues_fixture()
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = shiny::reactiveVal(
+      list(venues_reports = venues_missing_fixture)
+    )
+  ),
+  {
+
+    session$setInputs(
+      dashboard_section = "metrics"
+    )
+    session$flushReact()
+
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2025"
+    )
+    session$flushReact()
+
+    values <- executive_venues_kpis_for_year(2025L)
+    specs <- executive_kpi_specs()
+
+    stopifnot(
+      is.na(values$merchandise_sales),
+      identical(specs[[4L]]$value, "—"),
+      isTRUE(all.equal(values$hire_revenue, 6500)),
+      isTRUE(all.equal(values$actual_wages, 2100))
+    )
+  }
+)
+
+cat("PASS Venues missing-data safeguards\n")
+
+
+# -------------------------------------------------------------------------
+# Executive Venues: Comparison mode regression
+# -------------------------------------------------------------------------
+
+# Reuse the verified 2025 fixture from Change 14.
+# Create 2024 values at half the 2025 values so that incorrect
+# year selection and comparison calculations are detectable.
+
+venues_comparison_2024 <- lapply(
+  venues_kpi_fixture,
+  function(rows) {
+
+    if (!is.data.frame(rows) ||
+        !"report_year" %in% names(rows)) {
+      return(rows)
+    }
+
+    rows$report_year[] <- 2024L
+
+    if ("date" %in% names(rows)) {
+      valid_dates <- !is.na(rows$date)
+
+      rows$date[valid_dates] <- as.Date(
+        sub(
+          "^2025-",
+          "2024-",
+          as.character(rows$date[valid_dates])
+        )
+      )
+    }
+
+    if ("value" %in% names(rows)) {
+      rows$value <- as.numeric(rows$value) / 2
+    }
+
+    rows
+  }
+)
+
+# Combine both years without modifying the original fixture.
+venues_comparison_fixture <- Map(
+  function(previous, current) {
+    if (is.data.frame(previous) && is.data.frame(current)) {
+      rbind(previous, current)
+    } else {
+      current
+    }
+  },
+  venues_comparison_2024,
+  venues_kpi_fixture
+)
+
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(
+    data = shiny::reactiveVal(
+      list(venues_reports = venues_comparison_fixture)
+    )
+  ),
+  {
+
+    session$setInputs(dashboard_section = "metrics")
+    session$flushReact()
+
+    session$setInputs(
+      view_mode = "Comparison",
+      year = "2025",
+      comparison_year = "2024"
+    )
+    session$flushReact()
+
+    # -------------------------------------------------------------
+    # Comparison context
+    # -------------------------------------------------------------
+
+    stopifnot(
+      identical(active_focus(), "Metrics"),
+      identical(executive_context()$view_mode, "Comparison"),
+      identical(executive_selected_years(), c(2024L, 2025L))
+    )
+
+    # -------------------------------------------------------------
+    # Known KPI values for both years
+    # -------------------------------------------------------------
+
+    current <- executive_venues_kpis_for_year(2025L)
+    previous <- executive_venues_kpis_for_year(2024L)
+
+    stopifnot(
+      isTRUE(all.equal(current$total_attendance, 3800)),
+      isTRUE(all.equal(previous$total_attendance, 1900)),
+
+      isTRUE(all.equal(current$hire_revenue, 6500)),
+      isTRUE(all.equal(previous$hire_revenue, 3250)),
+
+      isTRUE(all.equal(current$actual_wages, 2100)),
+      isTRUE(all.equal(previous$actual_wages, 1050)),
+
+      isTRUE(all.equal(current$merchandise_sales, 425)),
+      isTRUE(all.equal(previous$merchandise_sales, 212.5))
+    )
+
+    # -------------------------------------------------------------
+    # KPI comparison labels
+    # -------------------------------------------------------------
+
+    specs <- executive_kpi_specs()
+
+    stopifnot(
+      length(specs) == 4L,
+
+      identical(
+        specs[[1L]]$comparison,
+        executive_count_change_label(3800, 1900, "2024")
+      ),
+
+      identical(
+        specs[[2L]]$comparison,
+        executive_currency_change_label(6500, 3250, "2024")
+      ),
+
+      identical(
+        specs[[3L]]$comparison,
+        executive_currency_change_label(2100, 1050, "2024")
+      ),
+
+      identical(
+        specs[[4L]]$comparison,
+        executive_currency_change_label(425, 212.5, "2024")
+      )
+    )
+
+    # -------------------------------------------------------------
+    # All four charts contain both reporting years
+    # -------------------------------------------------------------
+
+    attendance <- executive_venues_attendance_rows()
+    hire <- executive_venues_hire_rows()
+    wages <- executive_venues_wages_rows()
+    merchandise <- executive_venues_merchandise_rows()
+
+    both_years <- function(rows) {
+      identical(
+        sort(unique(as.integer(rows$report_year))),
+        c(2024L, 2025L)
+      )
+    }
+
+    stopifnot(
+      both_years(attendance),
+      both_years(hire),
+      both_years(wages),
+      both_years(merchandise)
+    )
+
+    # -------------------------------------------------------------
+    # Facility Hire and Merchandise chart reconciliation
+    # -------------------------------------------------------------
+
+    for (year in c(2024L, 2025L)) {
+
+      annual <- executive_venues_kpis_for_year(year)
+
+      hire_year <- hire[
+        hire$report_year == year, , drop = FALSE
+      ]
+
+      merchandise_year <- merchandise[
+        merchandise$report_year == year, , drop = FALSE
+      ]
+
+      wages_year <- wages[
+        wages$report_year == year, , drop = FALSE
+      ]
+
+      stopifnot(
+        isTRUE(all.equal(
+          sum(hire_year$revenue),
+          annual$hire_revenue
+        )),
+
+        isTRUE(all.equal(
+          sum(merchandise_year$revenue),
+          annual$merchandise_sales
+        )),
+
+        nrow(wages_year) == 1L,
+
+        isTRUE(all.equal(
+          wages_year$actual[[1L]],
+          annual$actual_wages
+        ))
+      )
+    }
+
+    # -------------------------------------------------------------
+    # Exact-value hover shows both years
+    # -------------------------------------------------------------
+
+    hire_chart <- executive_venues_chart_rows(
+      hire,
+      "facility",
+      "revenue",
+      "Facility Hire Comparison"
+    )
+
+    hover_text <- executive_venues_category_hover(
+      list(x = 1, y = length(unique(hire_chart$category))),
+      hire,
+      "facility",
+      "revenue",
+      TRUE
+    )
+
+    stopifnot(
+      grepl("2024:", hover_text, fixed = TRUE),
+      grepl("2025:", hover_text, fixed = TRUE)
+    )
+
+    # -------------------------------------------------------------
+    # Key Insights use the primary selected year
+    # -------------------------------------------------------------
+
+    insights_html <- output$venues_key_insights$html
+
+    stopifnot(
+      grepl("Badminton", insights_html, fixed = TRUE),
+      grepl("Courts", insights_html, fixed = TRUE),
+      grepl("Retail", insights_html, fixed = TRUE)
+    )
+  }
+)
+
+cat("PASS Venues Comparison, KPIs, charts and insights\n")
+

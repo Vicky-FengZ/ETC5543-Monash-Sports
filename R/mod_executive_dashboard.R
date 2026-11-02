@@ -1313,6 +1313,197 @@ executive_site_insights_card_ui <- function(ns) {
   )
 }
 
+
+# -------------------------------------------------------------------------
+# Executive Venues: four-chart dashboard layout
+# -------------------------------------------------------------------------
+
+executive_venues_dashboard_ui <- function(ns, context_label, years) {
+
+  years <- sort(unique(suppressWarnings(as.integer(years))))
+  years <- years[!is.na(years)]
+
+  comparison_legend <- if (length(years) == 2L) {
+    list(
+      labels = as.character(years),
+      colours = c("secondary", "primary")
+    )
+  } else {
+    list(
+      labels = if (length(years)) as.character(years) else "Reported",
+      colours = "primary"
+    )
+  }
+
+  charts <- list(
+    list(
+      id = "venues_attendance",
+      title = "Attendance by Activity",
+      legend = comparison_legend
+    ),
+    list(
+      id = "venues_facility_hire",
+      title = "Facility Hire Revenue",
+      legend = comparison_legend
+    ),
+    list(
+      id = "venues_wages",
+      title = "Casual Wages: Budget vs Actual",
+      legend = list(
+        labels = c("Budget", "Actual"),
+        colours = c("primary", "secondary")
+      )
+    ),
+    list(
+      id = "venues_merchandise",
+      title = "Merchandise Revenue by Section",
+      legend = comparison_legend
+    )
+  )
+
+  shiny::div(
+    class = "executive-site-grid executive-venues-grid",
+
+    shiny::tagList(lapply(charts, function(chart) {
+
+      legend <- shiny::div(
+        class = "executive-site-header-legend",
+
+        shiny::tagList(lapply(
+          seq_along(chart$legend$labels),
+          function(i) {
+            shiny::span(
+              class = "executive-site-legend-item",
+
+              shiny::span(
+                class = paste(
+                  "executive-site-legend-swatch",
+                  chart$legend$colours[[i]]
+                )
+              ),
+
+              chart$legend$labels[[i]]
+            )
+          }
+        ))
+      )
+
+      bslib::card(
+        class = paste(
+          "executive-visual-card",
+          "executive-site-visual-card",
+          "executive-venues-visual-card"
+        ),
+
+        full_screen = TRUE,
+
+        bslib::card_header(
+          shiny::div(
+            class = "executive-visual-card-header",
+
+            shiny::div(
+              class = "executive-visual-card-heading",
+
+              shiny::div(
+                class = "chart-header-title",
+                chart$title
+              ),
+
+              shiny::div(
+                class = "chart-header-subtitle",
+                context_label
+              )
+            ),
+
+            legend
+          )
+        ),
+
+        shiny::plotOutput(
+          ns(paste0("executive_plot_", chart$id)),
+          height = "305px",
+
+          hover = shiny::hoverOpts(
+            id = ns(paste0("executive_hover_", chart$id)),
+            delay = 125,
+            delayType = "debounce"
+          )
+        ),
+
+        shiny::div(
+          class = "executive-site-hover-readout",
+
+          shiny::textOutput(
+            ns(paste0("executive_hover_value_", chart$id)),
+            inline = TRUE
+          )
+        )
+      )
+    }))
+  )
+}
+
+
+# -------------------------------------------------------------------------
+# Executive Venues: Operational Summary and Key Insights
+# -------------------------------------------------------------------------
+
+executive_venues_supporting_ui <- function(ns) {
+
+  shiny::div(
+    class = "executive-site-bottom-grid executive-venues-bottom-grid",
+
+    # Left: Operational Summary
+    bslib::card(
+      class = paste(
+        "executive-dashboard-table-card",
+        "executive-site-rankings-card"
+      ),
+
+      full_screen = TRUE,
+
+      bslib::card_header(
+        shiny::div(
+          class = "chart-header-title",
+          "Venues Operational Summary"
+        )
+      ),
+
+      shiny::div(
+        class = "executive-site-rankings-table",
+
+        shiny::tableOutput(
+          ns("venues_summary_table")
+        )
+      )
+    ),
+
+    # Right: Key Insights
+    bslib::card(
+      class = paste(
+        "executive-insights-card",
+        "executive-site-insights-card"
+      ),
+
+      full_screen = TRUE,
+
+      bslib::card_header(
+        "Venues Key Insights"
+      ),
+
+      shiny::div(
+        class = "executive-site-insights-content",
+
+        shiny::uiOutput(
+          ns("venues_key_insights")
+        )
+      )
+    )
+  )
+}
+
+
+
 mod_executive_dashboard_ui <- function(id) {
 
   ns <- shiny::NS(id)
@@ -1351,7 +1542,7 @@ mod_executive_dashboard_ui <- function(id) {
           choices = c(
             "Overview" = "finance",
             "Site" = "site",
-            "Metrics" = "metrics"
+            "Venues" = "metrics"
           ),
           selected = "finance",
           inline = TRUE
@@ -2928,124 +3119,897 @@ mod_executive_dashboard_server <- function(
       spacing = "s",
       rownames = FALSE)
 
+      
       # -------------------------------------------------------------------
-      # Executive Metrics KPI data
+      # Executive Venues: reporting-year data and operational KPIs
       # -------------------------------------------------------------------
+      # Keep the internal focus value "Metrics" for compatibility with the
+      # existing dashboard contexts. The visible tab is now named Venues.
+      # Reuse Venues Operations calculations so reported totals are not added
+      # again to detail rows or monthly values.
 
       executive_venues_reports <- reactive({
-
-        dashboard_data <-
-          dashboard_data_value()
-
-        if (is.null(dashboard_data)) {
-          return(NULL)
-        }
-
-        if (
-          inherits(
-            dashboard_data,
-            "venues_tracking_report_data"
-          )
-        ) {
-          return(dashboard_data)
-        }
-
-        if (!is.list(dashboard_data)) {
-          return(NULL)
-        }
-
-        if (
-          inherits(
-            dashboard_data$venues_reports,
-            "venues_tracking_report_data"
-          )
-        ) {
-          return(
-            dashboard_data$venues_reports
-          )
-        }
-
-        if (
-          inherits(
-            dashboard_data$venues,
-            "venues_tracking_report_data"
-          )
-        ) {
-          return(
-            dashboard_data$venues
-          )
-        }
-
-        NULL
+        executive_source_data(
+          dashboard_data = dashboard_data_value(),
+          source_group = "venues"
+        )
       })
 
-      executive_metrics_attendance_for_year <- function(
-          year
-      ) {
+      executive_venues_kpis_for_year <- function(year) {
+        empty <- list(
+          total_attendance = NA_real_,
+          hire_revenue = NA_real_,
+          actual_wages = NA_real_,
+          merchandise_sales = NA_real_,
+          hire_transactions = NA_real_,
+          paid_hours = NA_real_,
+          wage_variance = NA_real_
+        )
 
-        reports <-
-          executive_venues_reports()
+        year <- suppressWarnings(as.integer(year))
+        reports <- executive_venues_reports()
 
-        if (
-          is.null(reports) ||
-            !is.list(reports) ||
-            is.null(reports$attendance) ||
-            !is.data.frame(reports$attendance)
-        ) {
+        if (length(year) != 1L || is.na(year) ||
+            is.null(reports) || !is.list(reports)) {
+          return(empty)
+        }
+
+        # Missing datasets must remain missing, rather than becoming zero.
+        rows_for <- function(dataset) {
+          rows <- reports[[dataset]]
+
+          if (is.null(rows) || !is.data.frame(rows) ||
+              nrow(rows) == 0L || !"report_year" %in% names(rows)) {
+            return(NULL)
+          }
+
+          venues_operations_filter_year(rows, year = year)
+        }
+
+        attendance <- venues_operations_attendance_kpis(
+          rows_for("attendance")
+        )
+
+        hire <- venues_operations_facility_hire_kpis(
+          rows_for("facility_hire")
+        )
+
+        workforce <- venues_operations_workforce_kpis(
+          rows_for("casual_hours"), rows_for("casual_wages")
+        )
+
+        merchandise <- venues_operations_merchandise_kpis(
+          rows_for("merchandise")
+        )
+
+        list(
+          total_attendance = attendance$total_attendance,
+          hire_revenue = hire$revenue,
+          actual_wages = workforce$actual_wages,
+          merchandise_sales = merchandise$revenue,
+          hire_transactions = hire$transactions,
+          paid_hours = workforce$paid_hours,
+          wage_variance = workforce$wage_variance
+        )
+      }
+
+      # ---------------------------------------------------------------
+      # Executive Venues: shared chart data helpers
+      # ---------------------------------------------------------------
+
+      executive_venues_rows_for_year <- function(dataset, year) {
+
+        reports <- executive_venues_reports()
+
+        if (is.null(reports) || !is.list(reports)) {
+          return(NULL)
+        }
+
+        rows <- reports[[dataset]]
+
+        if (is.null(rows) ||
+            !is.data.frame(rows) ||
+            nrow(rows) == 0L ||
+            !"report_year" %in% names(rows)) {
           return(NULL)
         }
 
         venues_operations_filter_year(
-          reports$attendance,
+          rows,
           year = year
         )
       }
 
+      executive_venues_bind_years <- function(make_rows, empty) {
 
-      executive_metrics_attendance <- reactive({
+        years <- executive_selected_years()
 
-        context <-
-          executive_context()
+        pieces <- lapply(years, make_rows)
 
-        executive_metrics_attendance_for_year(
-          context$year
+        pieces <- Filter(
+          function(x) is.data.frame(x) && nrow(x) > 0L,
+          pieces
         )
-      })
 
-
-      executive_metrics_attendance_kpis <- reactive({
-
-        venues_operations_attendance_kpis(
-          executive_metrics_attendance()
-        )
-      })
-
-      executive_metrics_comparison_kpis <- reactive({
-
-        context <-
-          executive_context()
-
-        if (
-          !identical(
-            context$view_mode,
-            "Comparison"
-          ) ||
-            is.null(
-              context$comparison_year
-            )
-        ) {
-          return(NULL)
+        if (length(pieces) == 0L) {
+          return(empty)
         }
 
-        attendance <-
-          executive_metrics_attendance_for_year(
-            context$comparison_year
-          )
+        result <- do.call(rbind, pieces)
+        rownames(result) <- NULL
 
-        venues_operations_attendance_kpis(
-          attendance
+        result
+      }
+
+      # ---------------------------------------------------------------
+      # Chart 1: Attendance by Activity
+      # ---------------------------------------------------------------
+
+      executive_venues_attendance_rows <- reactive({
+
+        empty <- data.frame(
+          report_year = integer(),
+          activity = character(),
+          value = double(),
+          stringsAsFactors = FALSE
+        )
+
+        executive_venues_bind_years(
+          function(year) {
+
+            rows <- venues_operations_attendance_section_totals(
+              executive_venues_rows_for_year(
+                "attendance",
+                year
+              )
+            )
+
+            if (nrow(rows) == 0L) {
+              return(NULL)
+            }
+
+            # Reuse validated section totals.
+            # Combine activity areas without adding detail rows again.
+            totals <- stats::aggregate(
+              value ~ activity,
+              data = rows,
+              FUN = sum
+            )
+
+            data.frame(
+              report_year = as.integer(year),
+              activity = as.character(totals$activity),
+              value = as.numeric(totals$value),
+              stringsAsFactors = FALSE
+            )
+          },
+          empty
         )
       })
+
+
+      # ---------------------------------------------------------------
+      # Chart 2: Facility Hire Revenue
+      # ---------------------------------------------------------------
+
+      executive_venues_hire_rows <- reactive({
+
+        empty <- data.frame(
+          report_year = integer(),
+          facility = character(),
+          revenue = double(),
+          transactions = double(),
+          stringsAsFactors = FALSE
+        )
+
+        executive_venues_bind_years(
+          function(year) {
+
+            raw <- executive_venues_rows_for_year(
+              "facility_hire", year
+            )
+
+            revenue <- venues_operations_facility_hire_by_facility(
+              raw, metric = "Revenue"
+            )
+
+            transactions <- venues_operations_facility_hire_by_facility(
+              raw, metric = "Transactions"
+            )
+
+            if (nrow(revenue) == 0L &&
+                nrow(transactions) == 0L) {
+              return(NULL)
+            }
+
+            names(revenue)[names(revenue) == "value"] <- "revenue"
+            names(transactions)[names(transactions) == "value"] <- "transactions"
+
+            rows <- merge(
+              revenue,
+              transactions,
+              by = "facility",
+              all = TRUE,
+              sort = FALSE
+            )
+
+            data.frame(
+              report_year = as.integer(year),
+              facility = as.character(rows$facility),
+              revenue = as.numeric(rows$revenue),
+              transactions = as.numeric(rows$transactions),
+              stringsAsFactors = FALSE
+            )
+          },
+          empty
+        )
+      })
+
+
+      # ---------------------------------------------------------------
+      # Chart 3: Casual Wages - Budget vs Actual
+      # ---------------------------------------------------------------
+
+      executive_venues_wages_rows <- reactive({
+
+        empty <- data.frame(
+          report_year = integer(),
+          budget = double(),
+          actual = double(),
+          paid_hours = double(),
+          stringsAsFactors = FALSE
+        )
+
+        executive_venues_bind_years(
+          function(year) {
+
+            wages <- executive_venues_rows_for_year(
+              "casual_wages", year
+            )
+
+            hours <- executive_venues_rows_for_year(
+              "casual_hours", year
+            )
+
+            budget <- venues_operations_workforce_annual_value(
+              wages, metric = "Budget"
+            )
+
+            actual <- venues_operations_workforce_annual_value(
+              wages, metric = "Actual"
+            )
+
+            paid_hours <- venues_operations_workforce_annual_value(
+              hours,
+              metric = "Paid Hours",
+              record_group = "Monthly Summary"
+            )
+
+            if (!any(is.finite(c(budget, actual)))) {
+              return(NULL)
+            }
+
+            data.frame(
+              report_year = as.integer(year),
+              budget = budget,
+              actual = actual,
+              paid_hours = paid_hours,
+              stringsAsFactors = FALSE
+            )
+          },
+          empty
+        )
+      })
+
+
+      # ---------------------------------------------------------------
+      # Chart 4: Merchandise Revenue by Section
+      # ---------------------------------------------------------------
+
+      executive_venues_merchandise_rows <- reactive({
+
+        empty <- data.frame(
+          report_year = integer(),
+          section = character(),
+          revenue = double(),
+          transactions = double(),
+          stringsAsFactors = FALSE
+        )
+
+        executive_venues_bind_years(
+          function(year) {
+
+            raw <- executive_venues_rows_for_year(
+              "merchandise", year
+            )
+
+            revenue <- venues_operations_merchandise_breakdown(
+              raw,
+              metric = "Revenue",
+              section = "All Sections"
+            )
+
+            transactions <- venues_operations_merchandise_breakdown(
+              raw,
+              metric = "Transactions",
+              section = "All Sections"
+            )
+
+            if (nrow(revenue) == 0L &&
+                nrow(transactions) == 0L) {
+              return(NULL)
+            }
+
+            # The source helper calls the section column "facility".
+            names(revenue) <- c("section", "revenue")
+            names(transactions) <- c("section", "transactions")
+
+            rows <- merge(
+              revenue,
+              transactions,
+              by = "section",
+              all = TRUE,
+              sort = FALSE
+            )
+
+            data.frame(
+              report_year = as.integer(year),
+              section = as.character(rows$section),
+              revenue = as.numeric(rows$revenue),
+              transactions = as.numeric(rows$transactions),
+              stringsAsFactors = FALSE
+            )
+          },
+          empty
+        )
+      })
+
+
+      # ---------------------------------------------------------------
+      # Executive Venues: render four presentation charts
+      # ---------------------------------------------------------------
+
+      # Chart 1: Attendance by Activity
+      output$executive_plot_venues_attendance <- renderPlot({
+
+        rows <- executive_venues_attendance_rows()
+
+        validate(
+          need(
+            nrow(rows) > 0L && any(is.finite(rows$value)),
+            "No reported attendance activity totals for these years."
+          )
+        )
+
+        plot_executive_venues_attendance(rows)
+
+      }, res = 96, bg = "white")
+
+
+      # Chart 2: Facility Hire Revenue
+      output$executive_plot_venues_facility_hire <- renderPlot({
+
+        rows <- executive_venues_hire_rows()
+
+        validate(
+          need(
+            nrow(rows) > 0L && any(is.finite(rows$revenue)),
+            "No facility-hire revenue breakdown for these years."
+          )
+        )
+
+        plot_executive_venues_facility_hire(rows)
+
+      }, res = 96, bg = "white")
+
+
+      # Chart 3: Casual Wages - Budget vs Actual
+      output$executive_plot_venues_wages <- renderPlot({
+
+        rows <- executive_venues_wages_rows()
+
+        validate(
+          need(
+            nrow(rows) > 0L &&
+              any(is.finite(c(rows$budget, rows$actual))),
+            "No reported casual wage amounts for these years."
+          )
+        )
+
+        plot_executive_venues_wages(rows)
+
+      }, res = 96, bg = "white")
+
+
+      # Chart 4: Merchandise Revenue by Section
+      output$executive_plot_venues_merchandise <- renderPlot({
+
+        rows <- executive_venues_merchandise_rows()
+
+        validate(
+          need(
+            nrow(rows) > 0L && any(is.finite(rows$revenue)),
+            "No merchandise revenue breakdown for these years."
+          )
+        )
+
+        plot_executive_venues_merchandise(rows)
+
+      }, res = 96, bg = "white")
+
+
+      # ---------------------------------------------------------------
+      # Executive Venues: exact-value hover readouts
+      # ---------------------------------------------------------------
+
+      executive_venues_category_hover <- function(
+          hover, data, category, value_col, currency = FALSE
+      ) {
+
+        hint <- "Hover over a bar to inspect exact values."
+
+        if (is.null(hover) ||
+            is.null(hover$y) ||
+            !is.finite(hover$y)) {
+          return(hint)
+        }
+
+        rows <- tryCatch(
+          executive_venues_chart_rows(
+            data,
+            category,
+            value_col,
+            "Venues hover"
+          ),
+          error = function(e) NULL
+        )
+
+        if (is.null(rows) || nrow(rows) == 0L) {
+          return(hint)
+        }
+
+        labels <- unique(rows$category)
+        y <- round(hover$y)
+
+        if (abs(hover$y - y) > 0.46 ||
+            y < 1L ||
+            y > length(labels)) {
+          return(hint)
+        }
+
+        selected <- labels[[length(labels) - as.integer(y) + 1L]]
+
+        parts <- vapply(
+          executive_selected_years(),
+          function(year) {
+
+            matched <- rows[
+              rows$category == selected &
+                rows$report_year == year,
+              ,
+              drop = FALSE
+            ]
+
+            value <- if (nrow(matched) > 0L) {
+              matched$value[[1L]]
+            } else {
+              NA_real_
+            }
+
+            formatted <- if (!is.finite(value)) {
+              "Not reported"
+            } else if (currency) {
+              format_executive_hover_value(value)
+            } else {
+              executive_format_count(value)
+            }
+
+            paste0(year, ": ", formatted)
+          },
+          character(1)
+        )
+
+        paste(c(selected, parts), collapse = " | ")
+      }
+
+
+      # Attendance hover
+      output$executive_hover_value_venues_attendance <- renderText({
+
+        executive_venues_category_hover(
+          input$executive_hover_venues_attendance,
+          executive_venues_attendance_rows(),
+          "activity",
+          "value",
+          FALSE
+        )
+      })
+
+
+      # Facility Hire hover
+      output$executive_hover_value_venues_facility_hire <- renderText({
+
+        executive_venues_category_hover(
+          input$executive_hover_venues_facility_hire,
+          executive_venues_hire_rows(),
+          "facility",
+          "revenue",
+          TRUE
+        )
+      })
+
+
+      # Merchandise hover
+      output$executive_hover_value_venues_merchandise <- renderText({
+
+        executive_venues_category_hover(
+          input$executive_hover_venues_merchandise,
+          executive_venues_merchandise_rows(),
+          "section",
+          "revenue",
+          TRUE
+        )
+      })
+
+
+      # Casual Wages hover
+      output$executive_hover_value_venues_wages <- renderText({
+
+        hint <- "Hover over a year to inspect Budget and Actual wages."
+
+        hover <- input$executive_hover_venues_wages
+        rows <- executive_venues_wages_rows()
+
+        if (is.null(hover) ||
+            is.null(hover$y) ||
+            !is.finite(hover$y) ||
+            nrow(rows) == 0L) {
+          return(hint)
+        }
+
+        rows <- rows[order(-rows$report_year), , drop = FALSE]
+
+        y <- round(hover$y)
+
+        if (abs(hover$y - y) > 0.46 ||
+            y < 1L ||
+            y > nrow(rows)) {
+          return(hint)
+        }
+
+        record <- rows[
+          nrow(rows) - as.integer(y) + 1L,
+          ,
+          drop = FALSE
+        ]
+
+        paste0(
+          record$report_year[[1L]],
+          " | Budget ",
+          format_executive_hover_value(record$budget),
+          " | Actual ",
+          format_executive_hover_value(record$actual)
+        )
+      })
+
+
+      # ---------------------------------------------------------------
+      # Executive Venues: Operational Summary
+      # ---------------------------------------------------------------
+
+      output$venues_summary_table <- renderTable({
+
+        years <- executive_selected_years()
+
+        validate(
+          need(
+            length(years) > 0L,
+            "Select a reporting year."
+          )
+        )
+
+        metrics <- c(
+          "Facility Hire Transactions",
+          "Paid Casual Hours",
+          "Casual Wage Budget Difference",
+          "Merchandise Transactions"
+        )
+
+        summary_table <- data.frame(
+          Measure = metrics,
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        )
+
+        # Format reported numbers without treating missing values as zero.
+        number_or_dash <- function(value, currency = FALSE) {
+
+          if (length(value) != 1L || !is.finite(value)) {
+            return("—")
+          }
+
+          if (currency) {
+            return(format_executive_hover_value(value))
+          }
+
+          executive_format_count(value)
+        }
+
+        # Prepare one column per selected reporting year.
+        for (year in sort(years)) {
+
+          values <- executive_venues_kpis_for_year(year)
+
+          # Calculate wage budget difference using the same
+          # Budget and Actual figures displayed in the wage chart.
+          wage_year <- executive_venues_wages_rows()
+
+          wage_year <- wage_year[
+            !is.na(wage_year$report_year) &
+              wage_year$report_year == year,
+            ,
+            drop = FALSE
+          ]
+
+          wage_budget_difference <- NA_real_
+
+          if (
+            nrow(wage_year) == 1L &&
+            is.finite(wage_year$budget[[1L]]) &&
+            is.finite(wage_year$actual[[1L]])
+          ) {
+            wage_budget_difference <-
+              wage_year$budget[[1L]] - wage_year$actual[[1L]]
+          }
+
+          merchandise <- venues_operations_merchandise_kpis(
+            executive_venues_rows_for_year(
+              "merchandise",
+              year
+            )
+          )
+
+          summary_table[[as.character(year)]] <- c(
+
+            # Facility hire transactions
+            number_or_dash(
+              values$hire_transactions
+            ),
+
+            # Total paid casual hours
+            number_or_dash(
+              values$paid_hours
+            ),
+
+            # Reported wage variance
+            number_or_dash(
+              wage_budget_difference,
+              currency = TRUE
+            ),
+
+            # Merchandise and equipment transactions
+            number_or_dash(
+              merchandise$transactions
+            )
+          )
+        }
+
+        summary_table
+
+      },
+      striped = TRUE,
+      hover = TRUE,
+      bordered = FALSE,
+      spacing = "s",
+      rownames = FALSE)
+
+
+      # ---------------------------------------------------------------
+      # Executive Venues: Key Insights
+      # ---------------------------------------------------------------
+
+      output$venues_key_insights <- renderUI({
+
+        context <- executive_context()
+
+        year <- suppressWarnings(
+          as.integer(context$year)
+        )
+
+        if (length(year) != 1L || is.na(year)) {
+          return(
+            shiny::div(
+              class = "text-secondary",
+              "Select a reporting year."
+            )
+          )
+        }
+
+        insights <- character()
+
+        # -------------------------------------------------------------
+        # 1. Highest Attendance Activity
+        # -------------------------------------------------------------
+
+        attendance <- executive_venues_attendance_rows()
+
+        attendance <- attendance[
+          !is.na(attendance$report_year) &
+            attendance$report_year == year &
+            is.finite(attendance$value),
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(attendance) > 0L) {
+
+          top <- attendance[
+            which.max(attendance$value),
+            ,
+            drop = FALSE
+          ]
+
+          insights <- c(
+            insights,
+            paste0(
+              "Highest attendance: ",
+              top$activity[[1L]],
+              " (",
+              executive_format_count(top$value[[1L]]),
+              " visits)."
+            )
+          )
+        }
+
+        # -------------------------------------------------------------
+        # 2. Highest Facility Hire Revenue
+        # -------------------------------------------------------------
+
+        hire <- executive_venues_hire_rows()
+
+        hire <- hire[
+          !is.na(hire$report_year) &
+            hire$report_year == year &
+            is.finite(hire$revenue),
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(hire) > 0L) {
+
+          top <- hire[
+            which.max(hire$revenue),
+            ,
+            drop = FALSE
+          ]
+
+          insights <- c(
+            insights,
+            paste0(
+              "Highest facility-hire revenue: ",
+              top$facility[[1L]],
+              " (",
+              format_executive_hover_value(
+                top$revenue[[1L]]
+              ),
+              ")."
+            )
+          )
+        }
+
+        # -------------------------------------------------------------
+        # 3. Casual Wages: Budget vs Actual
+        # -------------------------------------------------------------
+
+        wages <- executive_venues_wages_rows()
+
+        wages <- wages[
+          !is.na(wages$report_year) &
+            wages$report_year == year,
+          ,
+          drop = FALSE
+        ]
+
+        if (
+          nrow(wages) > 0L &&
+          is.finite(wages$budget[[1L]]) &&
+          is.finite(wages$actual[[1L]])
+        ) {
+
+          budget <- wages$budget[[1L]]
+          actual <- wages$actual[[1L]]
+
+          difference <- actual - budget
+
+          wage_status <- if (difference > 0) {
+
+            paste0(
+              "above budget by ",
+              format_executive_hover_value(difference)
+            )
+
+          } else if (difference < 0) {
+
+            paste0(
+              "below budget by ",
+              format_executive_hover_value(abs(difference))
+            )
+
+          } else {
+
+            "in line with budget"
+          }
+
+          insights <- c(
+            insights,
+            paste0(
+              "Casual wages: ",
+              format_executive_hover_value(actual),
+              " actual, ",
+              wage_status,
+              "."
+            )
+          )
+        }
+
+        # -------------------------------------------------------------
+        # 4. Highest Merchandise Revenue Section
+        # -------------------------------------------------------------
+
+        merchandise <- executive_venues_merchandise_rows()
+
+        merchandise <- merchandise[
+          !is.na(merchandise$report_year) &
+            merchandise$report_year == year &
+            is.finite(merchandise$revenue),
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(merchandise) > 0L) {
+
+          top <- merchandise[
+            which.max(merchandise$revenue),
+            ,
+            drop = FALSE
+          ]
+
+          insights <- c(
+            insights,
+            paste0(
+              "Highest merchandise revenue: ",
+              top$section[[1L]],
+              " (",
+              format_executive_hover_value(
+                top$revenue[[1L]]
+              ),
+              ")."
+            )
+          )
+        }
+
+        # -------------------------------------------------------------
+        # Display results
+        # -------------------------------------------------------------
+
+        if (length(insights) == 0L) {
+
+          return(
+            shiny::div(
+              class = "text-secondary",
+              "No reported Venues insights are available for this year."
+            )
+          )
+        }
+
+        shiny::tags$ul(
+          class = "executive-insights-list",
+          shiny::tagList(
+            lapply(insights, shiny::tags$li)
+          )
+        )
+      })
+
 
       executive_format_count <- function(
           value
@@ -3154,140 +4118,82 @@ mod_executive_dashboard_server <- function(
         context <-
           executive_context()
 
-
         # ---------------------------------------------------------------
-        # Metrics
+        # Venues: four headline operational KPIs
         # ---------------------------------------------------------------
+        if (identical(focus, "Metrics")) {
+          current <- executive_venues_kpis_for_year(context$year)
 
-        if (
-          identical(
-            focus,
-            "Metrics"
-          )
-        ) {
-
-          values <-
-            executive_metrics_attendance_kpis()
-
-          comparison_values <-
-            executive_metrics_comparison_kpis()
-
-          comparison_year <-
-            context$comparison_year
-
-          peak_month <- "—"
-
-          if (
-            !is.null(values$peak_month) &&
-              length(values$peak_month) > 0L &&
-              !is.na(values$peak_month[[1L]]) &&
-              nzchar(
-                as.character(
-                  values$peak_month[[1L]]
-                )
-              )
+          previous <- if (
+            identical(context$view_mode, "Comparison") &&
+              !is.null(context$comparison_year)
           ) {
-
-            peak_month <-
-              as.character(
-                values$peak_month[[1L]]
-              )
+            executive_venues_kpis_for_year(context$comparison_year)
+          } else {
+            NULL
           }
 
+          count_value <- function(field) {
+            executive_format_count(current[[field]])
+          }
 
-          return(
-            list(
+          money_value <- function(field) {
+            value <- current[[field]]
 
-              list(
-                title = "Total Attendance",
-                value =
-                  executive_format_count(
-                    values$total_attendance
-                  ),
-                comparison =
-                  if (!is.null(comparison_values)) {
-                    executive_count_change_label(
-                      values$total_attendance,
-                      comparison_values$total_attendance,
-                      comparison_year
-                    )
-                  } else {
-                    NULL
-                  },
-                icon = "people"
-              ),
+            if (length(value) == 0L || !is.finite(value[[1L]])) {
+              return("—")
+            }
 
-              list(
-                title = "Average / Month",
-                value =
-                  executive_format_count(
-                    values$average_monthly
-                  ),
-                comparison =
-                  if (!is.null(comparison_values)) {
-                    executive_count_change_label(
-                      values$average_monthly,
-                      comparison_values$average_monthly,
-                      comparison_year
-                    )
-                  } else {
-                    NULL
-                  },
-                icon = "calendar3"
-              ),
+            format_compact_currency(value[[1L]])
+          }
 
-              list(
-                title = "Peak Attendance",
-                value =
-                  executive_format_count(
-                    values$peak_value
-                  ),
-                comparison =
-                  if (!is.null(comparison_values)) {
-                    executive_count_change_label(
-                      values$peak_value,
-                      comparison_values$peak_value,
-                      comparison_year
-                    )
-                  } else {
-                    NULL
-                  },
-                icon = "bar-chart-line"
-              ),
+          count_change <- function(field) {
+            if (is.null(previous)) return(NULL)
 
-              list(
-                title = "Peak Month",
-                value = peak_month,
-                comparison =
-                  if (
-                    !is.null(comparison_values) &&
-                      !is.null(
-                        comparison_values$peak_month
-                      ) &&
-                      length(
-                        comparison_values$peak_month
-                      ) > 0L &&
-                      !is.na(
-                        comparison_values$peak_month[[1L]]
-                      )
-                  ) {
-
-                    paste0(
-                      comparison_year,
-                      ": ",
-                      comparison_values$peak_month[[1L]]
-                    )
-
-                  } else {
-
-                    NULL
-                  },
-                icon = "calendar-event"
-              )
+            executive_count_change_label(
+              current[[field]],
+              previous[[field]],
+              context$comparison_year
             )
-          )
-        }
+          }
 
+          money_change <- function(field) {
+            if (is.null(previous)) return(NULL)
+
+            executive_currency_change_label(
+              current[[field]],
+              previous[[field]],
+              context$comparison_year
+            )
+          }
+
+          return(list(
+            list(
+              title = "Total Attendance",
+              value = count_value("total_attendance"),
+              comparison = count_change("total_attendance"),
+              icon = "people"
+            ),
+            list(
+              title = "Facility Hire Revenue",
+              value = money_value("hire_revenue"),
+              comparison = money_change("hire_revenue"),
+              icon = "cash-stack"
+            ),
+            list(
+              title = "Casual Wages",
+              value = money_value("actual_wages"),
+              comparison = money_change("actual_wages"),
+              icon = "wallet2"
+            ),
+            list(
+              title = "Merchandise Revenue",
+              value = money_value("merchandise_sales"),
+              comparison = money_change("merchandise_sales"),
+              icon = "bag"
+            )
+          ))
+        }
 
         # ---------------------------------------------------------------
         # Sites: four operational KPIs, independently sourced from detailed
@@ -4697,11 +5603,33 @@ mod_executive_dashboard_server <- function(
       # -------------------------------------------------------------------
       # Dynamic Finance visual grid
       # -------------------------------------------------------------------
-
+            
       output$finance_visual_grid <- renderUI({
 
+        # Venues: fixed four-chart executive dashboard
+        if (identical(active_focus(), "Metrics")) {
+          context <- executive_context()
+
+          context_label <- executive_visual_context_label(
+            view_mode = context$view_mode,
+            year = context$year,
+            comparison_year = context$comparison_year,
+            site = "All Venues"
+          )
+
+          return(
+            executive_venues_dashboard_ui(
+              ns = ns,
+              context_label = context_label,
+              years = executive_selected_years()
+            )
+          )
+        }
+
+        # Sites: existing fixed dashboard, unchanged
         if (identical(active_focus(), "Site")) {
           context <- executive_context()
+
           context_label <- executive_visual_context_label(
             view_mode = context$view_mode, year = context$year,
             comparison_year = context$comparison_year,
@@ -4902,8 +5830,17 @@ mod_executive_dashboard_server <- function(
       # Dynamic Finance table / insight components
       # -------------------------------------------------------------------
 
+      
       output$finance_supporting_components <- renderUI({
 
+        # Venues: Operational Summary and Key Insights
+        if (identical(active_focus(), "Metrics")) {
+          return(
+            executive_venues_supporting_ui(ns)
+          )
+        }
+
+        # Sites: existing financial rankings and insights
         if (identical(active_focus(), "Site")) {
           return(shiny::div(
             class = "executive-site-bottom-grid",
@@ -4911,6 +5848,7 @@ mod_executive_dashboard_server <- function(
             executive_site_insights_card_ui(ns)
           ))
         }
+
 
         if (identical(active_focus(), "Overview")) {
 
