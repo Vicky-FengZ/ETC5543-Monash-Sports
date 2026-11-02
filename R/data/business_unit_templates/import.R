@@ -100,9 +100,32 @@ extract_business_unit_template_year <- function(source_name) {
 }
 
 
-# Business unit from the file name, without the year and "Site/Program Report",
-# e.g. "Aquatics Site Report 2025.xlsx" -> "Aquatics"; known units get their standard name.
-extract_business_unit_report_name <- function(source_name) {
+# Standard name of a known business unit ("aquatics" -> "Aquatics"), or NA.
+known_business_unit_name <- function(label) {
+
+  key <- normalise_excel_label(label)
+  known_names <- c(
+    "aquatics" = "Aquatics",
+    "caulfield" = "Caulfield",
+    "health & fitness" = "Health & Fitness",
+    "participation" = "Participation Programs",
+    "participation programs" = "Participation Programs",
+    "peninsula" = "Peninsula",
+    "venues" = "Venues"
+  )
+
+  if (length(key) == 1L && key %in% names(known_names)) {
+    return(unname(known_names[[key]]))
+  }
+
+  NA_character_
+}
+
+
+# The text of a file name left after removing the year and "Site/Program
+# Report", e.g. "Aquatics Site Report 2025.xlsx" -> "Aquatics"; "" when
+# nothing is left (e.g. "2025.xlsx").
+business_unit_label_from_file <- function(source_name) {
 
   label <- tools::file_path_sans_ext(basename(source_name))
   label <- gsub(
@@ -117,20 +140,19 @@ extract_business_unit_report_name <- function(source_name) {
     label,
     ignore.case = TRUE
   )
-  label <- trimws(gsub("[[:space:]]+", " ", label))
-  key <- normalise_excel_label(label)
-  known_names <- c(
-    "aquatics" = "Aquatics",
-    "caulfield" = "Caulfield",
-    "health & fitness" = "Health & Fitness",
-    "participation" = "Participation Programs",
-    "participation programs" = "Participation Programs",
-    "peninsula" = "Peninsula",
-    "venues" = "Venues"
-  )
+  trimws(gsub("[[:space:]]+", " ", label))
+}
 
-  if (key %in% names(known_names)) {
-    return(unname(known_names[[key]]))
+
+# Business unit from the file name, without the year and "Site/Program Report",
+# e.g. "Aquatics Site Report 2025.xlsx" -> "Aquatics"; known units get their standard name.
+extract_business_unit_report_name <- function(source_name) {
+
+  label <- business_unit_label_from_file(source_name)
+  known <- known_business_unit_name(label)
+
+  if (!is.na(known)) {
+    return(known)
   }
 
   if (!nzchar(label)) {
@@ -141,6 +163,120 @@ extract_business_unit_report_name <- function(source_name) {
   }
 
   label
+}
+
+
+# Business unit named in the title at the top of the Finance sheet, e.g.
+# "AQUATICS (CLAYTON)" -> "AQUATICS". The blank template has a "Business
+# unit" label instead, so the cell after that label is used. "" when the
+# sheet has no title.
+business_unit_title_from_finance <- function(finance_sheet) {
+
+  if (!is.data.frame(finance_sheet) || nrow(finance_sheet) == 0L) {
+    return("")
+  }
+
+  header_words <- c(
+    "income", "expenses", "expenditure", "budget", "actual", "variance",
+    "total", "ytd", "finance", tolower(month.abb), tolower(month.name)
+  )
+  clean_title <- function(text) {
+    trimws(gsub("[[:space:]]*\\([^)]*\\)[[:space:]]*$", "", trimws(text)))
+  }
+
+  # Only the first rows: further down are site codes and cost centres.
+  for (row in seq_len(min(3L, nrow(finance_sheet)))) {
+    texts <- vapply(
+      seq_len(ncol(finance_sheet)),
+      function(column) cell_as_text(finance_sheet, row, column),
+      character(1)
+    )
+    filled <- !is.na(texts) & nzchar(trimws(texts))
+    keys <- normalise_excel_label(texts)
+
+    label_at <- which(filled & keys == "business unit")
+    if (length(label_at) > 0L) {
+      after <- which(filled & seq_along(texts) > label_at[[1L]])
+      return(if (length(after) > 0L) clean_title(texts[[after[[1L]]]]) else "")
+    }
+
+    title <- filled &
+      !keys %in% header_words &
+      !grepl("[0-9]", texts)
+    if (any(title)) {
+      return(clean_title(texts[[which(title)[[1L]]]]))
+    }
+  }
+
+  ""
+}
+
+
+# Business unit of one Detailed Site Report and, when it was not taken
+# straight from the file name, a note for the upload warnings.
+#
+# 1. A known unit in the file name ("Aquatics Site Report 2025.xlsx").
+# 2. Otherwise the unit in the Finance sheet title, so that a file named
+#    only "2025.xlsx", or "Copy of Aquatics Site Report 2025.xlsx", is still
+#    read as the right unit.
+# 3. Otherwise the file name text, for a new unit (as before).
+resolve_business_unit_report_name <- function(source_name, finance_sheet) {
+
+  file_label <- business_unit_label_from_file(source_name)
+  file_known <- known_business_unit_name(file_label)
+  title_label <- business_unit_title_from_finance(finance_sheet)
+  title_known <- known_business_unit_name(title_label)
+  title_name <- if (!is.na(title_known)) {
+    title_known
+  } else if (nzchar(title_label) && identical(title_label, toupper(title_label))) {
+    tools::toTitleCase(tolower(title_label))
+  } else {
+    title_label
+  }
+
+  if (!is.na(file_known)) {
+    note <- NULL
+    if (!is.na(title_known) && !identical(title_known, file_known)) {
+      note <- paste0(
+        "The file name says ", file_known, " but the Finance sheet title says ",
+        title_known, ". The figures were read as ", file_known,
+        " (from the file name); check that this is the right workbook."
+      )
+    }
+    return(list(unit = file_known, note = note))
+  }
+
+  same_text <- nzchar(file_label) &&
+    identical(normalise_excel_label(file_label), normalise_excel_label(title_label))
+
+  if (nzchar(title_name) && !same_text) {
+    return(list(
+      unit = title_name,
+      note = paste0(
+        if (nzchar(file_label)) {
+          paste0("\u201c", file_label, "\u201d in the file name is not a known business unit")
+        } else {
+          "The file name does not name the business unit"
+        },
+        ", so it was taken from the Finance sheet title: ", title_name,
+        ". Rename the file, e.g. \u201c", title_name, " Site Report ",
+        extract_business_unit_template_year(source_name), ".xlsx\u201d, to make this explicit."
+      )
+    ))
+  }
+
+  if (nzchar(file_label)) {
+    return(list(unit = file_label, note = NULL))
+  }
+
+  stop(
+    paste0(
+      "Could not tell which business unit ", source_name, " is for: neither ",
+      "the file name nor the title of the Finance sheet names it. Put the unit ",
+      "in the file name, e.g. \u201cAquatics Site Report 2025.xlsx\u201d."
+    ),
+    call. = FALSE
+  )
 }
 
 
@@ -263,7 +399,6 @@ read_business_unit_template_file <- function(
   }
 
   report_year <- extract_business_unit_template_year(source_name)
-  report_unit <- extract_business_unit_report_name(source_name)
   sheet_names <- readxl::excel_sheets(path)
   expected_sheets <- c(
     finance = "Finance",
@@ -298,6 +433,10 @@ read_business_unit_template_file <- function(
 
   finance_sheet <- raw_sheets$finance
   site_code <- extract_site_code("Finance", finance_sheet)
+  # The unit comes from the file name, or from the Finance sheet title when
+  # the name does not give a known unit.
+  unit <- resolve_business_unit_report_name(source_name, finance_sheet)
+  report_unit <- unit$unit
 
   structure(
     list(
@@ -305,6 +444,7 @@ read_business_unit_template_file <- function(
       source_file = source_name,
       report_year = report_year,
       report_unit = report_unit,
+      report_unit_note = unit$note,
       campus = business_unit_template_campus(report_unit),
       site_code = site_code,
       workbook_sheets = sheet_names,

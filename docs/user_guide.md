@@ -65,6 +65,7 @@ report type from it, so:
 | Each file name contains **exactly one** four-digit year | `Aquatics Site Report 2025.xlsx`, not `Aquatics Site Report 2025 (copy of 2024).xlsx` |
 | Monthly Site Reports start with `Monthly Site Report` | `Monthly Site Report 2026 - March.xlsx` |
 | Business unit reports contain `Site Report` or `Program Report` | `Participation Program Report 2026.xlsx` |
+| Business unit reports start with the unit's name | `Aquatics Site Report 2026.xlsx`; if the name leaves it out (for example `2026.xlsx`), the unit is read from the title at the top of the Finance sheet and a warning says so |
 | Venues reports contain `Venues Tracking Report` | `2026 Venues Tracking Report.xlsx` |
 | Keep **one** Monthly Site Report and one Venues Tracking Report per year | Replace the year's file with the latest version instead of adding a second one |
 | Keep drafts, old copies and other files elsewhere | A second file for a year that is already loaded is not used (see below) |

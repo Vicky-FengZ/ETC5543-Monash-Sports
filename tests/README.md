@@ -32,7 +32,7 @@ everything in one R session, for example while debugging, first run
 | `test_excel_templates.R` | The blank Excel templates have the structure the importers expect |
 | `test_basic_upload.R` | Data page: one "Add data" entry, matching files to report types, choosing a type for unrecognised files, replacing and removing files, saving and loading parsed data |
 | `test_upload_warnings.R` | Validation warnings are counted, grouped and shown without losing any |
-| `test_upload_realworld.R` | Situations met in practice, with the real importers: two files for one year, a wrong year in the file name, blank templates, damaged files, saved data that overlaps the session, a new report year |
+| `test_upload_realworld.R` | Situations met in practice, with the real importers: two files for one year, a wrong year in the file name, a Detailed Site Report named without its business unit, blank templates, damaged files, saved data that overlaps the session, a new report year |
 | `test_real_upload_parsers.R` | Every workbook in the report set parses (sample and full runs only) |
 
 **Dashboard pages**

@@ -230,6 +230,88 @@ shiny::testServer(
   }
 )
 
+# 4b. A Detailed Site Report whose file name does not name the business unit
+# (only the year, or extra words) takes the unit from the Finance sheet
+# title, with a warning, instead of failing or inventing a new unit.
+site_sample <- function(unit) {
+  sample_file(
+    "Business Unit Templates that feed master reports", "2025",
+    paste0(unit, if (unit == "Participation") " Program" else " Site", " Report 2025.xlsx")
+  )
+}
+unit_of <- function(result) unique(result$finance$report_unit)
+has_warning <- function(result, pattern) {
+  issues <- result$validation
+  any(issues$level == "warning" & grepl(pattern, issues$message, fixed = TRUE))
+}
+title_sheet <- function(...) {
+  sheet <- as.data.frame(list(...), stringsAsFactors = FALSE)
+  names(sheet) <- paste0("column_", seq_along(sheet))
+  sheet
+}
+stopifnot(
+  identical(business_unit_title_from_finance(
+    title_sheet(NA, NA, NA, NA, "AQUATICS (CLAYTON)")), "AQUATICS"),
+  identical(business_unit_title_from_finance(
+    title_sheet("Business unit", "New Sport")), "New Sport"),
+  identical(business_unit_title_from_finance(title_sheet("INCOME", "Budget")), ""),
+  identical(business_unit_title_from_finance(NULL), ""),
+  identical(resolve_business_unit_report_name("2025.xlsx",
+    title_sheet(NA, "PARTICIPATION PROGRAMS"))$unit, "Participation Programs"),
+  identical(resolve_business_unit_report_name("Tennis Site Report 2026.xlsx",
+    title_sheet(NA, "TENNIS"))$unit, "Tennis"),
+  is.null(resolve_business_unit_report_name("Tennis Site Report 2026.xlsx",
+    title_sheet(NA, "TENNIS"))$note),
+  inherits(tryCatch(resolve_business_unit_report_name("2025.xlsx", NULL),
+    error = identity), "error")
+)
+
+year_only <- parsers$site_detail(copy_as(site_sample("Aquatics"), "2025.xlsx"), "2025.xlsx")
+extra_words <- parsers$site_detail(
+  copy_as(site_sample("Caulfield"), "Final 2025.xlsx"), "Final 2025.xlsx"
+)
+mismatch <- parsers$site_detail(
+  copy_as(site_sample("Venues"), "Peninsula Site Report 2025.xlsx"),
+  "Peninsula Site Report 2025.xlsx"
+)
+named <- parsers$site_detail(site_sample("Health & Fitness"), basename(site_sample("Health & Fitness")))
+stopifnot(
+  !any(year_only$validation$level == "error"),
+  identical(unit_of(year_only), "Aquatics"),
+  has_warning(year_only, "taken from the Finance sheet title: Aquatics"),
+  identical(unit_of(extra_words), "Caulfield"),
+  has_warning(extra_words, "“Final” in the file name is not a known business unit"),
+  identical(unit_of(mismatch), "Peninsula"),
+  has_warning(mismatch, "the Finance sheet title says Venues"),
+  identical(unit_of(named), "Health & Fitness"),
+  !has_warning(named, "Finance sheet title")
+)
+
+# In the dashboard: "2025.xlsx" waits for a type, then counts as Aquatics,
+# so it cannot be added next to the Aquatics 2025 report.
+shiny::testServer(
+  mod_data_upload_server,
+  {
+    session$flushReact()
+    aquatics <- site_sample("Aquatics")
+    session$setInputs(all_reports = upload_frame(aquatics))
+    session$flushReact()
+    year_only_path <- copy_as(aquatics, "2025.xlsx")
+    session$setInputs(all_reports = upload_frame(year_only_path))
+    session$flushReact()
+    pending <- pending_files()
+    stopifnot(identical(pending$name, "2025.xlsx"))
+    session$setInputs(assign_file = list(id = pending$pending_id, action = "add", type = "site_detail"))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    row <- uploads[uploads$original_name == "2025.xlsx", , drop = FALSE]
+    stopifnot(
+      row$status == "failed",
+      grepl("Detailed Site Reports for Aquatics 2025 are already loaded", row$error_message, fixed = TRUE)
+    )
+  }
+)
+
 # 5. A new report year (2026) reaches the year choices of the pages that
 # read their years from the data.
 shift_report_year <- function(report, from, to) {

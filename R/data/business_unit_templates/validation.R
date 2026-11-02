@@ -234,6 +234,18 @@ validate_business_unit_template_workbook <- function(workbook) {
   raw_finance <- workbook$sheets$finance
   issues <- list()
 
+  # The business unit was not taken straight from the file name (see
+  # resolve_business_unit_report_name()); say where it came from.
+  note <- workbook$report_unit_note
+  if (is.character(note) && length(note) == 1L && nzchar(note)) {
+    issues[[length(issues) + 1L]] <- make_import_issue(
+      level = "warning",
+      source_file = workbook$source_file,
+      sheet = workbook$sheet_names$finance,
+      message = note
+    )
+  }
+
   if (!is.data.frame(raw_finance) || nrow(raw_finance) == 0L) {
     issues[[length(issues) + 1L]] <- make_import_issue(
       level = "error",
