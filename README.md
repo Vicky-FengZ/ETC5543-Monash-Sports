@@ -538,7 +538,7 @@ docs/
 report/
   report.qmd              # project report (Quarto): title, authors and text
   _quarto.yml             # PDF and website settings
-  _output/                # rendered report.pdf and index.html (website)
+  report.pdf, index.html  # rendered report (PDF and website)
   README.md               # what the other report folders hold
 
 slides/

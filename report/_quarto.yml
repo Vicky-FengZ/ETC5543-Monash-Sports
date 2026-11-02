@@ -3,11 +3,11 @@
 #
 # Render both versions from the project root (RStudio Terminal):
 #   quarto render report/report.qmd
-# The PDF and the website are written to report/_output/.
+# The PDF (report.pdf) and the website (index.html) are written next to
+# report.qmd, in the report/ folder.
 
 project:
   type: default
-  output-dir: _output
   render:
     - report.qmd
 

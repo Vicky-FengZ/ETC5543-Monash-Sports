@@ -10,7 +10,7 @@
 <meta name="author" content="Ziqi Feng">
 <meta name="dcterms.date" content="2026-11-03">
 
-<title>Modelling resource and space for Monash Sport</title>
+<title>From spreadsheets to decisions</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -2252,8 +2252,8 @@ src: url(data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRiNBHnwAAAI8AAAAuEdQT1OJ4GQ0AA
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body site-hero-inner">
       <p class="site-kicker"><span class="site-kicker-dot"></span>ETC5543 Business Analytics Creative Activity</p>
-      <h1 class="title">Modelling resource and space for Monash Sport</h1>
-      <p class="subtitle lead">ETC5543 Project Report</p>
+      <h1 class="title">From spreadsheets to decisions</h1>
+      <p class="subtitle lead">A reporting and forecasting dashboard for Monash Sport</p>
       <div class="site-actions">
         <a class="site-button is-primary" href="https://vicky-fengz.github.io/ETC5543-Monash-Sports/" target="_blank" rel="noopener">Try the dashboard <span aria-hidden="true">→</span></a>
         <a class="site-button" href="https://github.com/Vicky-FengZ/ETC5543-Monash-Sports" target="_blank" rel="noopener">View the code</a>
@@ -2274,13 +2274,40 @@ src: url(data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRiNBHnwAAAI8AAAAuEdQT1OJ4GQ0AA
   <ul class="collapse">
   <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract">Abstract</a></li>
   <li><a href="#sec-intro" id="toc-sec-intro" class="nav-link" data-scroll-target="#sec-intro"><span class="header-section-number">1</span> Introduction</a></li>
-  <li><a href="#sec-data" id="toc-sec-data" class="nav-link" data-scroll-target="#sec-data"><span class="header-section-number">2</span> Data</a></li>
-  <li><a href="#sec-methods" id="toc-sec-methods" class="nav-link" data-scroll-target="#sec-methods"><span class="header-section-number">3</span> System design and methods</a></li>
-  <li><a href="#sec-dashboard" id="toc-sec-dashboard" class="nav-link" data-scroll-target="#sec-dashboard"><span class="header-section-number">4</span> The dashboard</a></li>
-  <li><a href="#sec-evaluation" id="toc-sec-evaluation" class="nav-link" data-scroll-target="#sec-evaluation"><span class="header-section-number">5</span> Evaluation</a></li>
-  <li><a href="#sec-discussion" id="toc-sec-discussion" class="nav-link" data-scroll-target="#sec-discussion"><span class="header-section-number">6</span> Discussion</a></li>
-  <li><a href="#sec-conclusion" id="toc-sec-conclusion" class="nav-link" data-scroll-target="#sec-conclusion"><span class="header-section-number">7</span> Conclusion</a></li>
-  <li><a href="#contributions" id="toc-contributions" class="nav-link" data-scroll-target="#contributions">Contributions</a></li>
+  <li><a href="#sec-objectives" id="toc-sec-objectives" class="nav-link" data-scroll-target="#sec-objectives"><span class="header-section-number">2</span> Objectives and significance</a>
+  <ul class="collapse">
+  <li><a href="#sec-obj-data" id="toc-sec-obj-data" class="nav-link" data-scroll-target="#sec-obj-data"><span class="header-section-number">2.1</span> Data objectives</a></li>
+  <li><a href="#sec-obj-dashboard" id="toc-sec-obj-dashboard" class="nav-link" data-scroll-target="#sec-obj-dashboard"><span class="header-section-number">2.2</span> Dashboard and planning objectives</a></li>
+  </ul></li>
+  <li><a href="#sec-design" id="toc-sec-design" class="nav-link" data-scroll-target="#sec-design"><span class="header-section-number">3</span> System design</a>
+  <ul class="collapse">
+  <li><a href="#sec-users" id="toc-sec-users" class="nav-link" data-scroll-target="#sec-users"><span class="header-section-number">3.1</span> Users and requirements</a></li>
+  <li><a href="#sec-architecture" id="toc-sec-architecture" class="nav-link" data-scroll-target="#sec-architecture"><span class="header-section-number">3.2</span> Architecture</a></li>
+  <li><a href="#sec-principles" id="toc-sec-principles" class="nav-link" data-scroll-target="#sec-principles"><span class="header-section-number">3.3</span> Design principles</a></li>
+  </ul></li>
+  <li><a href="#sec-data" id="toc-sec-data" class="nav-link" data-scroll-target="#sec-data"><span class="header-section-number">4</span> Data pipeline: from workbooks to tidy tables</a>
+  <ul class="collapse">
+  <li><a href="#sec-sources" id="toc-sec-sources" class="nav-link" data-scroll-target="#sec-sources"><span class="header-section-number">4.1</span> Source reports</a></li>
+  <li><a href="#sec-cleaning" id="toc-sec-cleaning" class="nav-link" data-scroll-target="#sec-cleaning"><span class="header-section-number">4.2</span> Import, cleaning and validation</a></li>
+  <li><a href="#sec-upload" id="toc-sec-upload" class="nav-link" data-scroll-target="#sec-upload"><span class="header-section-number">4.3</span> Upload workflow</a></li>
+  <li><a href="#sec-extend" id="toc-sec-extend" class="nav-link" data-scroll-target="#sec-extend"><span class="header-section-number">4.4</span> Extending to future years</a></li>
+  </ul></li>
+  <li><a href="#sec-dashboard" id="toc-sec-dashboard" class="nav-link" data-scroll-target="#sec-dashboard"><span class="header-section-number">5</span> The dashboard</a></li>
+  <li><a href="#sec-forecast" id="toc-sec-forecast" class="nav-link" data-scroll-target="#sec-forecast"><span class="header-section-number">6</span> Forecasting and scenario planning</a>
+  <ul class="collapse">
+  <li><a href="#sec-forecast-data" id="toc-sec-forecast-data" class="nav-link" data-scroll-target="#sec-forecast-data"><span class="header-section-number">6.1</span> Forecast data preparation</a></li>
+  <li><a href="#sec-model-selection" id="toc-sec-model-selection" class="nav-link" data-scroll-target="#sec-model-selection"><span class="header-section-number">6.2</span> Model selection</a></li>
+  <li><a href="#sec-scenarios" id="toc-sec-scenarios" class="nav-link" data-scroll-target="#sec-scenarios"><span class="header-section-number">6.3</span> Payroll, price and demand scenarios</a></li>
+  <li><a href="#sec-forecast-ui" id="toc-sec-forecast-ui" class="nav-link" data-scroll-target="#sec-forecast-ui"><span class="header-section-number">6.4</span> Uncertainty and interface</a></li>
+  </ul></li>
+  <li><a href="#sec-evaluation" id="toc-sec-evaluation" class="nav-link" data-scroll-target="#sec-evaluation"><span class="header-section-number">7</span> Evaluation</a>
+  <ul class="collapse">
+  <li><a href="#sec-eval-data" id="toc-sec-eval-data" class="nav-link" data-scroll-target="#sec-eval-data"><span class="header-section-number">7.1</span> Data correctness</a></li>
+  <li><a href="#sec-eval-dashboard" id="toc-sec-eval-dashboard" class="nav-link" data-scroll-target="#sec-eval-dashboard"><span class="header-section-number">7.2</span> Dashboard consistency</a></li>
+  <li><a href="#sec-eval-forecast" id="toc-sec-eval-forecast" class="nav-link" data-scroll-target="#sec-eval-forecast"><span class="header-section-number">7.3</span> Forecast accuracy</a></li>
+  <li><a href="#sec-eval-performance" id="toc-sec-eval-performance" class="nav-link" data-scroll-target="#sec-eval-performance"><span class="header-section-number">7.4</span> Performance</a></li>
+  </ul></li>
+  <li><a href="#sec-conclusion" id="toc-sec-conclusion" class="nav-link" data-scroll-target="#sec-conclusion"><span class="header-section-number">8</span> Discussion and conclusion</a></li>
   <li><a href="#use-of-generative-ai" id="toc-use-of-generative-ai" class="nav-link" data-scroll-target="#use-of-generative-ai">Use of generative AI</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   
@@ -2307,33 +2334,104 @@ src: url(data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRiNBHnwAAAI8AAAAuEdQT1OJ4GQ0AA
 
 <section id="abstract" class="level1 unnumbered">
 <h1 class="unnumbered">Abstract</h1>
+<!--Owner: Vicky -->
 </section>
 <section id="sec-intro" class="level1" data-number="1">
 <h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<!--Owner: Vicky-->
 </section>
-<section id="sec-data" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Data</h1>
+<section id="sec-objectives" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Objectives and significance</h1>
+<!--
+Owner: Both
+Opening paragraph: the overall aim (turn scattered reports into a tool for
+decision-making and planning).
+-->
+<section id="sec-obj-data" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-obj-data"><span class="header-section-number">2.1</span> Data objectives</h2>
 </section>
-<section id="sec-methods" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> System design and methods</h1>
+<section id="sec-obj-dashboard" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-obj-dashboard"><span class="header-section-number">2.2</span> Dashboard and planning objectives</h2>
 </section>
-<section id="sec-dashboard" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> The dashboard</h1>
 </section>
-<section id="sec-evaluation" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Evaluation</h1>
+<section id="sec-design" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> System design</h1>
+<!-- Owner: Vicky -->
+<section id="sec-users" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="sec-users"><span class="header-section-number">3.1</span> Users and requirements</h2>
 </section>
-<section id="sec-discussion" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Discussion</h1>
+<section id="sec-architecture" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="sec-architecture"><span class="header-section-number">3.2</span> Architecture</h2>
 </section>
-<section id="sec-conclusion" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Conclusion</h1>
+<section id="sec-principles" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="sec-principles"><span class="header-section-number">3.3</span> Design principles</h2>
 </section>
-<section id="contributions" class="level1 unnumbered">
-<h1 class="unnumbered">Contributions</h1>
+</section>
+<section id="sec-data" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Data pipeline: from workbooks to tidy tables</h1>
+<!-- Owner: Vicky -->
+<section id="sec-sources" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="sec-sources"><span class="header-section-number">4.1</span> Source reports</h2>
+</section>
+<section id="sec-cleaning" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="sec-cleaning"><span class="header-section-number">4.2</span> Import, cleaning and validation</h2>
+</section>
+<section id="sec-upload" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="sec-upload"><span class="header-section-number">4.3</span> Upload workflow</h2>
+</section>
+<section id="sec-extend" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="sec-extend"><span class="header-section-number">4.4</span> Extending to future years</h2>
+</section>
+</section>
+<section id="sec-dashboard" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> The dashboard</h1>
+<!--Owner: Ayush-->
+</section>
+<section id="sec-forecast" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Forecasting and scenario planning</h1>
+<!-- Owner: Vicky.-->
+<section id="sec-forecast-data" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="sec-forecast-data"><span class="header-section-number">6.1</span> Forecast data preparation</h2>
+</section>
+<section id="sec-model-selection" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="sec-model-selection"><span class="header-section-number">6.2</span> Model selection</h2>
+</section>
+<section id="sec-scenarios" class="level2" data-number="6.3">
+<h2 data-number="6.3" class="anchored" data-anchor-id="sec-scenarios"><span class="header-section-number">6.3</span> Payroll, price and demand scenarios</h2>
+</section>
+<section id="sec-forecast-ui" class="level2" data-number="6.4">
+<h2 data-number="6.4" class="anchored" data-anchor-id="sec-forecast-ui"><span class="header-section-number">6.4</span> Uncertainty and interface</h2>
+</section>
+</section>
+<section id="sec-evaluation" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Evaluation</h1>
+<!--
+Owner: Both
+Each subsection: start by referring back to the method section and the
+objective it tests
+Also can mentioned some mentor feedback during our working, and how we
+change it
+-->
+<section id="sec-eval-data" class="level2" data-number="7.1">
+<h2 data-number="7.1" class="anchored" data-anchor-id="sec-eval-data"><span class="header-section-number">7.1</span> Data correctness</h2>
+</section>
+<section id="sec-eval-dashboard" class="level2" data-number="7.2">
+<h2 data-number="7.2" class="anchored" data-anchor-id="sec-eval-dashboard"><span class="header-section-number">7.2</span> Dashboard consistency</h2>
+</section>
+<section id="sec-eval-forecast" class="level2" data-number="7.3">
+<h2 data-number="7.3" class="anchored" data-anchor-id="sec-eval-forecast"><span class="header-section-number">7.3</span> Forecast accuracy</h2>
+</section>
+<section id="sec-eval-performance" class="level2" data-number="7.4">
+<h2 data-number="7.4" class="anchored" data-anchor-id="sec-eval-performance"><span class="header-section-number">7.4</span> Performance</h2>
+</section>
+</section>
+<section id="sec-conclusion" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Discussion and conclusion</h1>
+<!--Owner: Ayush-->
 </section>
 <section id="use-of-generative-ai" class="level1 unnumbered">
 <h1 class="unnumbered">Use of generative AI</h1>
+<!-- Owner: Both -->
 </section>
 <section id="references" class="level1 unnumbered">
 <h1 class="unnumbered">References</h1>

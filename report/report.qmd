@@ -1,6 +1,6 @@
 ---
-title: "Modelling resource and space for Monash Sport"
-subtitle: "ETC5543 Project Report"
+title: "From spreadsheets to decisions"
+subtitle: "A reporting and forecasting dashboard for Monash Sport"
 author:
   - name: Ayush Pandia
     affiliation: Monash University
@@ -29,23 +29,121 @@ knitr::write_bib(cited, file = "references/packages.bib")
 
 # Abstract {.unnumbered}
 
+<!--Owner: Vicky -->
+
 # Introduction {#sec-intro}
 
-# Data {#sec-data}
+<!--Owner: Vicky-->
 
-# System design and methods {#sec-methods}
+# Objectives and significance {#sec-objectives}
+
+<!--
+Owner: Both
+Opening paragraph: the overall aim (turn scattered reports into a tool for
+decision-making and planning).
+-->
+
+## Data objectives {#sec-obj-data}
+
+
+
+## Dashboard and planning objectives {#sec-obj-dashboard}
+
+
+
+
+# System design {#sec-design}
+
+<!-- Owner: Vicky -->
+
+## Users and requirements {#sec-users}
+
+
+
+## Architecture {#sec-architecture}
+
+
+
+## Design principles {#sec-principles}
+
+
+# Data pipeline: from workbooks to tidy tables {#sec-data}
+
+<!-- Owner: Vicky -->
+
+## Source reports {#sec-sources}
+
+
+
+## Import, cleaning and validation {#sec-cleaning}
+
+
+
+## Upload workflow {#sec-upload}
+
+
+## Extending to future years {#sec-extend}
+
+
 
 # The dashboard {#sec-dashboard}
 
+<!--Owner: Ayush-->
+
+
+
+
+
+
+
+# Forecasting and scenario planning {#sec-forecast}
+
+<!-- Owner: Vicky.-->
+
+## Forecast data preparation {#sec-forecast-data}
+
+
+
+## Model selection {#sec-model-selection}
+
+
+
+## Payroll, price and demand scenarios {#sec-scenarios}
+
+
+## Uncertainty and interface {#sec-forecast-ui}
+
+
+
 # Evaluation {#sec-evaluation}
 
-# Discussion {#sec-discussion}
+<!--
+Owner: Both
+Each subsection: start by referring back to the method section and the
+objective it tests
+Also can mentioned some mentor feedback during our working, and how we
+change it
+-->
 
-# Conclusion {#sec-conclusion}
+## Data correctness {#sec-eval-data}
 
-# Contributions {.unnumbered}
+
+## Dashboard consistency {#sec-eval-dashboard}
+
+
+## Forecast accuracy {#sec-eval-forecast}
+
+
+## Performance {#sec-eval-performance}
+
+
+# Discussion and conclusion {#sec-conclusion}
+
+<!--Owner: Ayush-->
 
 # Use of generative AI {.unnumbered}
+
+<!-- Owner: Both -->
 
 # References {.unnumbered}
 
@@ -55,3 +153,4 @@ knitr::write_bib(cited, file = "references/packages.bib")
 {{< pagebreak >}}
 
 # Appendix {.appendix .unnumbered}
+
