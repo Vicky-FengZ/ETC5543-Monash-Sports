@@ -221,6 +221,9 @@ mod_forecasting_ui <- function(id) {
   )
 }
 
+# Server for the Forecasting page: prepares the history from the uploaded
+# reports, fits the baseline once per history and horizon, and recalculates
+# the scenario, charts and tables when the plan changes.
 mod_forecasting_server <- function(id, data = NULL) {
   moduleServer(id, function(input, output, session) {
     default <- function(value, fallback) if (is.null(value) || !length(value)) fallback else value

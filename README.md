@@ -600,8 +600,10 @@ quarto render report/report.qmd
 quarto render slides/slides.qmd
 ```
 
-The report is rendered twice, as a PDF in the Monash report format and as a
-one-page website, both into `report/_output/` (see `report/README.md`).
+The report is rendered twice, as a PDF in the Monash report format
+(`report/report.pdf`) and as a one-page website (`report/index.html`); see
+`report/README.md`. Rendering runs R code, so knitr is recorded in
+`renv.lock` with the dashboard's packages.
 
 The slides use the bundled `quarto-monash` theme in `slides/_extensions/` and
 need no R packages. `slides/slides.html` is the rendered, self-contained
@@ -678,3 +680,8 @@ app from RStudio for the fastest parsing.
 The code and documentation are released under the [MIT Licence](LICENSE).
 Monash University and Monash Sport names, logos and brand assets, and the
 Monash Sport report data, are not covered by this licence.
+
+The Quarto templates in `slides/_extensions/` and `report/_extensions/` come
+from [quarto-monash](https://github.com/quarto-monash) (CC0). The fonts
+bundled with the report template (Fira Sans, XCharter, Font Awesome Free)
+keep their own open licences.

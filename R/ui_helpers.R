@@ -25,6 +25,7 @@ placeholder_chart <- function(
 }
 
 
+# Small note marking placeholder values on a page still in development.
 prototype_note <- function(
   text = "Prototype values are placeholders for layout demonstration only"
 ) {
@@ -35,6 +36,7 @@ prototype_note <- function(
 }
 
 
+# Subtitle line under a chart card's title.
 chart_subtitle <- function(...) {
   div(
     class = "chart-header-subtitle",
