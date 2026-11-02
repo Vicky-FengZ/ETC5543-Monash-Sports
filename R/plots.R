@@ -1137,6 +1137,545 @@ plot_revenue_capture_over_time <- function(annual_revenue) {
   invisible(NULL)
 }
 
+
+# -------------------------------------------------------------------------
+# Executive Overview charts
+# -------------------------------------------------------------------------
+# These charts use the existing financial calculations.
+# Comparison years share a month axis, making non-consecutive years
+# easier to compare without implying that missing years contain data.
+
+executive_chart_months <- month.abb
+
+
+executive_chart_series <- function(data, value_field) {
+  if (
+    is.null(data) ||
+    !is.data.frame(data) ||
+    nrow(data) == 0L
+  ) {
+    return(list())
+  }
+
+  years <- sort(unique(as.integer(data$report_year)))
+  years <- years[!is.na(years)]
+
+  months <- as.integer(format(as.Date(data$date), "%m"))
+  values <- suppressWarnings(as.numeric(data[[value_field]]))
+
+  result <- lapply(years, function(year) {
+    monthly <- rep(NA_real_, 12L)
+
+    for (month in seq_len(12L)) {
+      matches <- which(
+        as.integer(data$report_year) == year &
+          months == month &
+          is.finite(values)
+      )
+
+      if (length(matches) > 0L) {
+        monthly[[month]] <- sum(values[matches])
+      }
+    }
+
+    monthly
+  })
+
+  names(result) <- as.character(years)
+  result
+}
+
+
+executive_chart_axis <- function(values, month_labels = TRUE) {
+  limits <- overview_plot_limits(values)
+
+  plot(
+    NA,
+    xlim = c(0.5, 12.5),
+    ylim = limits,
+    xlab = "",
+    ylab = "",
+    axes = FALSE,
+    xaxs = "i",
+    yaxs = "i"
+  )
+
+  ticks <- pretty(limits, n = 4)
+  ticks <- ticks[ticks >= limits[1] & ticks <= limits[2]]
+
+  abline(h = ticks, col = CHART_COLOURS[["grid"]])
+  abline(h = 0, col = CHART_COLOURS[["subtle"]])
+
+  axis(
+    2,
+    at = ticks,
+    labels = format_compact_currency(ticks),
+    las = 1,
+    tick = FALSE,
+    cex.axis = 0.75,
+    col.axis = CHART_COLOURS[["muted"]]
+  )
+
+  if (month_labels) {
+    axis(
+      1,
+      at = seq_len(12L),
+      labels = executive_chart_months,
+      tick = FALSE,
+      cex.axis = 0.74,
+      col.axis = CHART_COLOURS[["muted"]]
+    )
+  }
+
+  invisible(limits)
+}
+
+
+# Monthly Income vs Expenses -------------------------------------------
+
+plot_executive_income_expenses <- function(monthly_finance) {
+  income <- executive_chart_series(
+    monthly_finance, "income_actual"
+  )
+  expenses <- executive_chart_series(
+    monthly_finance, "expenses_actual"
+  )
+
+  years <- names(income)
+
+  if (length(years) == 0L) {
+    stop("No monthly finance data is available.", call. = FALSE)
+  }
+
+  all_values <- c(unlist(income), unlist(expenses))
+
+  if (!any(is.finite(all_values))) {
+    stop("No Income or Expenses values are available.", call. = FALSE)
+  }
+
+  old_par <- par(
+  mar = c(5.0, 5.6, 3.1, 1),
+  family = "sans"
+  )
+  on.exit(par(old_par), add = TRUE)
+
+  executive_chart_axis(all_values)
+
+  year_colours <- chart_categorical_colours(length(years))
+
+  legend_labels <- character()
+  legend_colours <- character()
+  legend_styles <- integer()
+
+  for (i in seq_along(years)) {
+    year <- years[[i]]
+    colour <- year_colours[[i]]
+
+    lines(
+      seq_len(12L),
+      income[[year]],
+      col = colour,
+      lwd = 2.5,
+      lty = 1
+    )
+
+    points(
+      seq_len(12L),
+      income[[year]],
+      col = colour,
+      pch = 16,
+      cex = 0.65
+    )
+
+    lines(
+      seq_len(12L),
+      expenses[[year]],
+      col = colour,
+      lwd = 2,
+      lty = 2
+    )
+
+    points(
+      seq_len(12L),
+      expenses[[year]],
+      col = colour,
+      pch = 1,
+      cex = 0.65
+    )
+
+    legend_labels <- c(
+      legend_labels,
+      paste(year, "Income"),
+      paste(year, "Expenses")
+    )
+
+    legend_colours <- c(legend_colours, colour, colour)
+    legend_styles <- c(legend_styles, 1L, 2L)
+  }
+
+  chart_legend(
+    "top",
+    legend = legend_labels,
+    col = legend_colours,
+    lty = legend_styles,
+    lwd = 2.5,
+    bty = "n",
+    ncol = min(4L, length(legend_labels)),
+    cex = 0.82,
+    seg.len = 2,
+    x.intersp = 0.8,
+    y.intersp = 1.1,
+    inset = c(0, -0.12),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
+
+
+# Annual Performance ----------------------------------------------------
+
+plot_executive_annual_performance <- function(
+    annual_finance,
+    metrics = c("Income", "Expenses", "Net Result")
+) {
+  metrics <- intersect(
+    unique(metrics),
+    c("Income", "Expenses", "Net Result", "Budget Variance")
+  )
+
+  if (
+    nrow(annual_finance) == 0L ||
+    length(metrics) == 0L
+  ) {
+    stop("No annual performance values are available.", call. = FALSE)
+  }
+
+  years <- as.integer(annual_finance$report_year)
+  keep <- !is.na(years)
+
+  years <- years[keep]
+  annual_finance <- annual_finance[keep, , drop = FALSE]
+
+  year_order <- order(years)
+  years <- years[year_order]
+  annual_finance <- annual_finance[year_order, , drop = FALSE]
+
+  values <- sapply(
+    metrics,
+    function(metric) overview_metric_values(annual_finance, metric)
+  )
+
+  values <- matrix(
+    values,
+    nrow = length(years),
+    ncol = length(metrics),
+    dimnames = list(NULL, metrics)
+  )
+
+  if (!any(is.finite(values))) {
+    stop("No annual performance values are available.", call. = FALSE)
+  }
+
+  limits <- overview_plot_limits(as.numeric(values))
+  colours <- chart_metric_colours(metrics)
+
+  old_par <- par(
+  mar = c(5.0, 5.6, 3.1, 1),
+  family = "sans"
+  )
+  on.exit(par(old_par), add = TRUE)
+
+  plot(
+    NA,
+    xlim = c(0.4, length(years) + 0.6),
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    xaxs = "i",
+    yaxs = "i"
+  )
+
+  ticks <- pretty(limits, n = 4)
+  ticks <- ticks[ticks >= limits[1] & ticks <= limits[2]]
+
+  abline(h = ticks, col = CHART_COLOURS[["grid"]])
+  abline(h = 0, col = CHART_COLOURS[["subtle"]])
+
+  bar_width <- 0.7 / length(metrics)
+
+  for (i in seq_along(years)) {
+    for (j in seq_along(metrics)) {
+      value <- values[i, j]
+
+      if (!is.finite(value)) next
+
+      centre <- i - 0.35 + (j - 0.5) * bar_width
+
+      rect(
+        centre - bar_width * 0.43,
+        min(0, value),
+        centre + bar_width * 0.43,
+        max(0, value),
+        col = colours[[j]],
+        border = NA
+      )
+    }
+  }
+
+  year_labels <- as.character(years)
+
+  if (
+    "Net Result" %in% metrics &&
+    any(c("Income", "Expenses") %in% metrics)
+  ) {
+    net_result <- values[, match("Net Result", metrics)]
+
+    year_labels <- paste0(
+      years,
+      "\nNet ",
+      format_compact_currency(net_result)
+    )
+  }
+
+  axis(
+    1,
+    at = seq_along(years),
+    labels = year_labels,
+    tick = FALSE,
+    cex.axis = 0.80,
+    line = -0.3,
+    col.axis = CHART_COLOURS[["muted"]]
+  )
+
+  axis(
+    2,
+    at = ticks,
+    labels = format_compact_currency(ticks),
+    las = 1,
+    tick = FALSE,
+    cex.axis = 0.75
+  )
+
+  chart_legend(
+    "top",
+    legend = metrics,
+    fill = colours,
+    border = NA,
+    bty = "n",
+    ncol = min(3L, length(metrics)),
+    cex = 0.72,
+    inset = c(0, -0.02),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
+
+
+# Monthly Budget vs Actual ---------------------------------------------
+
+plot_executive_budget_actual <- function(monthly_finance) {
+  budget <- executive_chart_series(monthly_finance, "net_budget")
+  actual <- executive_chart_series(monthly_finance, "net_actual")
+
+  years <- names(budget)
+
+  if (length(years) == 0L) {
+    stop("No monthly Budget or Actual data is available.", call. = FALSE)
+  }
+
+  values <- c(unlist(budget), unlist(actual))
+
+  if (!any(is.finite(values))) {
+    stop("No monthly Budget or Actual values are available.", call. = FALSE)
+  }
+
+  old_par <- par(
+  mar = c(5.0, 5.6, 3.1, 1),
+  family = "sans"
+  )
+  on.exit(par(old_par), add = TRUE)
+
+  executive_chart_axis(values)
+
+  year_colours <- chart_categorical_colours(length(years))
+
+  # Each month contains one Budget and one Actual bar per year.
+  series_count <- length(years) * 2L
+  bar_width <- 0.76 / series_count
+
+  legend_labels <- character()
+  legend_colours <- character()
+
+  for (i in seq_along(years)) {
+    year <- years[[i]]
+
+    for (kind in c("Budget", "Actual")) {
+      j <- if (kind == "Budget") 1L else 2L
+      series_index <- (i - 1L) * 2L + j
+
+      series <- if (kind == "Budget") {
+        budget[[year]]
+      } else {
+        actual[[year]]
+      }
+
+      colour <- if (kind == "Budget") {
+        grDevices::adjustcolor(year_colours[[i]], alpha.f = 0.45)
+      } else {
+        year_colours[[i]]
+      }
+
+      legend_labels <- c(legend_labels, paste(year, kind))
+      legend_colours <- c(legend_colours, colour)
+
+      for (month in seq_len(12L)) {
+        value <- series[[month]]
+
+        if (!is.finite(value)) next
+
+        centre <- month - 0.38 +
+          (series_index - 0.5) * bar_width
+
+        rect(
+          centre - bar_width * 0.44,
+          min(0, value),
+          centre + bar_width * 0.44,
+          max(0, value),
+          col = colour,
+          border = NA
+        )
+      }
+    }
+  }
+
+  chart_legend(
+    "top",
+    legend = legend_labels,
+    fill = legend_colours,
+    border = NA,
+    bty = "n",
+    ncol = min(4L, length(legend_labels)),
+    cex = 0.82,
+    x.intersp = 0.8,
+    y.intersp = 1.1,
+    inset = c(0, -0.12),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
+
+
+# Revenue Capture -------------------------------------------------------
+
+plot_executive_revenue_capture <- function(annual_revenue) {
+  complete <- is.finite(annual_revenue$actual_income) &
+    is.finite(annual_revenue$discount_opportunity) &
+    is.finite(annual_revenue$capture_rate) &
+    !is.na(annual_revenue$report_year)
+
+  data <- annual_revenue[complete, , drop = FALSE]
+
+  if (nrow(data) == 0L) {
+    stop("No complete Revenue Capture data is available.", call. = FALSE)
+  }
+
+  years <- as.integer(data$report_year)
+  actual <- as.numeric(data$actual_income)
+  opportunity <- as.numeric(data$discount_opportunity)
+  capture <- as.numeric(data$capture_rate)
+
+  potential <- actual + opportunity
+
+  if (any(actual < 0 | opportunity < 0)) {
+    stop("Revenue Capture requires non-negative components.", call. = FALSE)
+  }
+
+  limits <- c(0, max(potential) * 1.2)
+
+  if (limits[2] <= 0) limits[2] <- 1
+
+  old_par <- par(
+  mar = c(5.0, 5.6, 3.1, 1),
+  family = "sans"
+  )
+  on.exit(par(old_par), add = TRUE)
+
+  plot(
+    NA,
+    xlim = c(0.4, length(years) + 0.6),
+    ylim = limits,
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    xaxs = "i",
+    yaxs = "i"
+  )
+
+  ticks <- pretty(limits, n = 4)
+  ticks <- ticks[ticks >= 0 & ticks <= limits[2]]
+
+  abline(h = ticks, col = CHART_COLOURS[["grid"]])
+
+  for (i in seq_along(years)) {
+    rect(
+      i - 0.28, 0, i + 0.28, actual[[i]],
+      col = CHART_COLOURS[["primary"]],
+      border = NA
+    )
+
+    rect(
+      i - 0.28,
+      actual[[i]],
+      i + 0.28,
+      potential[[i]],
+      col = CHART_COLOURS[["secondary"]],
+      border = NA
+    )
+
+    text(
+      i,
+      potential[[i]] + limits[2] * 0.025,
+      labels = format_percentage(capture[[i]]),
+      cex = 0.7,
+      col = CHART_COLOURS[["text_strong"]]
+    )
+  }
+
+  axis(1, at = seq_along(years), labels = years,
+       tick = FALSE, cex.axis = 0.82)
+
+  axis(
+    2,
+    at = ticks,
+    labels = format_compact_currency(ticks),
+    las = 1,
+    tick = FALSE,
+    cex.axis = 0.75
+  )
+
+  chart_legend(
+    "top",
+    legend = c("Actual Income", "Discount Opportunity"),
+    fill = c(
+      CHART_COLOURS[["primary"]],
+      CHART_COLOURS[["secondary"]]
+    ),
+    border = NA,
+    bty = "n",
+    horiz = TRUE,
+    cex = 0.7,
+    inset = c(0, -0.02),
+    xpd = NA
+  )
+
+  invisible(NULL)
+}
+
+
 # -------------------------------------------------------------------------
 # Site Comparison plots
 # -------------------------------------------------------------------------

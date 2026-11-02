@@ -751,27 +751,7 @@ executive_visual_metric_control_ui <- function(
   switch(
     visual_id,
 
-    annual_performance_trend =
-      div(
-        class =
-          "chart-header-control executive-visual-metric-control",
-
-        selectizeInput(
-          ns("metric_annual_performance_trend"),
-          label = NULL,
-          choices = metric_choices,
-          selected = c(
-            "Income",
-            "Expenses",
-            "Net Result"
-          ),
-          multiple = TRUE,
-          options = list(
-            maxItems = 3,
-            placeholder = "Choose metrics"
-          )
-        )
-      ),
+    annual_performance_trend = NULL,
 
     budget_vs_actual =
       div(
@@ -934,14 +914,38 @@ executive_visual_card_ui <- function(
     ),
 
     plotOutput(
-      ns(
-        paste0(
-          "executive_plot_",
-          visual_id
+      ns(paste0("executive_plot_", visual_id)),
+      height = "320px",
+      hover = if (visual_id %in% c(
+        "monthly_income_expenses",
+        "annual_performance_trend",
+        "budget_vs_actual",
+        "revenue_capture"
+      )) {
+        hoverOpts(
+          id = ns(paste0("executive_hover_", visual_id)),
+          delay = 150,
+          delayType = "debounce"
         )
-      ),
-      height = "320px"
-    )
+      } else {
+        NULL
+      }
+    ),
+
+    if (visual_id %in% c(
+      "monthly_income_expenses",
+      "annual_performance_trend",
+      "budget_vs_actual",
+      "revenue_capture"
+    )) {
+      div(
+        class = "executive-chart-hover-readout",
+        textOutput(
+          ns(paste0("executive_hover_value_", visual_id)),
+          inline = TRUE
+        )
+      )
+    }
   )
 }
 
@@ -1097,6 +1101,30 @@ executive_site_values_card_ui <- function(
   )
 }
 
+# Financial Summary ------------------------------------------------------
+# Shows exact annual finance values for the selected reporting context.
+
+executive_financial_summary_card_ui <- function(ns) {
+
+  bslib::card(
+    class = "executive-dashboard-table-card executive-financial-summary-card",
+    full_screen = TRUE,
+
+    card_header(
+      div(
+        class = "chart-header-title",
+        "Financial Summary"
+      )
+    ),
+
+    div(
+      class = "executive-financial-summary-table",
+      tableOutput(
+        ns("financial_summary_table")
+      )
+    )
+  )
+}
 
 executive_key_insights_card_ui <- function(
   ns
@@ -1283,10 +1311,16 @@ mod_executive_dashboard_ui <- function(id) {
                   div(
                     class = "executive-dashboard-actions",
 
-                    actionButton(
-                      ns("choose_visuals"),
-                      "Choose Visuals",
-                      icon = bs_icon("sliders")
+                    # Visual selection remains available for Site and Metrics.
+                    # Overview uses a consistent set of charts.
+                    conditionalPanel(
+                      condition = "input.dashboard_section != 'finance'",
+                      actionButton(
+                        ns("choose_visuals"),
+                        "Choose Visuals",
+                        icon = bs_icon("sliders")
+                      ),
+                      ns = ns
                     ),
 
                     actionButton(
@@ -2360,6 +2394,144 @@ mod_executive_dashboard_server <- function(
       })
 
       # -------------------------------------------------------------------
+      # Financial Summary
+      # -------------------------------------------------------------------
+      # Reuse the annual finance calculations used by the KPI cards.
+      # Missing values are displayed as unavailable, not as zero.
+
+      output$financial_summary_table <- renderTable({
+
+        context <- executive_context()
+
+        current_finance <- executive_kpi_finance()
+        comparison_finance <- executive_kpi_comparison_finance()
+
+        fields <- c(
+          "income_actual",
+          "expenses_actual",
+          "net_actual",
+          "budget_variance"
+        )
+
+        metric_labels <- c(
+          "Total Income",
+          "Total Expenses",
+          "Net Result",
+          "Budget Variance"
+        )
+
+        get_values <- function(finance) {
+
+          if (
+            is.null(finance) ||
+            !is.data.frame(finance) ||
+            nrow(finance) == 0L
+          ) {
+            return(rep(NA_real_, length(fields)))
+          }
+
+          vapply(
+            fields,
+            function(field) {
+              if (!field %in% names(finance)) {
+                return(NA_real_)
+              }
+
+              value <- finance[[field]][[1L]]
+
+              if (is.finite(value)) {
+                as.numeric(value)
+              } else {
+                NA_real_
+              }
+            },
+            numeric(1)
+          )
+        }
+
+        
+        format_values <- function(values, show_plus = FALSE) {
+          vapply(
+            values,
+            function(value) {
+              if (!is.finite(value)) {
+                return("—")
+              }
+
+              rounded <- round(as.numeric(value), 2)
+
+              sign <- if (rounded < 0) {
+                "-"
+              } else if (show_plus && rounded > 0) {
+                "+"
+              } else {
+                ""
+              }
+
+              paste0(
+                sign,
+                "$",
+                formatC(
+                  abs(rounded),
+                  format = "f",
+                  digits = 2,
+                  big.mark = ","
+                )
+              )
+            },
+            character(1)
+          )
+        }
+
+
+        current_values <- get_values(current_finance)
+
+        result <- data.frame(
+          Metric = metric_labels,
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        )
+
+        selected_year <- as.character(context$year)
+
+        if (
+          identical(context$view_mode, "Comparison") &&
+          !is.null(context$comparison_year)
+        ) {
+
+          comparison_year <- as.character(context$comparison_year)
+
+          previous_values <- get_values(comparison_finance)
+
+          differences <- ifelse(
+            is.finite(current_values) & is.finite(previous_values),
+            current_values - previous_values,
+            NA_real_
+          )
+
+          result[[comparison_year]] <- format_values(previous_values)
+          result[[selected_year]] <- format_values(current_values)
+          result[["Difference"]] <- format_values(
+            differences,
+            show_plus = TRUE
+          )
+
+        } else {
+
+          result[[selected_year]] <- format_values(current_values)
+
+        }
+
+        result
+
+      },
+      striped = TRUE,
+      hover = TRUE,
+      bordered = FALSE,
+      spacing = "s",
+      rownames = FALSE)
+
+      # -------------------------------------------------------------------
       # Executive Metrics KPI data
       # -------------------------------------------------------------------
 
@@ -3430,7 +3602,7 @@ mod_executive_dashboard_server <- function(
               )
             )
 
-            plot_monthly_income_expenses(
+            plot_executive_income_expenses(
               x
             )
           },
@@ -3490,7 +3662,7 @@ mod_executive_dashboard_server <- function(
               )
             )
 
-            plot_annual_performance_trend(
+            plot_executive_annual_performance(
               x,
               metrics
             )
@@ -3568,7 +3740,7 @@ mod_executive_dashboard_server <- function(
             plot_data$net_budget <-
               budget
 
-            plot_monthly_budget_vs_actual_net_result(
+            plot_executive_budget_actual(
               plot_data
             )
           },
@@ -3609,13 +3781,282 @@ mod_executive_dashboard_server <- function(
               )
             )
 
-            plot_revenue_capture_over_time(
+            plot_executive_revenue_capture(
               x
             )
           },
           res = 96,
           bg = "white"
         )
+      
+      # -------------------------------------------------------------------
+      # Executive Overview hover values
+      # -------------------------------------------------------------------
+      # Hover readouts use the same source data as the charts.
+      # They show exact figures without adding labels to every plotted point.
+
+      format_executive_hover_value <- function(value) {
+        if (length(value) == 0L || !is.finite(value[[1L]])) {
+          return("—")
+        }
+
+        paste0(
+          if (value[[1L]] < 0) "-" else "",
+          "$",
+          formatC(
+            abs(value[[1L]]),
+            format = "f",
+            digits = 2,
+            big.mark = ","
+          )
+        )
+      }
+
+      executive_hover_monthly <- function(
+          hover,
+          data,
+          fields,
+          labels
+      ) {
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        month <- round(hover$x)
+
+        if (!is.finite(month) || month < 1L || month > 12L) {
+          return("")
+        }
+
+        years <- sort(unique(as.integer(data$report_year)))
+        years <- years[!is.na(years)]
+
+        details <- character()
+
+        for (year in years) {
+          year_rows <- data[
+            !is.na(data$report_year) & data$report_year == year &
+              !is.na(data$date) &
+              as.integer(format(as.Date(data$date), "%m")) == month,
+            ,
+            drop = FALSE
+          ]
+
+          if (nrow(year_rows) == 0L) {
+            next
+          }
+
+          values <- vapply(
+            fields,
+            function(field) {
+              available <- suppressWarnings(
+                as.numeric(year_rows[[field]])
+              )
+              available <- available[is.finite(available)]
+
+              if (length(available) == 0L) {
+                return(NA_real_)
+              }
+
+              sum(available)
+            },
+            numeric(1)
+          )
+
+          details <- c(
+            details,
+            paste0(
+              year,
+              ": ",
+              paste(
+                paste0(
+                  labels,
+                  " ",
+                  vapply(
+                    values,
+                    format_executive_hover_value,
+                    character(1)
+                  )
+                ),
+                collapse = " | "
+              )
+            )
+          )
+        }
+
+        if (length(details) == 0L) {
+          return(paste(month.abb[[month]], ": No data available"))
+        }
+
+        paste(
+          c(month.abb[[month]], details),
+          collapse = "  •  "
+        )
+      }
+
+      executive_hover_annual <- function(
+          hover,
+          data,
+          fields,
+          labels
+      ) {
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        years <- as.integer(data$report_year)
+        valid <- !is.na(years)
+
+        data <- data[valid, , drop = FALSE]
+        data <- data[order(as.integer(data$report_year)), , drop = FALSE]
+
+        index <- round(hover$x)
+
+        if (
+          !is.finite(index) ||
+          index < 1L ||
+          index > nrow(data)
+        ) {
+          return("")
+        }
+
+        selected <- data[index, , drop = FALSE]
+
+        values <- vapply(
+          fields,
+          function(field) {
+            if (!field %in% names(selected)) {
+              return(NA_real_)
+            }
+            suppressWarnings(as.numeric(selected[[field]][[1L]]))
+          },
+          numeric(1)
+        )
+
+        paste0(
+          selected$report_year[[1L]],
+          ": ",
+          paste(
+            paste0(
+              labels,
+              " ",
+              vapply(
+                values,
+                format_executive_hover_value,
+                character(1)
+              )
+            ),
+            collapse = " | "
+          )
+        )
+      }
+
+      output$executive_hover_value_monthly_income_expenses <- renderText({
+        executive_hover_monthly(
+          input$executive_hover_monthly_income_expenses,
+          executive_monthly_finance(),
+          c("income_actual", "expenses_actual"),
+          c("Income", "Expenses")
+        )
+      })
+
+      output$executive_hover_value_annual_performance_trend <- renderText({
+        hover <- input$executive_hover_annual_performance_trend
+
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        data <- executive_annual_finance()
+
+        metrics <- input$metric_annual_performance_trend
+
+        if (is.null(metrics) || length(metrics) == 0L) {
+          metrics <- c("Income", "Expenses", "Net Result")
+        }
+
+        field_names <- c(
+          "Income" = "income_actual",
+          "Expenses" = "expenses_actual",
+          "Net Result" = "net_actual",
+          "Budget Variance" = "budget_variance"
+        )
+
+        executive_hover_annual(
+          input$executive_hover_annual_performance_trend,
+          data,
+          unname(field_names[metrics]),
+          metrics
+        )
+      })
+
+      output$executive_hover_value_budget_vs_actual <- renderText({
+        hover <- input$executive_hover_budget_vs_actual
+
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        data <- executive_monthly_finance()
+
+        metric <- input$metric_budget_vs_actual
+
+        if (is.null(metric) || !metric %in% FINANCE_METRICS) {
+          metric <- "Net Result"
+        }
+
+        fields <- switch(
+          metric,
+          "Income" = c("income_budget", "income_actual"),
+          "Expenses" = c("expenses_budget", "expenses_actual"),
+          "Net Result" = c("net_budget", "net_actual")
+        )
+
+        executive_hover_monthly(
+          input$executive_hover_budget_vs_actual,
+          data,
+          fields,
+          c("Budget", "Actual")
+        )
+      })
+
+      output$executive_hover_value_revenue_capture <- renderText({
+        hover <- input$executive_hover_revenue_capture
+
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        data <- executive_annual_revenue()
+
+        if (is.null(hover) || is.null(hover$x)) {
+          return("Hover over the chart to inspect exact values.")
+        }
+
+        complete <- is.finite(data$actual_income) &
+          is.finite(data$discount_opportunity) &
+          is.finite(data$capture_rate) &
+          !is.na(data$report_year)
+
+        data <- data[complete, , drop = FALSE]
+        index <- round(hover$x)
+
+        if (!is.finite(index) || index < 1L || index > nrow(data)) {
+          return("")
+        }
+
+        row <- data[index, , drop = FALSE]
+
+        paste0(
+          row$report_year[[1L]],
+          ": Income ",
+          format_executive_hover_value(row$actual_income),
+          " | Opportunity ",
+          format_executive_hover_value(row$discount_opportunity),
+          " | Capture ",
+          format_percentage(row$capture_rate)
+        )
+      })
       
       # -------------------------------------------------------------------
       # Executive Site Comparison plots
@@ -4725,7 +5166,16 @@ mod_executive_dashboard_server <- function(
 
         executive_visual_grid_ui(
           visual_ids =
-            selected_visuals[[active_focus()]],
+            if (identical(active_focus(), "Overview")) {
+              c(
+                "monthly_income_expenses",
+                "annual_performance_trend",
+                "budget_vs_actual",
+                "revenue_capture"
+              )
+            } else {
+              selected_visuals[[active_focus()]]
+            },
 
           context_label =
             context_label,
@@ -4743,9 +5193,24 @@ mod_executive_dashboard_server <- function(
 
       output$finance_supporting_components <- renderUI({
 
+        if (identical(active_focus(), "Overview")) {
+
+          return(
+            div(
+              class = paste(
+                "executive-dashboard-bottom-grid",
+                "executive-overview-bottom-grid"
+              ),
+
+              executive_financial_summary_card_ui(ns),
+
+              executive_key_insights_card_ui(ns)
+            )
+          )
+        }
+
         executive_supporting_components_ui(
-          visual_ids =
-            selected_visuals[[active_focus()]],
+          visual_ids = selected_visuals[[active_focus()]],
           ns = ns
         )
       })

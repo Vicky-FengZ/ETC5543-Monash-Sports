@@ -39,7 +39,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "wide",
+    preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -52,7 +52,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "wide",
+    preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
@@ -65,7 +65,7 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     source_group = "monthly",
     required_data = "finance",
     default_selected = TRUE,
-    preferred_size = "wide",
+    preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),

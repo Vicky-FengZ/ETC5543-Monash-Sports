@@ -188,6 +188,13 @@ expected_overview_defaults <- c(
   "key_insights"
 )
 
+expected_overview_kpi_titles <- c(
+  "Total Income",
+  "Total Expenses",
+  "Net Result",
+  "Budget Variance"
+)
+
 expected_site_defaults <- c(
   "site_performance",
   "site_ranking",
@@ -1611,9 +1618,25 @@ picker_test_data <- shiny::reactiveVal(
           2025L,
           2026L
         ),
+        date = as.Date(c(
+          "2025-01-01",
+          "2026-01-01"
+        )),
         site = c(
           "Aquatics Clayton",
           "Aquatics Clayton"
+        ),
+        is_summary = c(
+          TRUE,
+          TRUE
+        ),
+        metric = c(
+          "Income",
+          "Income"
+        ),
+        value_type = c(
+          "Actual",
+          "Actual"
         ),
         value = c(
           1,
@@ -1731,6 +1754,52 @@ shiny::testServer(
       )
 
       session$flushReact()
+    
+    # ---------------------------------------------------------------------
+    # Overview content contract
+    # ---------------------------------------------------------------------
+
+    overview_kpi_specs <-
+      executive_kpi_specs()
+
+    stopifnot(
+
+      length(
+        overview_kpi_specs
+      ) == 4L,
+
+      identical(
+        vapply(
+          overview_kpi_specs,
+          function(spec) {
+            spec$title
+          },
+          character(1)
+        ),
+        expected_overview_kpi_titles
+      ),
+
+      identical(
+        vapply(
+          overview_kpi_specs,
+          function(spec) {
+            spec$output_id
+          },
+          character(1)
+        ),
+        c(
+          "kpi_total_income",
+          "kpi_total_expenses",
+          "kpi_net_result",
+          "kpi_budget_variance"
+        )
+      ),
+
+      identical(
+        executive_context()$site,
+        "All Monash Sport"
+      )
+    )
 
 
     # ---------------------------------------------------------------------
@@ -1765,6 +1834,395 @@ shiny::testServer(
       ),
       !"metric" %in%
         names(comparison_context)
+    )
+
+    # ---------------------------------------------------------------------
+    # Overview Year Review vs Comparison year selection
+    # ---------------------------------------------------------------------
+
+    # Year Review includes only the selected year
+    # for monthly finance calculations.
+
+    stopifnot(
+      identical(
+        executive_context_years(
+          year_review_context
+        ),
+        2026L
+      )
+    )
+
+    # Historical trend visuals retain available years
+    # up to the selected reporting year.
+
+    stopifnot(
+      identical(
+        executive_context_trend_years(
+          context = year_review_context,
+          available_years = c(
+            2024L,
+            2025L,
+            2026L,
+            2027L
+          )
+        ),
+        c(
+          2024L,
+          2025L,
+          2026L
+        )
+      )
+    )
+
+    # Comparison mode uses exactly the two
+    # selected reporting years.
+
+    stopifnot(
+      identical(
+        executive_context_years(
+          comparison_context
+        ),
+        c(
+          2025L,
+          2026L
+        )
+      )
+    )
+
+    stopifnot(
+      identical(
+        executive_context_trend_years(
+          context = comparison_context,
+          available_years = c(
+            2024L,
+            2025L,
+            2026L,
+            2027L
+          )
+        ),
+        c(
+          2025L,
+          2026L
+        )
+      )
+    )
+
+    # ---------------------------------------------------------------------
+    # Overview KPI values and comparison labels
+    # ---------------------------------------------------------------------
+
+    current_finance <- executive_kpi_finance()
+
+    previous_finance <-
+      executive_kpi_comparison_finance()
+
+    comparison_kpis <- executive_kpi_specs()
+
+    kpi_fields <- c(
+      "income_actual",
+      "expenses_actual",
+      "net_actual",
+      "budget_variance"
+    )
+
+    stopifnot(
+      length(comparison_kpis) == 4L,
+      identical(
+        executive_context()$site,
+        "All Monash Sport"
+      )
+    )
+
+    # Current and comparison KPI values must come
+    # from their respective selected reporting years.
+
+    if (!is.null(current_finance)) {
+      stopifnot(
+        nrow(current_finance) == 1L,
+        current_finance$report_year[[1L]] == 2026L
+      )
+    }
+
+    if (!is.null(previous_finance)) {
+      stopifnot(
+        nrow(previous_finance) == 1L,
+        previous_finance$report_year[[1L]] == 2025L
+      )
+    }
+
+    # Every KPI must show a comparison only when
+    # both years have a finite corresponding value.
+
+    for (i in seq_along(kpi_fields)) {
+
+      field <- kpi_fields[[i]]
+
+      has_comparable_values <-
+        !is.null(current_finance) &&
+        !is.null(previous_finance) &&
+        is.finite(current_finance[[field]][[1L]]) &&
+        is.finite(previous_finance[[field]][[1L]])
+
+      comparison_label <-
+        comparison_kpis[[i]]$comparison
+
+      if (has_comparable_values) {
+
+        expected_difference <-
+          current_finance[[field]][[1L]] -
+          previous_finance[[field]][[1L]]
+
+        expected_label <- paste0(
+          if (expected_difference > 0) "+" else "",
+          format_compact_currency(expected_difference),
+          " vs 2025"
+        )
+
+        stopifnot(
+          identical(
+            comparison_label,
+            expected_label
+          )
+        )
+
+      } else {
+
+        stopifnot(
+          is.null(comparison_label)
+        )
+      }
+    }
+
+    # ---------------------------------------------------------------------
+    # Overview visual data and context consistency
+    # ---------------------------------------------------------------------
+
+    overview_data_checks <- function(
+      view_mode,
+      expected_years
+    ) {
+
+      context <- executive_context()
+
+      stopifnot(
+        identical(context$view_mode, view_mode),
+        identical(context$site, "All Monash Sport")
+      )
+
+      monthly_finance <- executive_monthly_finance()
+      annual_finance <- executive_annual_finance()
+      annual_revenue <- executive_annual_revenue()
+
+      check_years <- function(x, allowed_years) {
+        stopifnot(
+          is.data.frame(x),
+          "report_year" %in% names(x)
+        )
+
+        if (nrow(x) > 0L) {
+          stopifnot(
+            !anyNA(x$report_year),
+            all(
+              x$report_year %in% allowed_years
+            )
+          )
+        }
+      }
+
+      # Income vs Expenses and Budget vs Actual
+      # use the selected year(s).
+      check_years(
+        monthly_finance,
+        expected_years
+      )
+
+      # Annual Performance Trend and Revenue Capture
+      # use historical trend years in Year Review,
+      # or exactly two years in Comparison.
+      trend_years <- executive_context_trend_years(
+        context = context,
+        available_years = c(
+          2024L, 2025L, 2026L, 2027L
+        )
+      )
+
+      check_years(
+        annual_finance,
+        trend_years
+      )
+
+      check_years(
+        annual_revenue,
+        trend_years
+      )
+
+      invisible(TRUE)
+    }
+
+
+    # Comparison mode
+    overview_data_checks(
+      view_mode = "Comparison",
+      expected_years = c(2025L, 2026L)
+    )
+
+
+    # Year Review mode
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2026"
+    )
+
+    session$flushReact()
+
+    overview_data_checks(
+      view_mode = "Year Review",
+      expected_years = 2026L
+    )
+
+
+    # Restore Comparison mode so subsequent
+    # existing tests retain their expected context.
+    session$setInputs(
+      view_mode = "Comparison",
+      year = "2026",
+      comparison_year = "2025"
+    )
+
+    session$flushReact()
+
+    stopifnot(
+      identical(
+        executive_context()$view_mode,
+        "Comparison"
+      )
+    )
+
+    # ---------------------------------------------------------------------
+    # Final Executive Overview validation
+    # ---------------------------------------------------------------------
+
+    # Verify that KPI values remain consistent with
+    # the currently selected reporting year.
+
+    session$setInputs(
+      view_mode = "Year Review",
+      year = "2026"
+    )
+
+    session$flushReact()
+
+    year_review_kpis <- executive_kpi_specs()
+    year_review_finance <- executive_kpi_finance()
+
+    kpi_fields <- c(
+      "income_actual",
+      "expenses_actual",
+      "net_actual",
+      "budget_variance"
+    )
+
+    stopifnot(
+      length(year_review_kpis) == 4L,
+
+      identical(
+        executive_context()$view_mode,
+        "Year Review"
+      ),
+
+      is.null(
+        executive_kpi_comparison_finance()
+      ),
+
+      all(
+        vapply(
+          year_review_kpis,
+          function(spec) {
+            is.null(spec$comparison)
+          },
+          logical(1)
+        )
+      )
+    )
+
+    # Compare each displayed KPI with the
+    # underlying annual finance value.
+
+    for (i in seq_along(kpi_fields)) {
+
+      expected_value <- "—"
+
+      if (
+        !is.null(year_review_finance) &&
+        is.data.frame(year_review_finance) &&
+        nrow(year_review_finance) > 0L
+      ) {
+
+        field <- kpi_fields[[i]]
+
+        value <- year_review_finance[[field]][[1L]]
+
+        if (is.finite(value)) {
+          expected_value <-
+            format_compact_currency(value)
+        }
+      }
+
+      stopifnot(
+        identical(
+          year_review_kpis[[i]]$value,
+          expected_value
+        )
+      )
+    }
+
+
+    # Switch back to Comparison and verify
+    # the selected reporting context.
+
+    session$setInputs(
+      view_mode = "Comparison",
+      year = "2026",
+      comparison_year = "2025"
+    )
+
+    session$flushReact()
+
+    comparison_kpis <- executive_kpi_specs()
+
+    stopifnot(
+      identical(
+        executive_context()$view_mode,
+        "Comparison"
+      ),
+
+      identical(
+        executive_context()$year,
+        "2026"
+      ),
+
+      identical(
+        executive_context()$comparison_year,
+        "2025"
+      ),
+
+      identical(
+        executive_context()$site,
+        "All Monash Sport"
+      ),
+
+      length(comparison_kpis) == 4L,
+
+      identical(
+        vapply(
+          comparison_kpis,
+          function(spec) {
+            spec$title
+          },
+          character(1)
+        ),
+        expected_overview_kpi_titles
+      )
     )
 
     # ---------------------------------------------------------------------
@@ -1831,6 +2289,83 @@ shiny::testServer(
     # ---------------------------------------------------------------------
 
     overview_registry <- picker_registry()
+
+      stopifnot(
+        identical(
+          overview_registry$id,
+          c(
+            "monthly_income_expenses",
+            "annual_performance_trend",
+            "budget_vs_actual",
+            "revenue_capture",
+            "key_insights"
+          )
+        )
+      )
+    
+      # ---------------------------------------------------------------------
+      # Overview visual configuration contract
+      # ---------------------------------------------------------------------
+
+      expected_visual_ids <- c(
+        "monthly_income_expenses",
+        "annual_performance_trend",
+        "budget_vs_actual",
+        "revenue_capture",
+        "key_insights"
+      )
+
+      stopifnot(
+        all(
+          overview_registry$focus == "Overview"
+        ),
+
+        all(
+          vapply(
+            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
+            function(spec) {
+              isTRUE(spec$default_selected)
+            },
+            logical(1)
+          )
+        ),
+
+        all(
+          vapply(
+            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
+            function(spec) {
+              isTRUE(spec$supports_year_review)
+            },
+            logical(1)
+          )
+        ),
+
+        all(
+          vapply(
+            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
+            function(spec) {
+              isTRUE(spec$supports_comparison)
+            },
+            logical(1)
+          )
+        ),
+
+        all(
+          overview_registry$source_group[
+            overview_registry$id != "key_insights"
+          ] == "monthly"
+        ),
+
+        identical(
+          EXECUTIVE_VISUAL_REGISTRY[["key_insights"]]$component_type,
+          "insight"
+        ),
+
+        identical(
+          EXECUTIVE_VISUAL_REGISTRY[["revenue_capture"]]$required_data,
+          c("finance", "discounts")
+        )
+      )
 
       monthly_registry <- overview_registry[
         overview_registry$source_group ==
