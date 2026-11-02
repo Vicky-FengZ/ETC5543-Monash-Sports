@@ -49,7 +49,7 @@ downloads in the actual Shinylive page.
 |---|---|
 | `test_reporting_context.R` | Shared report years and site lists used by several pages, including years and sites added later |
 | `test_overview_charts.R` | Overview finance figures and charts |
-| `test_executive_dashboard.R` | Executive Dashboard visuals and how they behave with partial data |
+| `test_executive_dashboard.R` | Executive Dashboard Overview, Site and Venues layouts; KPI calculations; Year Review and Comparison; hover controls; facility-hire coverage; financial, attendance, casual wage and merchandise reconciliation; and missing-data handling |
 | `test_site_comparison.R` | Site Comparison calculations: site metrics, revenue opportunity, discount mix |
 | `test_site_detail.R` | Site Detail filters, KPIs and trends |
 | `test_venues_operations.R` | Venues Operations attendance, facility hire, workforce and finance values |
@@ -82,5 +82,6 @@ downloads in the actual Shinylive page.
 | `helper_parse_cache.R` | Parses each sample workbook once per run and reuses the result, to keep the run short |
 | `snapshots/` | Accepted key figures for the sample workbooks, used by `test_key_numbers.R` |
 
-When a code change is meant to alter the key figures, see *Testing* in the
-main README for how to accept a new snapshot.
+When a code change intentionally alters accepted key figures, follow the
+[snapshot update procedure](../docs/maintainer_guide.md#testing). Review the
+differences before committing a new snapshot.

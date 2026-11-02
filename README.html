@@ -601,1536 +601,353 @@ padding-top: 0px;
 
 <body>
 
-<!-- Generated from README.Rmd. Edit README.Rmd, then render README.md. -->
-
 <h1 id="monash-sport-performance-dashboard">Monash Sport Performance
 Dashboard</h1>
-<p>An R Shiny dashboard that turns Monash Sport’s Excel reports into an
-interactive view of financial and operational performance, with a
-forecasting and pricing planner. It was built for the ETC5543 Business
-Analytics Creative Activity with Monash Sport.</p>
-<ul>
-<li><strong>Team:</strong> Ayush Pandia and Ziqi Feng</li>
-<li><strong>Industry mentors:</strong> Alicia Stack and Darren McLeod
-(Monash Sport)</li>
-<li><strong>Academic mentor:</strong> Minh Huynh (Monash
-University)</li>
-</ul>
-<p><strong>Live dashboard:</strong> <a href="https://vicky-fengz.github.io/ETC5543-Monash-Sports/">https://vicky-fengz.github.io/ETC5543-Monash-Sports/</a>
-(runs in your browser; uploaded reports never leave your computer).</p>
-<p><strong>Who this repository is for</strong></p>
-<ul>
-<li><strong>Monash Sport staff</strong> using the dashboard with their
-own reports: start with the <a href="docs/user_guide.pdf">user guide</a>
-(PDF; also as a web page, <code>docs/user_guide.html</code>), a
-step-by-step guide for non-technical users covering every page,
-forecasting and common problems.</li>
-<li><strong>Maintainers</strong> looking after the code: see the <a href="docs/maintainer_guide.md">maintainer guide</a> for running the
-dashboard from RStudio, testing on the real reports and publishing a new
-version.</li>
-<li><strong>Reviewers and other readers</strong> without access to the
-confidential reports: follow the <a href="#quick-start">Quick start</a>
-with the synthetic workbooks in <code>data/sample/</code> and run
-<code>tests/run_sample_tests.R</code> (see <a href="#testing">Testing</a>).</li>
-</ul>
-<p>Monash Sport reports live in many separate workbooks. This app reads
-those workbooks, checks their structure and calculations, converts them
-into long tables and presents them on one dashboard, so trends, sites
-and plans can be compared without navigating the files by hand.</p>
+<p>An interactive R Shiny application built with <strong>Monash
+Sport</strong> for the ETC5543 Business Analytics Creative Activity. It
+brings financial and operational Excel reports into a consistent
+dashboard and provides forecasting and pricing-planning tools.</p>
+<p><strong><a href="https://vicky-fengz.github.io/ETC5543-Monash-Sports/">Open the
+live dashboard</a></strong> · <a href="docs/user_guide.html">User
+guide</a> · <a href="docs/maintainer_guide.md">Developer maintainer
+guide</a></p>
+<p><strong>Project team:</strong> Ayush Pandia and Ziqi Feng<br />
+<strong>Monash Sport mentors:</strong> Alicia Stack and Darren
+McLeod<br />
+<strong>Academic mentor:</strong> Minh Huynh (Monash University)</p>
+<p>The deployed application uses <strong>Shinylive</strong>, so R runs
+in the user’s browser. Uploaded reports are processed locally in that
+browser session; the published site does not receive or store report
+data. Monash Sport’s confidential source workbooks are <strong>not
+included</strong> in this repository.</p>
 <h2 id="contents">Contents</h2>
 <ul>
-<li><a href="#dashboard-pages">Dashboard pages</a></li>
+<li><a href="#dashboard-features">Dashboard features</a></li>
 <li><a href="#quick-start">Quick start</a></li>
-<li><a href="#data-availability">Data availability</a></li>
-<li><a href="#data-upload-and-review-workflow">Data upload and review
-workflow</a></li>
-<li><a href="#data-architecture">Data architecture</a></li>
-<li><a href="#report-contents">Report contents</a></li>
-<li><a href="#validation">Validation</a></li>
-<li><a href="#adding-future-report-years">Adding future report
-years</a></li>
-<li><a href="#forecasting-and-business-planning">Forecasting and
-business planning</a></li>
-<li><a href="#project-structure">Project structure</a></li>
-<li><a href="#developer-handover-and-file-map">Developer handover and
-file map</a></li>
-<li><a href="#common-maintenance-tasks">Common maintenance
-tasks</a></li>
-<li><a href="#important-calculation-and-reporting-rules">Important
-calculation and reporting rules</a></li>
-<li><a href="#troubleshooting-and-release-checklist">Troubleshooting and
-release checklist</a></li>
-<li><a href="#editing-this-readme">Editing this README</a></li>
-<li><a href="#report-and-presentation">Report and presentation</a></li>
-<li><a href="#testing">Testing</a></li>
-<li><a href="#performance-and-website-deployment">Performance and
-website deployment</a></li>
-<li><a href="#licence">Licence</a></li>
+<li><a href="#data-sources-and-privacy">Data sources and
+privacy</a></li>
+<li><a href="#architecture-at-a-glance">Architecture at a
+glance</a></li>
+<li><a href="#maintaining-the-application">Maintaining the
+application</a></li>
+<li><a href="#testing-and-deployment">Testing and deployment</a></li>
+<li><a href="#project-documentation">Project documentation</a></li>
+<li><a href="#report-presentation-and-licence">Report, presentation and
+licence</a></li>
 </ul>
-<h2 id="dashboard-pages">Dashboard pages</h2>
+<h2 id="dashboard-features">Dashboard features</h2>
 <table>
 <thead>
 <tr>
 <th>Page</th>
-<th>What it shows</th>
-<th>Data needed</th>
+<th>What it provides</th>
+<th>Source reports</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Executive Dashboard</td>
-<td>Three fixed, presentation-ready views: <strong>Overview</strong>
-(financial KPIs, charts, Financial Summary and insights);
-<strong>Site</strong> (visits, memberships, visits growth,
-positive-net-result sites, four charts, financial rankings and
-insights); and <strong>Venues</strong> (attendance, facility-hire
-revenue, casual wages, merchandise/equipment revenue, four charts,
-operational summary and insights). Supports Year Review, two-year
-Comparison, exact-value hover readouts and Presentation View</td>
-<td>Monthly Site Reports (Overview and Site); Detailed Site Reports
-(Site operational measures); Venues Tracking Reports (Venues)</td>
+<td><strong>Executive Dashboard</strong></td>
+<td>Three fixed presentation-ready sections: <strong>Overview</strong>
+(financial KPIs, four charts, summary and insights),
+<strong>Site</strong> (visits, memberships, growth, site finances and
+rankings) and <strong>Venues</strong> (attendance, facility hire, casual
+wages, merchandise/equipment revenue and insights). Includes
+<strong>Year Review</strong>, two-year <strong>Comparison</strong>,
+chart hover readouts and full-screen <strong>Presentation
+View</strong>.</td>
+<td>Monthly Site, Detailed Site and Venues Tracking reports, depending
+on section</td>
 </tr>
 <tr>
-<td>Overview</td>
+<td><strong>Overview</strong></td>
 <td>Organisation-wide income, expenses, budget variance and revenue
-opportunity over time</td>
+performance</td>
 <td>Monthly Site Reports</td>
 </tr>
 <tr>
-<td>Site Comparison</td>
-<td>Sites side by side, then a facility breakdown for one site</td>
-<td>Monthly Site Reports, Detailed Site Reports</td>
+<td><strong>Site Comparison</strong></td>
+<td>Site-level financial comparisons and facility breakdowns</td>
+<td>Monthly Site and Detailed Site Reports</td>
 </tr>
 <tr>
-<td>Detailed Analysis → Site Detail</td>
-<td>Visits, memberships and enrolments for one site and year</td>
+<td><strong>Site Detail</strong></td>
+<td>Visits, membership and enrolment measures for an individual
+reporting unit</td>
 <td>Detailed Site Reports</td>
 </tr>
 <tr>
-<td>Detailed Analysis → Venues Operations</td>
-<td>Attendance, facility hire, memberships, finance, online sales,
-merchandise and workforce for Venues</td>
+<td><strong>Venues Operations</strong></td>
+<td>Attendance, facility/court hire, memberships, online sales,
+merchandise, finance and casual workforce</td>
 <td>Venues Tracking Reports</td>
 </tr>
 <tr>
-<td>Forecasting</td>
-<td>3–12 month income and expenses forecast with payroll and pricing
-scenarios</td>
-<td>Monthly Site Reports (Venues Tracking Reports for the payroll
-estimate)</td>
+<td><strong>Forecasting</strong></td>
+<td>3-, 6- and 12-month income/expense forecasts, wage and pricing
+scenarios, and downloads</td>
+<td>Monthly Site Reports, optionally Venues Tracking Reports</td>
 </tr>
 <tr>
-<td>Data</td>
-<td>Upload and remove workbooks, review warnings, inspect and export the
-cleaned tables</td>
-<td>—</td>
+<td><strong>Data</strong></td>
+<td>Workbook upload and validation, warning review, saved data and
+cleaned-table export</td>
+<td>Supported <code>.xlsx</code>, <code>.xls</code> and dashboard
+<code>.rds</code> files</td>
 </tr>
 </tbody>
 </table>
-<p>The Executive Dashboard now uses <strong>fixed charts</strong>, not
-the earlier “Choose Visuals” selection. The separate Site Comparison,
-Site Detail and Venues Operations pages retain more detailed reporting
-filters. Missing reporting months or years are shown as gaps rather than
-being filled with zero. Chart hover readouts show reported values where
-the interaction is supported.</p>
-<p>The colours and layout follow the Monash brand; see <a href="docs/dashboard_design.md">Dashboard design</a>. For illustrative
-screenshots, see the <a href="docs/user_guide.html">user guide</a>; the
-guide may need new screenshots when dashboard layouts change.
-<strong>Never add screenshots containing confidential Monash Sport
-results to this public repository.</strong></p>
+<p>The three Executive sections use <strong>fixed charts</strong>, not
+the old <em>Choose Visuals</em> workflow. Detailed pages retain their
+own filters. Missing reported months or years remain gaps rather than
+being treated as zero; supported charts show exact values on hover. For
+design decisions see <a href="docs/dashboard_design.md">Dashboard
+design</a>.</p>
 <h2 id="quick-start">Quick start</h2>
-<p>The easiest way is to open the <strong><a href="https://vicky-fengz.github.io/ETC5543-Monash-Sports/">live
-dashboard</a></strong> and upload the synthetic workbooks in
-<code>data/sample/</code> (or your own reports) on the Data page. It is
-a static <a href="https://posit-dev.github.io/r-shinylive/">Shinylive</a> build that
-runs R in the browser, published to GitHub Pages by
-<code>.github/workflows/deploy-shinylive.yml</code> on every push to
-<code>main</code> (see <code>deploy/build_shinylive.R</code>).</p>
-<p>To run it in R instead. Requirements: R 4.4 (the project was built
-with R 4.4.3) and RStudio or another R IDE. From the project root,
-restore the packages recorded in <code>renv.lock</code> and start the
-app:</p>
+<p><strong>Use the live application:</strong> Open the <a href="https://vicky-fengz.github.io/ETC5543-Monash-Sports/">dashboard</a>,
+go to <strong>Data</strong>, and upload supported workbooks. To try it
+without confidential reports, use the <strong>synthetic</strong>
+workbooks in <code>data/sample/</code>.</p>
+<p><strong>Run locally:</strong> Install R 4.4 (the project was built
+with R 4.4.3) and RStudio. Clone/download the repository and run from
+its root:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>renv<span class="sc">::</span><span class="fu">restore</span>()</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">runApp</span>()</span></code></pre></div>
-<p>Then open the <strong>Data</strong> page and upload the report
-workbooks. Without access to the confidential reports, upload the
-synthetic workbooks in <code>data/sample/</code> instead (see <a href="#synthetic-sample-data">Synthetic sample data</a>). Uploaded files
-last for the current Shiny session, and every page uses the data from
-successful imports.</p>
-<h2 id="data-availability">Data availability</h2>
-<p>The Monash Sport source workbooks are <strong>confidential and are
-not included</strong> in this repository. Monash Sport staff can find
-how to store and upload them in the <a href="docs/user_guide.pdf">user
-guide</a>. Everyone else can use the synthetic sample workbooks
-described below.</p>
-<h3 id="synthetic-sample-data">Synthetic sample data</h3>
-<p>To try the dashboard without the confidential reports, use the
-<strong>synthetic workbooks in <code>data/sample/</code></strong>. They
-follow the same folder structure, file names and Excel layouts as the
-original reports, so they can be uploaded on the Data page or used by
-the tests. They cover 2021-2025:</p>
-<pre class="text"><code>data/sample/
-  Monthly Site Report/                                   # e.g. Monthly Site Report 2025 -December.xlsx
-  Business Unit Templates that feed master reports/&lt;year&gt;/  # e.g. Aquatics Site Report 2025.xlsx
-  Business Unit Tracking Reports/                         # e.g. 2025 Venues Tracking Report.xlsx</code></pre>
-<p>The sample workbooks exist only to check that the dashboard and its
-upload pipeline run end to end. The following has been hidden:</p>
-<ul>
-<li><strong>All figures</strong> (income, expenses, budgets, discounts,
-visits, memberships, hours, wages and other numbers) are randomly
-generated and do not reflect Monash Sport’s actual results, trends or
-patterns.</li>
-<li><strong>Free-text commentary</strong>, such as monthly highlights,
-staff notes and help text, has been removed, along with cell comments
-and file metadata.</li>
-<li><strong>Names of external organisations</strong> (e.g. partner
-institutions and user groups) have been replaced with neutral names such
-as “Partner Organisation A”.</li>
-<li><strong>Formulas and links</strong> to other workbooks have been
-removed; the files contain values only.</li>
-</ul>
-<p>The figures, charts and forecasts produced from these files carry no
-meaning about Monash Sport and must not be interpreted.</p>
-<p>Blank versions of each report layout are provided in
-<code>www/templates/</code> and can be downloaded from the Data page.
-The structure of every cleaned table is described in the <a href="docs/data_dictionary.md">data dictionary</a>.</p>
-<h2 id="data-upload-and-review-workflow">Data upload and review
-workflow</h2>
-<p>Select your Excel workbooks from their existing folders on your
-computer. You do not need to move them into the application folder
-before uploading.</p>
-<p>The Data page has two tasks:</p>
-<ul>
-<li><strong>Upload &amp; Manage</strong> lets you upload, parse and
-remove Excel workbooks.</li>
-<li><strong>View Cleaned Data</strong> lets you inspect and download the
-standardised tables from successful imports.</li>
-</ul>
-<h3 id="uploading-files">Uploading files</h3>
-<p>Everything is added through the <strong>Add data</strong> card:
-<strong>Choose files</strong> for selected files, or <strong>Choose
-folder</strong> for a whole folder (subfolders included). Both accept
-report workbooks (<code>.xlsx</code>, <code>.xls</code>) and saved data
-files (<code>.rds</code>, see below), so the same button is used the
-first time and every time after.</p>
-<ul>
-<li>Each workbook is matched to its report family from its file name,
-using the same naming rules as the importers, and parsed one after
-another. The matching rules and blank templates are under <strong>Excel
-templates and file naming</strong> in the same card.</li>
-<li>A workbook whose name matches no family is not read yet. It is
-listed with a <strong>Choose report type</strong> box: pick the type and
-select <strong>Add</strong>, or <strong>Dismiss</strong> it. If the
-chosen type does not fit the workbook, the error says so.</li>
-<li>A workbook that is already loaded with the same name and contents is
-skipped, so choosing the whole folder again only reads new or changed
-reports. Content fingerprints are also kept in saved data. Older saves
-without a fingerprint still load; selecting the Excel file again checks
-it by parsing it once.</li>
-<li>Other files in the selection are ignored, and a summary under the
-buttons lists what was matched, skipped, left for a type or
-ignored.</li>
-</ul>
-<p>While files are parsing, the buttons are paused and a progress
-message is shown, and a failed transfer is explained in plain words. The
-module copies each workbook into a temporary session directory, keeps
-its original filename for traceability, and runs the matching import,
-cleaning and validation pipeline. Your original workbook stays
-unchanged.</p>
-<p>The module processes one file at a time. The page shows overall
-parsing progress and a status row for each upload:</p>
-<table>
-<thead>
-<tr>
-<th>Upload status</th>
-<th>Meaning and action</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>queued</code> or <code>parsing</code></td>
-<td>The workbook is waiting or is currently being read, cleaned and
-validated</td>
-</tr>
-<tr>
-<td><code>ready</code></td>
-<td>Parsing completed without validation errors; the cleaned data are
-available to the dashboard</td>
-</tr>
-<tr>
-<td><code>failed</code></td>
-<td>The file type, workbook structure, parser or validation produced a
-blocking error; its data are excluded from the dashboard</td>
-</tr>
-</tbody>
-</table>
-<p>The status row displays the relevant warning count or error message.
-For files with warnings, select <strong>View details</strong> beneath
-the progress line to inspect the original messages and a short
-explanation of their impact. Notes are grouped by worksheet; notes
-without a worksheet appear under <strong>File-level notes</strong>.
-Details are collapsed by default and do not open a popup. The successful
-status remains <code>ready</code>, including when warnings are
-present.</p>
-<p>A warning does not block a file or alter its extracted values. A
-validation error or parser exception does block it, because continuing
-could silently mislabel data. If failed validation also supplies
-warnings, those notes can be inspected without including that file’s
-data in the dashboard.</p>
-<p>A file with the same report family and filename as an existing upload
-replaces the session copy after it passes parsing and validation. If the
-replacement fails, the previous ready file and its dashboard data stay
-available.</p>
-<p>Only one file per report year is used (per business unit and year for
-Detailed Site Reports). A second file for a year that is already loaded
-under another name, such as
-<code>Monthly Site Report 2025 -November.xlsx</code> next to
-<code>-December.xlsx</code>, is marked <code>failed</code> and names the
-file already in use, because using both would count the same figures
-twice. Two more checks block a file: a year in the file name that
-differs from the year inside the workbook (Monthly Site Reports and
-Venues Tracking Reports), and a workbook without any figures, such as a
-blank template.</p>
-<p>Use the remove button beside a status row to delete the temporary
-upload and its parsed result. Your original Excel file stays
-unchanged.</p>
-<h3 id="saving-and-loading-parsed-data">Saving and loading parsed
-data</h3>
-<p>Parsing every workbook takes several minutes in the browser version,
-so the cleaned data can be kept in a file and loaded again:</p>
-<ul>
-<li><strong>Save current data</strong>, at the top of the
-<strong>Uploaded files</strong> card, downloads one <code>.rds</code>
-file with the cleaned tables, warning notes and a manifest for every
-<code>ready</code> file. Raw workbooks are not included. A line above
-the file list says what will be saved, and the file name records the
-years, file count and save date, for example
-<code>monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds</code>.</li>
-<li>Choosing that file in <strong>Add data</strong> restores those files
-in a few seconds without reading the workbooks again. A summary then
-shows when the data was saved, the files and years per report family,
-and the list of source files; data saved more than 30 days ago is
-flagged as possibly out of date.</li>
-<li>The saved file can be chosen together with the reports, for example
-by choosing the report folder that holds it. The saved data is loaded
-first; reports with the same name and contents are skipped, and changed
-versions replace their saved copies.</li>
-<li>Loaded files behave like uploads: they can be removed, and the
-session can be saved again.</li>
-</ul>
-<p>Files that are not saved dashboard data, are damaged, or were saved
-by a different version of the cleaned tables are refused with a message,
-and the current session is left unchanged. When the importers change the
-shape of their output, increase <code>BASIC_SAVED_DATA_VERSION</code> in
-<code>R/mod_data_upload.R</code> so older saved files ask for the
-workbooks to be uploaded again.</p>
-<p>The saved file contains the same confidential figures as the reports.
-Store it where the reports are kept and never commit it to this
-repository.</p>
-<h3 id="viewing-cleaned-data">Viewing cleaned data</h3>
-<p>Open <strong>View Cleaned Data</strong> and select the report family.
-The preview supports:</p>
-<ul>
-<li>multiple reporting years;</li>
-<li>worksheet-style navigation based on <code>source_sheet</code>;</li>
-<li>Measure and Value type filters for Monthly Site Reports;</li>
-<li>free-text search across displayed columns;</li>
-<li>column sorting and adjustable row pagination; and</li>
-<li>downloading the filtered result as an Excel workbook, with one
-worksheet per represented <code>source_sheet</code>.</li>
-</ul>
-<p>The preview uses the parsed R objects. You can filter, sort and move
-between pages without reading the Excel files again.</p>
-<p>The preview shows cleaned tables. To check a value in its original
-Excel context, use <code>source_file</code>, <code>source_sheet</code>,
-<code>source_row</code> and <code>source_column</code> to find the cell
-in your original workbook.</p>
-<h3 id="new-projects-audiences-and-indicators">New projects, audiences
-and indicators</h3>
-<p>Uploads can grow within the supported report layouts:</p>
-<ul>
-<li>Direct/Indirect Visits locate each month’s columns from the next
-month or YTD heading. New activity rows and audience columns are
-retained, and the audience total check includes the new categories.</li>
-<li>Memberships, Enrollments and Venues Membership Tracking retain new
-labelled indicator columns. Merchandise Tracking also retains unfamiliar
-indicators.</li>
-<li>Monthly and Detailed Site Finance accept new discount categories.
-Reported Total Revenue is located at the beginning of each business-unit
-group and reconciled against actual income plus the extracted discount
-categories.</li>
-<li>The field audit checks recognised Monthly/Detailed finance data
-areas, Detailed visits/member areas, and Venues membership/merchandise
-areas. Values without a recognised column, and non-numeric contents in
-numeric fields, are retained in <code>additional_data</code> with their
-original text and source positions. They appear in the same source-sheet
-preview/export and are excluded from existing chart totals. The
-corresponding warning explains where to look. Existing discount subtotal
-columns are retained there for reference without triggering an
-unfamiliar-field warning or double-counting discounts.</li>
-<li>New worksheets without a supported layout are reported in
-<strong>View details</strong>. They require an extraction rule; they are
-not silently treated as finance or membership data.
-Dashboard/chart/helper/budget worksheets remain intentional exclusions.
-The field audit is not a cell-by-cell audit of the entire workbook; the
-chosen Casual Hours summary and reporting-year wage scope still
-apply.</li>
-</ul>
-<p>Metric definitions are automatic. Existing defaults identify known
-counts, currencies and rates. Unfamiliar indicators retain their name
-and reported value with internal Unknown/None definitions. Users do not
-configure them when uploading. Internal <code>unit</code> and
-<code>aggregation</code> columns are omitted from the ordinary preview
-and cleaned Excel download; the imported R objects retain them. New
-indicators do not automatically become chart/forecast targets.</p>
-<p>Default definitions are delivered in <a href="config/metric_definitions.csv"><code>config/metric_definitions.csv</code></a>.
-Its columns are <code>family,dataset,metric,unit,aggregation</code>;
-names are matched without case/spacing differences. Supported units are
-Unknown, Count, Currency, Rate, Hours and Text; aggregations are None,
-Sum, Last and Mean. Restart the app after changing the CSV. The file is
-loaded once, and must be included when distributing the app. The default
-definitions live outside the parsing code in this file.</p>
-<h3 id="standard-excel-templates">Standard Excel templates</h3>
-<p>Each upload card includes <strong>Download Excel template</strong>.
-The three blank workbooks are bundled in <code>www/templates/</code>.
-Each has input areas, formula totals and a guide to the required
-headings, supported additions and filename/year rules. Download the
-matching template, complete it and upload the saved file. The example
-year is 2026; change the guide’s Reporting year and Save As with the
-matching year before uploading completed data.</p>
-<ul>
-<li>Monthly Site: organisation Finance Summary plus one example site,
-with Income, Expenses, Discounts and Total Revenue. Update the
-organisation links to include every site when adding more site
-worksheets.</li>
-<li>Detailed Site: Finance, Direct Visits, Indirect Visits, Memberships
-and Enrollments. Rename activity rows and insert new activities before
-Total; repeated audience/indicator additions must be consistent across
-months.</li>
-<li>Venues Tracking: all nine supported worksheets, including the
-selected Casual Hours summary and the reporting-year Casual Salaries
-block.</li>
-</ul>
-<p>Amber cells are editable inputs. Grey labels and dark headings
-identify the required structure. Calculated cells should retain their
-formulas. Blank is unreported; enter zero only for a confirmed zero.
-Blank templates are starting files rather than reported data. Unknown
-fields can be viewed/downloaded, but new business relationships and
-arbitrary layouts require extraction rules.</p>
-<p>See <a href="docs/excel_templates.md">Excel template guide</a> for
-instructions and the specific extension boundaries for each
-worksheet.</p>
-<h3 id="session-scope">Session scope</h3>
-<p>Uploads last only for the current session. Refreshing or closing the
-dashboard clears the temporary files and parsed results; use
-<strong>Save current data</strong> to keep the cleaned data on your own
-computer. Nothing is stored on a server.</p>
-<h2 id="data-architecture">Data architecture</h2>
-<p>Each report type follows this workflow:</p>
-<pre class="text"><code>Excel files selected on the Data page
-        ↓
-temporary session copies and worksheet import
-        ↓
-structure and calculation validation
-        ↓
-standardised long tables
-        ↓
-dashboard calculations, charts and forecasts</code></pre>
-<p>Extracted tables keep source metadata such as
-<code>source_file</code>, <code>source_sheet</code>,
-<code>source_row</code> and <code>source_column</code>, so you can trace
-a dashboard value back to its original Excel cell.</p>
-<h3 id="data-source-summary">Data-source summary</h3>
+<p>The package versions are recorded in <code>renv.lock</code>. For the
+full import and upload workflow, file naming, warnings, saved-data
+format and templates, see <a href="docs/maintainer_guide.md#data-upload-and-review-workflow">Maintainer
+guide: data upload</a> and the <a href="docs/user_guide.html">user
+guide</a>.</p>
+<h2 id="data-sources-and-privacy">Data sources and privacy</h2>
+<p>The application supports three report families:</p>
 <table>
 <thead>
 <tr>
 <th>Report family</th>
-<th>Upload area</th>
-<th>Intended dashboard use</th>
+<th>Main outputs</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Monthly Site Reports</td>
-<td>Monthly Site Reports</td>
-<td>Executive Dashboard, Overview, Site &amp; Facility Comparison and
-Forecasting</td>
+<td><strong>Monthly Site Reports</strong></td>
+<td>Income, expenses, budgets, discounts and revenue
+reconciliations</td>
 </tr>
 <tr>
-<td>Venues Tracking Reports</td>
-<td>Venues Tracking Reports</td>
-<td>Venues Operations, facility analysis and the casual-payroll
-reference for Forecasting</td>
+<td><strong>Detailed Site / Business Unit Reports</strong></td>
+<td>Site finance, Direct/Indirect visits, memberships and
+enrolments</td>
 </tr>
 <tr>
-<td>Business Unit Site/Program Reports</td>
-<td>Detailed Site Reports</td>
-<td>Site Detail, visits, memberships and enrolments</td>
+<td><strong>Venues Tracking Reports</strong></td>
+<td>Attendance, hire revenue and transactions, workforce hours/wages,
+online sales and merchandise/equipment measures</td>
 </tr>
 </tbody>
 </table>
-<h2 id="report-contents">Report contents</h2>
-<p>Each report family produces the data and checks described below. Use
-<strong>View Cleaned Data</strong> to browse the cleaned rows by source
-worksheet.</p>
-<h3 id="id_1-monthly-site-reports">1. Monthly Site Reports</h3>
-<p>Outputs:</p>
+<p>Uploads are validated before being used in charts. Imported records
+retain source-file, worksheet and cell-position metadata to help
+reconcile figures. The <a href="docs/data_dictionary.md">data
+dictionary</a> defines the cleaned tables; <a href="docs/excel_templates.md">Excel templates</a> document required
+workbook layouts.</p>
+<p>The workbooks under <code>data/sample/</code> use artificial figures
+and must <strong>never</strong> be treated as actual Monash Sport
+results. Don’t commit original reports, exported confidential
+<code>.rds</code> files or screenshots containing real values. The live
+app does not keep uploads between sessions; <strong>Save current
+data</strong> produces a local <code>.rds</code> file that must be
+handled as confidential data.</p>
+<h2 id="architecture-at-a-glance">Architecture at a glance</h2>
+<pre class="text"><code>Excel workbooks → import → cleaning and validation → standardised data
+                                                   ↓
+                       shared calculations and reporting context
+                                                   ↓
+                      page modules → charts, KPIs and forecasts</code></pre>
 <table>
 <thead>
 <tr>
-<th>Object</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>finance</code></td>
-<td>Monthly Income and Expenses by site, business unit, Budget, Actual
-and Variance</td>
-</tr>
-<tr>
-<td><code>discounts</code></td>
-<td>Monthly discount opportunities, including Student, Staff, Other and
-additional labelled categories</td>
-</tr>
-<tr>
-<td><code>total_revenue</code></td>
-<td>Annual <code>Actual Income + Discount Opportunity</code>
-reconciliation against the workbook value</td>
-</tr>
-<tr>
-<td><code>files</code></td>
-<td>Discovered files and report years</td>
-</tr>
-<tr>
-<td><code>validation</code></td>
-<td>Import, structure and calculation issues</td>
-</tr>
-</tbody>
-</table>
-<p>Summary rows give site totals. The Monash Sport summary row gives the
-total for the organisation.</p>
-<h3 id="id_2-venues-tracking-reports">2. Venues Tracking Reports</h3>
-<p>Outputs:</p>
-<table>
-<thead>
-<tr>
-<th>Object</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>finance</code></td>
-<td>MTD Finance values by fund, metric and value type</td>
-</tr>
-<tr>
-<td><code>attendance</code></td>
-<td>Facility, activity and customer/category attendance with Month and
-YTD periods</td>
-</tr>
-<tr>
-<td><code>facility_hire</code></td>
-<td>Facility-hire revenue and transaction measures with Month and YTD
-periods</td>
-</tr>
-<tr>
-<td><code>court_hire</code></td>
-<td>Annual Court Hire comparisons by activity, including previous year,
-report year, growth achieved, monthly values and reported totals</td>
-</tr>
-<tr>
-<td><code>membership</code></td>
-<td>Membership measures such as New, Renewed, Active and Retention</td>
-</tr>
-<tr>
-<td><code>online_sales</code></td>
-<td>Online revenue by site, category and Month/YTD period, with
-reporting flags for incomplete months</td>
-</tr>
-<tr>
-<td><code>merchandise</code></td>
-<td>Equipment hire, equipment sales and Monash Sport merchandise
-revenue/transaction measures</td>
-</tr>
-<tr>
-<td><code>casual_hours</code></td>
-<td>Monthly summary only: budgeted hours, paid hours and variance, plus
-the reported total</td>
-</tr>
-<tr>
-<td><code>casual_wages</code></td>
-<td>Budget, actual and variance for the salary-year block matching each
-workbook’s report year</td>
-</tr>
-<tr>
-<td><code>*_checks</code></td>
-<td>Independent monthly-to-YTD and finance reconciliation checks</td>
-</tr>
-</tbody>
-</table>
-<p>The source workbook’s <code>MTD Total</code> and
-<code>YTD Total</code> rows stay separate from fund-level rows to avoid
-double counting.</p>
-<h3 id="id_3-business-unit-site-and-program-reports">3. Business Unit
-Site and Program Reports</h3>
-<p>Outputs:</p>
-<table>
-<thead>
-<tr>
-<th>Object</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>finance</code></td>
-<td>Monthly and reported annual Finance values, including
-Profit/Loss</td>
-</tr>
-<tr>
-<td><code>visits</code></td>
-<td>Direct and Indirect visits by activity, audience, month and YTD</td>
-</tr>
-<tr>
-<td><code>memberships</code></td>
-<td>Monthly membership counts and shares where a Memberships sheet
-exists</td>
-</tr>
-<tr>
-<td><code>enrollments</code></td>
-<td>Monthly enrolment measures; multiple labelled Month blocks are
-supported</td>
-</tr>
-<tr>
-<td><code>discounts</code></td>
-<td>Discount opportunities retained from the Finance sheet</td>
-</tr>
-<tr>
-<td><code>total_revenue</code></td>
-<td>Independently recalculated Total Revenue and validation status</td>
-</tr>
-</tbody>
-</table>
-<p><code>visit_type</code> distinguishes Direct and Indirect visits.
-Common <code>audience</code> values include Student, Staff, Community
-and Total. Additional labelled audience columns keep their workbook
-names. <code>period_type</code> distinguishes Month and YTD values.</p>
-<p>Visit formulas can store fractional values even when Excel displays
-whole people. Visit checks allow a difference of one visit by default.
-Financial checks use a tolerance of one cent.</p>
-<h2 id="validation">Validation</h2>
-<p>Validation keeps extracted data available and records source
-discrepancies in check tables and validation notes. It does not silently
-overwrite or discard a discrepancy.</p>
-<p>Common statuses are:</p>
-<table>
-<thead>
-<tr>
-<th>Status</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>pass</code></td>
-<td>Reported value agrees with the independently calculated value within
-tolerance</td>
-</tr>
-<tr>
-<td><code>fail</code></td>
-<td>Both values exist but do not reconcile</td>
-</tr>
-<tr>
-<td><code>missing_reported_value</code></td>
-<td>Components exist but the workbook has no reported total</td>
-</tr>
-<tr>
-<td><code>missing_components</code></td>
-<td>A reported total exists but some required detail is absent</td>
-</tr>
-<tr>
-<td><code>missing_monthly_values</code></td>
-<td>An annual/YTD value cannot be fully checked against monthly
-data</td>
-</tr>
-</tbody>
-</table>
-<p>Warnings allow extraction to continue. Blocking validation errors and
-parser errors exclude the affected file from the dashboard. Review the
-file’s status and <strong>View details</strong> in <strong>Upload &amp;
-Manage</strong>, then correct and upload the workbook again if
-needed.</p>
-<h2 id="adding-future-report-years">Adding future report years</h2>
-<p>Upload the new year’s workbook through the matching report-family
-card in <strong>Upload &amp; Manage</strong>. Keep its filename and
-reporting year consistent, and preserve the required headings and
-worksheet structure. The importers recognise years and row positions
-within the supported layouts.</p>
-<table>
-<thead>
-<tr>
-<th>Report type</th>
-<th>Example future filename</th>
-<th>Required recognisable structure</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Monthly Site Report</td>
-<td><code>Monthly Site Report 2026 - December.xlsx</code></td>
-<td>Finance sections labelled Income, Expenses, months, Budget, Actual
-and Variance</td>
-</tr>
-<tr>
-<td>Venues Tracking Report</td>
-<td><code>2026 Venues Tracking Report.xlsx</code></td>
-<td>Labelled Finance, Attendance, Facility Hire, Court Hire year
-comparison, Membership, Online Sales, Merchandise, Casual Hours and
-Casual Wages sheets; a year prefix such as
-<code>2026 Casual Hours</code> and a comparison name such as
-<code>Court Hire 2025 vs 2026</code> are accepted</td>
-</tr>
-<tr>
-<td>Business Unit report</td>
-<td><code>Aquatics Site Report 2026.xlsx</code></td>
-<td>Finance, Direct Visits and Indirect Visits; Memberships and
-Enrollments are optional</td>
-</tr>
-</tbody>
-</table>
-<p>If a workbook’s structure changes, review its parsing status and any
-<strong>View details</strong> notes. Check the available cleaned rows
-before using the new year’s data in the dashboard.</p>
-<h2 id="forecasting-and-business-planning">Forecasting and business
-planning</h2>
-<p>The <strong>Forecasting</strong> page uses monthly Income and
-Expenses from Monthly Site Reports. It selects history and models
-automatically, so you do not need to choose a statistical model. It does
-not forecast Net Result.</p>
-<p>Choose a 3/6/12-month horizon, a price rise (%) and a casual-payroll
-mode:</p>
-<ul>
-<li><strong>Quick estimate</strong> is the default. Enter the additional
-pay rise (%). Venues Tracking Reports supply the historical Casual
-Salaries reference. The predicted payroll is not a headcount budget or a
-measure of all staff costs.</li>
-<li><strong>Manual adjustment</strong> uses one signed <strong>Monthly
-payroll adjustment (AUD)</strong> entered in <strong>Your plan</strong>.
-Positive amounts add costs, negative amounts reduce costs, and 0 leaves
-costs unchanged. You do not need Venues wage data.</li>
-</ul>
-<p>Choose the payroll method in <strong>More options</strong>; only one
-method applies at a time. A manual amount adjusts the Overall financial
-forecast by an additional monthly amount. It is not a full replacement
-payroll budget, so do not deduct savings from departures already
-reflected in the forecast. The amount applies each month from the
-selected effective date, without compounding. The system rejects blank
-amounts and reductions that would make any month’s total Expenses
-negative.</p>
-<p>The page calculates the minimum income growth and price increase
-needed to cover costs over the selected period, including any existing
-shortfall. <strong>Price sensitivity</strong> appears in <strong>Income
-needed to cover costs</strong>. Use <strong>More options</strong> to set
-the payroll method, history, pricing, demand and timing. Settings apply
-directly and stay in effect when the panel is closed. <strong>Monthly
-plan</strong> and both CSV downloads are always visible below the
-results.</p>
-<p>Validation runs internally, and the assumptions CSV records the
-selected model names. Missing years remain gaps and are not filled with
-zero. Model accuracy is assessed only when continuous history supports
-rolling-origin validation.</p>
-<p>See <a href="docs/forecasting.md">Forecasting and practical
-planning</a> for the formulas, data checks, limitations, model
-comparison and testing instructions.</p>
-<h2 id="project-structure">Project structure</h2>
-<pre class="text"><code>app.R                     # assembles the navigation and connects the modules
-README.Rmd                # editable R Markdown source for this GitHub README
-README.md                 # rendered/committed GitHub landing page
-LICENSE
-renv.lock                 # package versions (restore with renv::restore())
-.renvignore               # folders renv skips (deploy/ and local data)
-
-R/
-  _disable_autoload.R     # app.R sources R/ itself; stops Shiny loading it twice
-  config.R                # brand colours, theme, chart palettes, constants
-  ui_helpers.R            # shared UI pieces, chart hover helpers
-  calculations.R          # finance, revenue and facility calculations
-  reporting_context.R     # shared years, site identities and data availability
-  plots.R                 # dashboard charts (base R graphics)
-  forecasting.R           # forecast models and planning scenarios
-  forecast_plots.R        # forecasting charts
-  executive_visual_registry.R  # metadata/availability; fixed layouts live in module
-
-  data/                   # Excel import pipeline
-    load.R                # sources the data layer in dependency order
-    common.R              # helpers shared by all report types
-    extensibility.R       # additional fields and metric definitions
-    monthly_site/         # import.R, validation.R, cleaning.R
-    venues/               # import.R, validation.R, cleaning.R
-    business_unit_templates/  # import.R, validation.R, cleaning.R
-
-  mod_executive_dashboard.R   # Overview, Site and Venues executive views
-  mod_overview.R
-  mod_site_comparison.R
-  mod_site_detail.R
-  mod_venues_operations.R
-  mod_forecasting.R
-  mod_data_upload.R
-
-config/
-  metric_definitions.csv  # units and aggregation rules for imported metrics
-
-data/
-  sample/                 # synthetic workbooks with the report layouts (random values)
-
-docs/
-  user_guide.qmd          # for Monash Sport staff: step-by-step guide (Quarto source)
-  user_guide.pdf, .html   # rendered user guide
-  user_guide.css          # look of the HTML user guide
-  images/user_guide/      # screenshots used in the user guide (synthetic data)
-  maintainer_guide.md     # for maintainers: RStudio, full tests, publishing
-  dashboard_design.md     # brand colours, typography and layout rules
-  data_dictionary.md      # every cleaned table and column
-  excel_templates.md      # how to fill in and extend the templates
-  forecasting.md          # forecasting method, assumptions and checks
-
-report/
-  report.qmd              # project report (Quarto): title, authors and text
-  _quarto.yml             # PDF and website settings
-  report.pdf, index.html  # rendered report (PDF and website)
-  README.md               # what the other report folders hold
-
-slides/
-  slides.qmd              # project presentation (Quarto, Monash theme)
-  slides.html             # rendered presentation
-  _extensions/            # quarto-monash presentation theme
-
-deploy/
-  build_shinylive.R       # builds the static browser version into _site/
-
-.github/workflows/
-  deploy-shinylive.yml    # publishes _site/ to GitHub Pages on every push
-  tests.yml               # runs the sample test suite on every push
-
-tests/
-  run_tests.R             # regression tests (see Testing)
-  run_sample_tests.R      # same, plus parsing every workbook in data/sample
-  run_full_tests.R        # same, on the original reports (see docs/maintainer_guide.md)
-  README.md               # what each test file checks and how to run them
-  fixtures_site_venues.R  # shared test fixtures
-  helper_parse_cache.R    # parses each sample workbook once per run
-  test_*.R                # one file per area
-  snapshots/              # accepted key figures for the sample workbooks
-
-www/
-  styles.css              # dashboard styles (brand variables at the top)
-  browser_downloads.js    # browser-compatible downloads for Shinylive
-  brand/                  # official Monash logo used in the navbar
-  templates/              # blank Excel report templates</code></pre>
-<p>Each part has a specific role:</p>
-<ul>
-<li><code>R/data/*/import.R</code> reads the uploaded workbooks and
-required worksheets, <code>validation.R</code> identifies structural
-problems and reconciliation differences, and <code>cleaning.R</code>
-converts workbook layouts into analysis-ready tables.</li>
-<li><code>R/mod_*.R</code> files pair page UI and server logic.
-Page-specific reactive calculations are usually inside the server
-module; reusable calculations may live in <code>R/calculations.R</code>
-or <code>R/reporting_context.R</code>.</li>
-<li><code>config/metric_definitions.csv</code> is read at startup, so
-include it when distributing the project.</li>
-<li>Chart colours are defined once in <code>CHART_COLOURS</code> in
-<code>R/config.R</code>; page colours are CSS variables at the top of
-<code>www/styles.css</code>.</li>
-</ul>
-<h2 id="developer-handover-and-file-map">Developer handover and file
-map</h2>
-<p><strong>For the next Monash Sport developer:</strong> begin with
-<code>app.R</code>, which sources the R files in dependency order and
-passes one shared uploaded-data reactive to all pages. Avoid copying
-calculations into multiple page modules. The imported report formats,
-source years and aggregation rules are more important to preserve than
-any individual chart styling choice.</p>
-<h3 id="application-entry-point-and-shared-logic">Application entry
-point and shared logic</h3>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>What it owns</th>
-<th>Change it when…</th>
+<th>Location</th>
+<th>Responsibility</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><a href="app.R"><code>app.R</code></a></td>
-<td>Navigation, loading order, shared report-data reactive and module
-wiring</td>
-<td>Adding a major page/module or an app-wide dependency</td>
+<td>Starts the application, connects navigation and shares uploaded data
+across pages</td>
 </tr>
 <tr>
-<td><a href="R/config.R"><code>R/config.R</code></a></td>
-<td>Brand colours, constants, chart settings, user guide URL and known
-names</td>
-<td>Changing shared branding or configuration</td>
+<td><a href="R/data/"><code>R/data/</code></a></td>
+<td>Source-specific Excel extraction, cleaning, validation and
+extensible metric handling</td>
 </tr>
 <tr>
-<td><a href="R/reporting_context.R"><code>R/reporting_context.R</code></a></td>
-<td>Available years, report-family selection, discovered sites and site
-identity</td>
-<td>A new year/site is not appearing or source identity rules
-change</td>
+<td><a href="R/calculations.R"><code>R/calculations.R</code></a> and <a href="R/reporting_context.R"><code>R/reporting_context.R</code></a></td>
+<td>Shared financial calculations, reporting years, sites and source
+context</td>
 </tr>
 <tr>
-<td><a href="R/ui_helpers.R"><code>R/ui_helpers.R</code></a></td>
-<td>Shared KPI, navbar, chart hover and presentation UI helpers</td>
-<td>Changing a UI pattern used across several pages</td>
+<td><a href="R/"><code>R/mod_*.R</code></a></td>
+<td>Individual page UI, server calculations and reactive
+interactions</td>
 </tr>
 <tr>
-<td><a href="R/calculations.R"><code>R/calculations.R</code></a></td>
-<td>Organisation-, site- and facility-level financial calculations</td>
-<td>Fixing income, expenses, revenue, discounts or financial
-reconciliation</td>
-</tr>
-<tr>
-<td><a href="R/plots.R"><code>R/plots.R</code></a></td>
-<td>Standard base-R chart drawing, line-gap behaviour and Executive
-Site/Venues charts</td>
-<td>Changing chart aesthetics, chart grouping or axis/legend
-behaviour</td>
-</tr>
-<tr>
-<td><a href="R/executive_visual_registry.R"><code>R/executive_visual_registry.R</code></a></td>
-<td>Executive visual metadata and report-family availability checks</td>
-<td>Registering a visual or changing metadata; note that the three
-current layouts are rendered directly by their module</td>
+<td><a href="R/plots.R"><code>R/plots.R</code></a> and <a href="R/forecast_plots.R"><code>R/forecast_plots.R</code></a></td>
+<td>Charts, legends and plotted series</td>
 </tr>
 <tr>
 <td><a href="R/forecasting.R"><code>R/forecasting.R</code></a></td>
-<td>History preparation, model selection, forecast/backtest calculations
-and payroll/pricing scenarios</td>
-<td>Changing forecast logic or business planning assumptions</td>
+<td>Forecast and business-planning models</td>
 </tr>
 <tr>
-<td><a href="R/forecast_plots.R"><code>R/forecast_plots.R</code></a></td>
-<td>Forecasting-specific charts</td>
-<td>Changing forecast, scenario or interval displays</td>
+<td><a href="R/config.R"><code>R/config.R</code></a> and <a href="www/styles.css"><code>www/styles.css</code></a></td>
+<td>Branding, constants and responsive styling</td>
 </tr>
 <tr>
-<td><a href="R/_disable_autoload.R"><code>R/_disable_autoload.R</code></a></td>
-<td>Prevents Shiny double-sourcing files that <code>app.R</code> loads
-explicitly</td>
-<td>Changing the application loading strategy (rare)</td>
+<td><a href="tests/"><code>tests/</code></a></td>
+<td>Regression, parser, cross-page and chart checks</td>
+</tr>
+<tr>
+<td><a href="deploy/"><code>deploy/</code></a> and <a href=".github/workflows/"><code>.github/workflows/</code></a></td>
+<td>Browser build, continuous integration and GitHub Pages
+deployment</td>
 </tr>
 </tbody>
 </table>
-<h3 id="page-modules">Page modules</h3>
-<p>Each <code>mod_*.R</code> module pairs UI (<code>mod_*_ui</code>)
-with server logic (<code>mod_*_server</code>). Changes to inputs,
-outputs, hover readouts and chart placement normally belong in the
-relevant module, not in <code>app.R</code>.</p>
+<p><strong>For the full file-by-file map</strong>, including
+<code>mod_executive_dashboard.R</code>, all data importers and the tests
+to update for each change, use the <a href="docs/maintainer_guide.md#developer-handover-and-file-map">developer
+handover and file map</a>.</p>
+<h2 id="maintaining-the-application">Maintaining the application</h2>
+<p>This repository is designed for an incoming Monash Sport developer to
+take over. Start with <a href="docs/maintainer_guide.md"><code>docs/maintainer_guide.md</code></a>
+before changing data aggregation rules or source templates.</p>
 <table>
 <thead>
 <tr>
-<th>File</th>
-<th>Purpose</th>
-<th>Typical maintenance</th>
+<th>If you need to…</th>
+<th>Where to start</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="R/mod_executive_dashboard.R"><code>R/mod_executive_dashboard.R</code></a></td>
-<td>Fixed Overview, Site and Venues executive views; KPI cards, chart
-outputs, year comparisons, rankings, summaries and insights</td>
-<td>Update an executive KPI, add a summary/insight or connect a chart
-and its hover readout</td>
+<td><strong>Upload the next reporting year</strong></td>
+<td><a href="docs/maintainer_guide.md#adding-future-report-years">New
+reporting years</a> (normally no code change)</td>
 </tr>
 <tr>
-<td><a href="R/mod_overview.R"><code>R/mod_overview.R</code></a></td>
-<td>Organisation-wide financial overview and period selection</td>
-<td>Adjust financial trends, date filters or hover readouts</td>
+<td><strong>Support a changed Excel template</strong></td>
+<td><a href="docs/maintainer_guide.md#b-an-excel-workbook-changes-its-column-names-or-structure">Importer
+maintenance steps</a></td>
 </tr>
 <tr>
-<td><a href="R/mod_site_comparison.R"><code>R/mod_site_comparison.R</code></a></td>
-<td>Cross-site annual financial comparisons and facility drill-down</td>
-<td>Update selected-site logic, financial comparison controls or line
-hover behaviour</td>
+<td><strong>Add a site, facility or new measure</strong></td>
+<td><a href="docs/maintainer_guide.md#c-add-a-new-site-business-unit-facility-or-activity">Adding
+reporting categories</a></td>
 </tr>
 <tr>
-<td><a href="R/mod_site_detail.R"><code>R/mod_site_detail.R</code></a></td>
-<td>Individual site visits, membership and enrolment analysis</td>
-<td>Support a new detailed operational measure or monthly trend</td>
+<td><strong>Change a KPI, plot or hover readout</strong></td>
+<td><a href="docs/maintainer_guide.md#d-change-a-kpi-chart-hover-feature-or-executive-insight">Dashboard
+change procedure</a></td>
 </tr>
 <tr>
-<td><a href="R/mod_venues_operations.R"><code>R/mod_venues_operations.R</code></a></td>
-<td>Detailed attendance, hire, workforce, merchandise and other venues
-report analysis</td>
-<td>Update an operational section, facility group, wage metric or
-section-specific chart</td>
+<td><strong>Change the forecast</strong></td>
+<td><a href="docs/maintainer_guide.md#e-update-forecasting-or-business-planning-assumptions">Forecast
+maintenance</a></td>
 </tr>
 <tr>
-<td><a href="R/mod_forecasting.R"><code>R/mod_forecasting.R</code></a></td>
-<td>Forecasting controls, reactive scenarios, displayed results and
-downloads</td>
-<td>Modify forecast user flow, planning inputs or exports</td>
+<td><strong>Diagnose incorrect totals</strong></td>
+<td><a href="docs/maintainer_guide.md#important-calculation-and-reporting-rules">Calculation
+safeguards</a></td>
 </tr>
 <tr>
-<td><a href="R/mod_data_upload.R"><code>R/mod_data_upload.R</code></a></td>
-<td>Report matching, uploads, warnings, deduplication, saved data and
-cleaned-data exports</td>
-<td>Support a new upload family, saved-data contract or validation
-message</td>
+<td><strong>Release an update</strong></td>
+<td><a href="docs/maintainer_guide.md#troubleshooting-and-release-checklist">Troubleshooting
+and release checklist</a></td>
 </tr>
 </tbody>
 </table>
-<h3 id="excel-import-and-data-cleaning-files">Excel import and
-data-cleaning files</h3>
-<p><strong>Start with <code>R/data/load.R</code></strong> to see the
-source order. Each report family separates extraction
-(<code>import.R</code>), transformation (<code>cleaning.R</code>) and
-checks (<code>validation.R</code>). Keep those responsibilities
-distinct.</p>
+<p>The most important safeguards are to distinguish <strong>unreported
+data from zero</strong>, avoid summing YTD totals together with their
+monthly/detail components, and avoid summing successive membership
+snapshots. A wage budget difference must use a clearly stated sign
+convention. More detail and exceptions are in the maintainer guide.</p>
+<h2 id="testing-and-deployment">Testing and deployment</h2>
+<p>Run the basic regression suite from the project root:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_tests.R&quot;</span>)</span></code></pre></div>
+<p>Run the synthetic-workbook end-to-end checks before releasing:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_sample_tests.R&quot;</span>)</span></code></pre></div>
+<p>For sequential debugging, first run
+<code>Sys.setenv(MONASH_SPORT_TEST_WORKERS = &quot;1&quot;)</code>. Authorised
+maintainers can use <code>tests/run_full_tests.R</code> with
+confidential workbooks stored locally in <code>data/raw/</code>. See <a href="docs/maintainer_guide.md#testing">Testing instructions</a> for
+expected coverage and how to update intentional snapshot changes.</p>
+<p>GitHub Actions tests and builds the Shinylive site; the deployment
+workflow publishes changes from <code>main</code> to GitHub Pages.
+Review the code diff, run tests, and check the deployed application with
+<strong>synthetic</strong> reports. See the <a href="docs/maintainer_guide.md#3-publish-a-new-version">deployment
+guide</a>.</p>
+<h2 id="project-documentation">Project documentation</h2>
 <table>
 <thead>
 <tr>
-<th>File or folder</th>
-<th>Role</th>
+<th>Document</th>
+<th>Intended audience</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="R/data/load.R"><code>R/data/load.R</code></a></td>
-<td>Sources the common helpers and the three report families in
-dependency order</td>
+<td><a href="docs/user_guide.html">User guide (HTML)</a></td>
+<td>Monash Sport staff using the app</td>
 </tr>
 <tr>
-<td><a href="R/data/common.R"><code>R/data/common.R</code></a></td>
-<td>Shared Excel cell, date, numerical and report-parsing helpers</td>
+<td><a href="docs/user_guide.qmd">User guide source</a></td>
+<td>Updating staff instructions and generating the HTML/PDF guide</td>
 </tr>
 <tr>
-<td><a href="R/data/extensibility.R"><code>R/data/extensibility.R</code></a></td>
-<td>Captures additional columns/metrics and applies metadata definitions
-for changing templates</td>
+<td><a href="docs/maintainer_guide.md">Maintainer guide</a></td>
+<td>New developers: project files, report schemas, safe changes, tests
+and deployment</td>
 </tr>
 <tr>
-<td><a href="R/data/monthly_site/import.R"><code>R/data/monthly_site/import.R</code></a></td>
-<td>Reads Monthly Site Report workbook layout</td>
+<td><a href="docs/data_dictionary.md">Data dictionary</a></td>
+<td>Cleaned table and field definitions</td>
 </tr>
 <tr>
-<td><a href="R/data/monthly_site/cleaning.R"><code>R/data/monthly_site/cleaning.R</code></a></td>
-<td>Standardises Monthly Site finance, discounts and revenue
-records</td>
+<td><a href="docs/excel_templates.md">Excel template guide</a></td>
+<td>Expected report layouts and safe extensions</td>
 </tr>
 <tr>
-<td><a href="R/data/monthly_site/validation.R"><code>R/data/monthly_site/validation.R</code></a></td>
-<td>Checks Monthly Site structure and reconciliations</td>
+<td><a href="docs/forecasting.md">Forecasting methodology</a></td>
+<td>Model selection, scenarios, assumptions and limitations</td>
 </tr>
 <tr>
-<td><a href="R/data/venues/import.R"><code>R/data/venues/import.R</code></a></td>
-<td>Reads Venues Tracking Report worksheets</td>
+<td><a href="docs/dashboard_design.md">Dashboard design</a></td>
+<td>Visual guidelines</td>
 </tr>
 <tr>
-<td><a href="R/data/venues/cleaning.R"><code>R/data/venues/cleaning.R</code></a></td>
-<td>Standardises attendance, facility hire, memberships, wages,
-merchandise and other venues datasets</td>
-</tr>
-<tr>
-<td><a href="R/data/venues/validation.R"><code>R/data/venues/validation.R</code></a></td>
-<td>Checks Venues structure, totals and consistency</td>
-</tr>
-<tr>
-<td><a href="R/data/business_unit_templates/import.R"><code>R/data/business_unit_templates/import.R</code></a></td>
-<td>Reads Detailed Site / Business Unit workbook layouts</td>
-</tr>
-<tr>
-<td><a href="R/data/business_unit_templates/cleaning.R"><code>R/data/business_unit_templates/cleaning.R</code></a></td>
-<td>Standardises visits, memberships, enrolments, finance and related
-records</td>
-</tr>
-<tr>
-<td><a href="R/data/business_unit_templates/validation.R"><code>R/data/business_unit_templates/validation.R</code></a></td>
-<td>Checks Detailed Site workbook structure and reported totals</td>
-</tr>
-<tr>
-<td><a href="config/metric_definitions.csv"><code>config/metric_definitions.csv</code></a></td>
-<td>Classifies recognised metrics by unit and aggregation; edit when
-adding known measures within a supported layout</td>
+<td><a href="tests/README.md">Test documentation</a></td>
+<td>What the regression test files cover</td>
 </tr>
 </tbody>
 </table>
-<p>The schema of the resulting datasets is documented in the <a href="docs/data_dictionary.md">data dictionary</a>. The <a href="docs/excel_templates.md">Excel template guide</a> explains how far
-a workbook can change before parser code is needed.</p>
-<h3 id="non-r-files-that-matter">Non-R files that matter</h3>
-<table>
-<thead>
-<tr>
-<th>Path</th>
-<th>Purpose / reason to update</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="www/styles.css"><code>www/styles.css</code></a></td>
-<td>Responsive layout, colours, KPI cards, full-screen presentation and
-hover readout styles</td>
-</tr>
-<tr>
-<td><a href="www/browser_downloads.js"><code>www/browser_downloads.js</code></a></td>
-<td>Browser-specific downloads in Shinylive; check
-<code>tests/test_browser_downloads.cjs</code> when editing</td>
-</tr>
-<tr>
-<td><code>www/templates/</code></td>
-<td>Blank workbooks; keep them consistent with parser requirements and
-test them</td>
-</tr>
-<tr>
-<td><code>data/sample/</code></td>
-<td><strong>Synthetic</strong> workbooks for demos and end-to-end tests;
-do not replace with actual Monash Sport reports</td>
-</tr>
-<tr>
-<td><a href="docs/user_guide.qmd"><code>docs/user_guide.qmd</code></a></td>
-<td>Staff-facing instructions; regenerate HTML/PDF and synthetic
-screenshots after UI changes</td>
-</tr>
-<tr>
-<td><a href="docs/maintainer_guide.md"><code>docs/maintainer_guide.md</code></a></td>
-<td>Developer’s local setup, real-data testing and publishing
-details</td>
-</tr>
-<tr>
-<td><a href="docs/data_dictionary.md"><code>docs/data_dictionary.md</code></a></td>
-<td>Definitions of the imported datasets and columns</td>
-</tr>
-<tr>
-<td><a href="tests/README.md"><code>tests/README.md</code></a> and
-<code>tests/test_*.R</code></td>
-<td>Explains regression coverage; extend tests for every change to
-calculations or interface behaviour</td>
-</tr>
-<tr>
-<td><a href="deploy/build_shinylive.R"><code>deploy/build_shinylive.R</code></a></td>
-<td>Builds the browser-compatible static website</td>
-</tr>
-<tr>
-<td><a href=".github/workflows/tests.yml"><code>.github/workflows/tests.yml</code></a></td>
-<td>GitHub Actions R and download test pipeline</td>
-</tr>
-<tr>
-<td><a href=".github/workflows/deploy-shinylive.yml"><code>.github/workflows/deploy-shinylive.yml</code></a></td>
-<td>Build-and-publish pipeline for GitHub Pages, triggered by pushes to
-<code>main</code></td>
-</tr>
-<tr>
-<td><a href="renv.lock"><code>renv.lock</code></a></td>
-<td>Recorded R package versions used by collaborators and CI</td>
-</tr>
-</tbody>
-</table>
-<h2 id="common-maintenance-tasks">Common maintenance tasks</h2>
-<p>These procedures are intended for a Monash Sport successor
-maintaining the application after handover. Make changes on a branch,
-preserve source data confidentiality, and validate both <strong>the
-calculated values</strong> and <strong>the display</strong>.</p>
-<h3 id="a-load-the-next-reporting-year-usually-no-code-change">A. Load
-the next reporting year (usually no code change)</h3>
-<ol style="list-style-type: decimal">
-<li>Obtain the authorised new-year workbooks from Monash Sport’s
-existing internal storage. Do not add these files to Git.</li>
-<li>Check the reporting year in the filename, the year inside the
-workbook, worksheet names and required headings against the <a href="docs/excel_templates.md">Excel template guide</a>.</li>
-<li>In the <strong>Data</strong> page, remove an older version for the
-<em>same</em> year if it would otherwise conflict, then upload the
-current workbook(s). Read all warnings and confirm each workbook reaches
-<code>ready</code>.</li>
-<li>In <strong>View Cleaned Data</strong>, confirm the year, site names,
-metrics and reported totals. Trace suspect values with
-<code>source_file</code>, <code>source_sheet</code>,
-<code>source_row</code> and <code>source_column</code>.</li>
-<li>Check the new year in Overview, Executive Dashboard, Site
-Comparison, Site Detail and Venues Operations as applicable. A year with
-no supported report data must remain unavailable, not automatically
-become zero.</li>
-<li>Run the regression suite before distributing an updated app.
-<strong>Uploading a new year alone does not require redeploying the
-code</strong> if the existing importer supports its layout.</li>
-</ol>
-<h3 id="b-an-excel-workbook-changes-its-column-names-or-structure">B. An
-Excel workbook changes its column names or structure</h3>
-<ol style="list-style-type: decimal">
-<li>Make a <strong>sanitised synthetic copy</strong> of the new layout,
-keeping no genuine financial, member or staff values. Reproduce the
-structure causing the issue.</li>
-<li>Identify the report family in <code>R/data/monthly_site/</code>,
-<code>R/data/venues/</code> or
-<code>R/data/business_unit_templates/</code>.</li>
-<li>Update the relevant <code>import.R</code> only for how
-cells/sections are located; update <code>cleaning.R</code> for the
-standardised output shape; update <code>validation.R</code> for
-structural and numerical checks.</li>
-<li>For a new <em>recognised indicator</em> within an existing
-structure, check <code>config/metric_definitions.csv</code> and
-<code>R/data/extensibility.R</code> before adding a new parser branch.
-Unexpected fields may already be retained as
-<code>additional_data</code> without entering calculations.</li>
-<li>Update <code>docs/data_dictionary.md</code>, sample workbook(s) and
-blank templates if the output or supported input structure changed.</li>
-<li>Add a test in <code>tests/test_data_pipeline_regressions.R</code>,
-<code>tests/test_extensible_imports.R</code> or the report-family test;
-verify both valid and invalid examples.</li>
-<li>If the <strong>saved cleaned-table contract</strong> changes, review
-and increment <code>BASIC_SAVED_DATA_VERSION</code> in
-<code>R/mod_data_upload.R</code>. Older <code>.rds</code> files may need
-re-importing from Excel.</li>
-<li>Run sample and, when authorised, real-data tests before
-releasing.</li>
-</ol>
-<h3 id="c-add-a-new-site-business-unit-facility-or-activity">C. Add a
-new site, business unit, facility or activity</h3>
-<ol style="list-style-type: decimal">
-<li>First upload its workbook. The application discovers many new site
-names, years and labelled report categories automatically.</li>
-<li>Check <code>R/reporting_context.R</code> if it is absent from a site
-list or is attributed to the wrong campus/business unit.</li>
-<li>Check the relevant clean table before changing a chart. Source
-totals and detail rows may describe the same activity and must not be
-summed.</li>
-<li>For a genuinely new measure, add a source-aware calculation in
-<code>R/calculations.R</code> or the appropriate detailed page helper,
-then expose it through the module and, if necessary,
-<code>R/plots.R</code>.</li>
-<li>Extend <code>tests/test_reporting_context.R</code>, the relevant
-page test and cross-page consistency tests. Do not hard-code a list of
-2025 sites or fixed year choices into chart functions.</li>
-</ol>
-<h3 id="d-change-a-kpi-chart-hover-feature-or-executive-insight">D.
-Change a KPI, chart, hover feature or executive insight</h3>
-<ol style="list-style-type: decimal">
-<li>Determine the <strong>source dataset and aggregation
-definition</strong> first. Use <code>docs/data_dictionary.md</code> and
-the existing calculation helper.</li>
-<li>Update the calculation in <code>R/calculations.R</code> or a
-relevant reusable page helper. For Venues, first inspect the existing
-totals in <code>R/mod_venues_operations.R</code> before duplicating
-logic.</li>
-<li>Update the page module in <code>R/mod_*.R</code> (KPI specs, chart
-input/output, hover readout, summary table or insights).</li>
-<li>Update drawing in <code>R/plots.R</code> or
-<code>R/forecast_plots.R</code>; check legend placement, year labels,
-missing-period gaps and readability at both laptop and wide-screen
-sizes.</li>
-<li>Update <code>www/styles.css</code> only if layout changes are
-necessary.</li>
-<li>If registering a visual for metadata/availability purposes, inspect
-<code>R/executive_visual_registry.R</code>. <strong>The current
-Executive Overview, Site and Venues layouts are rendered directly;
-editing the registry alone will not add a visible chart.</strong></li>
-<li>Add or update <code>tests/test_executive_dashboard.R</code>, the
-relevant page test and <code>tests/test_cross_page_consistency.R</code>
-when a shared value changes. Verify Year Review, Comparison and hover
-readouts together.</li>
-</ol>
-<h3 id="e-update-forecasting-or-business-planning-assumptions">E. Update
-forecasting or business-planning assumptions</h3>
-<ol style="list-style-type: decimal">
-<li>Find the calculation in <code>R/forecasting.R</code> and read the
-methods and limitations in <code>docs/forecasting.md</code> before
-changing it.</li>
-<li>Update controls and outputs in <code>R/mod_forecasting.R</code>, and
-plots in <code>R/forecast_plots.R</code> where applicable.</li>
-<li>Preserve the distinction between historical actuals, model
-forecasts, wage scenarios and pricing assumptions. Test incomplete
-histories, zero values, missing years and boundary inputs.</li>
-<li>Update the forecasting tests, guide and assumptions/download
-labels.</li>
-</ol>
-<h3 id="f-update-the-website-or-documentation">F. Update the website or
-documentation</h3>
-<ol style="list-style-type: decimal">
-<li>For changes to this landing page, edit <code>README.Rmd</code> and
-regenerate <code>README.md</code> using the command in <a href="#editing-this-readme">Editing this README</a>. Commit
-<strong>both</strong> files to Git.</li>
-<li>Modify other source files on a Git branch and run the tests in <a href="#testing">Testing</a>.</li>
-<li>If the interface changed, update <code>docs/user_guide.qmd</code>
-and generate new <strong>synthetic-data</strong> screenshots. Render the
-guide with <code>quarto render docs/user_guide.qmd</code>.</li>
-<li>Confirm no confidential data, private <code>.rds</code>, raw
-workbooks or credentials appear in the changes. Review
-<code>git status</code>, <code>git diff --check</code> and the pull
-request diff.</li>
-<li>Merge/push to <code>main</code> only after review. GitHub Actions
-runs sample tests, builds the Shinylive site and publishes to GitHub
-Pages when successful.</li>
-<li>Check the deployed dashboard, upload one synthetic workbook and
-verify a chart and downloaded file. See the <a href="docs/maintainer_guide.md">maintainer guide</a> for local builds
-and publishing details.</li>
-</ol>
-<h2 id="important-calculation-and-reporting-rules">Important calculation
-and reporting rules</h2>
-<p>These rules protect Monash Sport from misleading KPIs or comparisons.
-Keep them in mind when adding new reports or new charts.</p>
-<table>
-<thead>
-<tr>
-<th>Rule</th>
-<th>Why it matters</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Reported totals vs detail</strong></td>
-<td>A worksheet may contain a section total and the component rows
-behind it. Prefer the validated reported total or a correctly derived
-total, <strong>not both</strong>. This applies to facility hire,
-merchandise, attendance and financial summaries.</td>
-</tr>
-<tr>
-<td><strong>YTD vs Month</strong></td>
-<td>Reported YTD values and individual monthly values overlap. Never add
-a YTD figure to the corresponding monthly figures.</td>
-</tr>
-<tr>
-<td><strong>Missing vs zero</strong></td>
-<td>A blank/unreported value is <code>NA</code>/unavailable. Show a
-genuine zero only when the report confirms it. Incomplete histories must
-not be silently filled.</td>
-</tr>
-<tr>
-<td><strong>Membership snapshots</strong></td>
-<td>Active Members describes a point in time; use the latest valid
-snapshot for the reporting context rather than adding membership counts
-across months.</td>
-</tr>
-<tr>
-<td><strong>Visits</strong></td>
-<td>Use the source’s Direct and Indirect visit definitions, and do not
-add audience/component totals to their own breakdowns.</td>
-</tr>
-<tr>
-<td><strong>Enrolment types</strong></td>
-<td>Aquatics <em>Total Active</em> and Participation Programs enrolments
-are different metrics. Do not combine them into one programme-total KPI
-without a valid common definition.</td>
-</tr>
-<tr>
-<td><strong>Wages</strong></td>
-<td>The Executive Venues wage figure is <strong>Casual Wages</strong>,
-not an organisation-wide payroll total. A budget difference must
-identify its sign convention (for example, Budget minus Actual).</td>
-</tr>
-<tr>
-<td><strong>Merchandise</strong></td>
-<td>The reported revenue includes equipment hire/sales and Monash Sport
-merchandise, so names should disclose that scope. Transactions are not
-necessarily unique customers.</td>
-</tr>
-<tr>
-<td><strong>Year comparisons</strong></td>
-<td>Report the year and matching site/category coverage. Missing annual
-or monthly data creates a visible gap; never draw a continuous trend
-through an unreported year.</td>
-</tr>
-<tr>
-<td><strong>Forecasts and scenarios</strong></td>
-<td>Forecasts are model outputs based on available history, not
-confirmed future results. Payroll and pricing scenario inputs must
-remain explicit assumptions.</td>
-</tr>
-<tr>
-<td><strong>Source traceability</strong></td>
-<td>Keep original file/sheet/row/column metadata in cleaned tables so a
-number can be checked back against an Excel cell.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="troubleshooting-and-release-checklist">Troubleshooting and
-release checklist</h2>
-<table>
-<thead>
-<tr>
-<th>Symptom</th>
-<th>First place to check</th>
-<th>Suggested action</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>New workbook shows <code>failed</code></td>
-<td>Data page <strong>View details</strong>, then report-family
-<code>import.R</code> and <code>validation.R</code></td>
-<td>Check filename-year match, sheet headings, duplicate reports and
-required totals</td>
-</tr>
-<tr>
-<td>Chart says no data</td>
-<td>Data page cleaned preview; <code>R/reporting_context.R</code>;
-relevant module</td>
-<td>Verify the year, report family, missing-value status and supported
-metric</td>
-</tr>
-<tr>
-<td>Site absent from choices</td>
-<td><code>R/reporting_context.R</code> and source manifest</td>
-<td>Check reporting unit/campus identity and that the workbook is
-<code>ready</code></td>
-</tr>
-<tr>
-<td>KPI disagrees with detailed page</td>
-<td>Shared <code>R/calculations.R</code> or Venues helper;
-<code>tests/test_cross_page_consistency.R</code></td>
-<td>Check summary/detail overlap, year selection and aggregation
-rule</td>
-</tr>
-<tr>
-<td>Trend has a gap</td>
-<td>Source workbook and cleaned rows</td>
-<td>Check for an unreported period; do <strong>not</strong> interpolate
-or connect it without a justified data rule</td>
-</tr>
-<tr>
-<td>Hover is blank/wrong</td>
-<td><code>plotOutput(..., hover=...)</code>, its
-<code>renderText</code>, plot coordinate mapping</td>
-<td>Ensure chart sorting and bar/line coordinates match the hover
-lookup</td>
-</tr>
-<tr>
-<td>New chart causes cramped layout</td>
-<td><code>www/styles.css</code>, chart drawing functions</td>
-<td>Check a laptop-width screen and Presentation View; avoid placing
-legends over data</td>
-</tr>
-<tr>
-<td>Saved <code>.rds</code> no longer loads</td>
-<td><code>R/mod_data_upload.R</code> saved-data version</td>
-<td>Re-upload source workbooks after a real schema change; do not bypass
-compatibility checks</td>
-</tr>
-<tr>
-<td>Published site differs from local</td>
-<td>GitHub Actions logs and <code>deploy/build_shinylive.R</code></td>
-<td>Check tests/build completion and whether the right branch was
-deployed</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Before every release:</strong></p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Run from the repository root.</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">MONASH_SPORT_TEST_WORKERS =</span> <span class="st">&quot;1&quot;</span>)  <span class="co"># optional: simpler debugging</span></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_tests.R&quot;</span>)</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_sample_tests.R&quot;</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># Monash Sport maintainers only, with authorised reports in data/raw/:</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co"># source(&quot;tests/run_full_tests.R&quot;)</span></span></code></pre></div>
-<p>Then test the application with synthetic data: upload and remove a
-report; review an Executive Dashboard KPI and hover readout; switch
-reporting years; inspect Site Detail, Venues Operations and Forecasting;
-and check any modified feature in both desktop R and the
-browser-deployed build. Only then publish.</p>
-<h2 id="editing-this-readme">Editing this README</h2>
-<p><code>README.Rmd</code> is the <strong>editable source</strong>.
-<code>README.md</code> is the GitHub-facing version produced from it.
-Keep both in the repository so a future Monash Sport developer can
-update the documentation without losing the source.</p>
-<p>From the project root in RStudio, after restoring the project’s
-packages:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>rmarkdown<span class="sc">::</span><span class="fu">render</span>(<span class="st">&quot;README.Rmd&quot;</span>, <span class="at">output_file =</span> <span class="st">&quot;README.md&quot;</span>)</span></code></pre></div>
-<p>The source contains Markdown and standard code fences, <strong>not
-executable R code chunks</strong>, so rendering the README should not
-import report files or run the app. Review the rendered
-<code>README.md</code>, follow its local links and commit both
-files:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">git</span> add README.Rmd README.md</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">&quot;docs: update Monash Sport README and maintainer notes&quot;</span></span></code></pre></div>
-<p>If <code>README.Rmd</code> and <code>README.md</code> differ after
-rendering, treat <code>README.Rmd</code> as the source of truth. A
-future maintainer should edit it rather than updating the generated
-Markdown directly.</p>
-<h2 id="report-and-presentation">Report and presentation</h2>
-<p>The report and slides are Quarto documents. With <a href="https://quarto.org">Quarto</a> installed, render them from the
-project root:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">quarto</span> render report/report.qmd</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">quarto</span> render slides/slides.qmd</span></code></pre></div>
-<p>The report is rendered twice, as a PDF in the Monash report format
-(<code>report/report.pdf</code>) and as a one-page website
-(<code>report/index.html</code>); see <code>report/README.md</code>.
-Rendering runs R code, so knitr is recorded in <code>renv.lock</code>
-with the dashboard’s packages.</p>
-<p>The slides use the bundled <code>quarto-monash</code> theme in
-<code>slides/_extensions/</code> and need no R packages.
-<code>slides/slides.html</code> is the rendered, self-contained
-presentation. If R code chunks are added to either document, install the
-packages they use and run <code>renv::snapshot()</code> so
-<code>renv.lock</code> stays complete.</p>
-<h2 id="testing">Testing</h2>
-<p>Run the regression tests from the project root in R or RStudio:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_tests.R&quot;</span>)</span></code></pre></div>
-<p>They cover data import helpers, uploads and validation, every
-dashboard page’s calculations (Overview, Site Comparison, Site Detail,
-Venues Operations, Forecasting, Executive Dashboard), chart helpers, and
-a smoke test that draws every Site Detail and Venues chart. The run ends
-with <code>ALL TESTS PASSED</code>. Three tests check the app as it is
-used:</p>
-<ul>
-<li><code>test_upload_realworld.R</code> runs the real importers on the
-sample workbooks for situations met in practice: two files for the same
-report year (the second is not used), a file name whose year differs
-from the workbook, a blank template, unreadable or empty workbooks,
-saved data that overlaps the session, and a new report year reaching the
-year filters.</li>
-<li><code>test_app_smoke.R</code> starts the whole app from
-<code>app.R</code>, sets every control to the value it shows when the
-page opens, and renders every output on every page with no data, one
-report type at a time, one year, and one file of each type; the headline
-figures of each loaded report type must appear.</li>
-<li><code>test_cross_page_consistency.R</code> checks that Overview, the
-Executive Dashboard, Site Comparison and the Forecasting history show
-the same income, expenses, net result and budget variance.</li>
-</ul>
-<p>The test files run in groups on several R processes at once, so the
-run takes about a minute on a machine with eight or more processor
-cores. To run them one after another in the current session, for example
-while debugging, first run
-<code>Sys.setenv(MONASH_SPORT_TEST_WORKERS = &quot;1&quot;)</code>.</p>
-<p>The full suite adds three steps that parse a complete set of
-workbooks: <code>test_real_upload_parsers.R</code>,
-<code>test_key_numbers.R</code> and the full-set part of
-<code>test_app_smoke.R</code> (which also loads the set from saved
-data). It takes about three minutes. Run it on the synthetic workbooks
-in <code>data/sample/</code>:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;tests/run_sample_tests.R&quot;</span>)</span></code></pre></div>
-<p><code>test_key_numbers.R</code> compares the dashboard’s annual
-figures and the totals of every cleaned table with an accepted snapshot
-(<code>tests/snapshots/sample_key_numbers.csv</code> for the sample
-workbooks), so a code change cannot alter the numbers unnoticed. After
-an intended change, rerun with
-<code>Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = &quot;true&quot;)</code>,
-review the differences in the file and keep it.</p>
-<p>Monash Sport maintainers with the original reports can run the same
-suite on them; see section 2 of the <a href="docs/maintainer_guide.md">maintainer guide</a>.</p>
-<h2 id="performance-and-website-deployment">Performance and website
-deployment</h2>
-<p>The live dashboard is a <a href="https://posit-dev.github.io/r-shinylive/">Shinylive</a> export: R
-runs inside the browser through WebAssembly, so GitHub Pages only serves
-the code and uploaded reports never leave the user’s computer. The first
-visit downloads R and the packages (about 30 seconds); later visits use
-the browser cache.</p>
-<p>Browser R runs on a single thread and is several times slower than
-desktop R, so parsing a full set of reports takes a few minutes. The
-importers cache each worksheet’s cell values and build tables in one
-step to keep this short, and <strong>Save current data</strong> lets
-users skip parsing on later visits. Run the app from RStudio for the
-fastest parsing.</p>
-<h2 id="licence">Licence</h2>
-<p>The code and documentation are released under the <a href="LICENSE">MIT Licence</a>. Monash University and Monash Sport
-names, logos and brand assets, and the Monash Sport report data, are not
-covered by this licence.</p>
-<p>The Quarto templates in <code>slides/_extensions/</code> and
-<code>report/_extensions/</code> come from <a href="https://github.com/quarto-monash">quarto-monash</a> (CC0). The
-fonts bundled with the report template (Fira Sans, XCharter, Font
-Awesome Free) keep their own open licences.</p>
+<p><strong>README maintenance:</strong> Edit <code>README.Rmd</code> as
+the source and run <code>rmarkdown::render(&quot;README.Rmd&quot;)</code> to
+regenerate this GitHub <code>README.md</code>. Commit both files after
+reviewing the result. Folder-specific READMEs (<code>tests/</code>,
+<code>report/</code>) remain independent.</p>
+<h2 id="report-presentation-and-licence">Report, presentation and
+licence</h2>
+<p>The project report and presentation are Quarto files. To rebuild them
+from the project root with Quarto installed:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="ex">quarto</span> render report/report.qmd</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="ex">quarto</span> render slides/slides.qmd</span></code></pre></div>
+<p>The report files live in <a href="report/"><code>report/</code></a>
+and the slides in <a href="slides/"><code>slides/</code></a>. The
+application code and documentation use the <a href="LICENSE">MIT
+Licence</a>. Monash University/Monash Sport names, logos, brand assets
+and confidential reporting data are <strong>not</strong> covered by that
+licence; bundled third-party Quarto resources retain their own
+licences.</p>
 
 </body>
 </html>

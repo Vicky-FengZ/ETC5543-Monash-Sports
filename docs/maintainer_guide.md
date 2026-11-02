@@ -3,11 +3,10 @@
 This guide is for whoever looks after the dashboard's code: running it from
 RStudio, testing changes against the real reports and publishing a new
 version. Staff who only use the dashboard should read the
-[user guide](user_guide.pdf) instead.
+[user guide](user_guide.html) instead.
 
-For more detail, see the main [README](../README.md): *Project structure*,
-*Adding future report years*, *Testing* and *Performance and website
-deployment*.
+The main [README](../README.md) introduces the project and links here for
+the detailed file map, data rules, tests, troubleshooting and release steps.
 
 ## 1. Run the dashboard from RStudio
 
@@ -76,7 +75,7 @@ Rscript --vanilla deploy/build_shinylive.R
 
 The build contains only the app code (`app.R`, `R/`, `www/` and `config/`),
 never `data/`, `tests/` or `renv/`. The rendered user guide
-(`docs/user_guide.html` and `.pdf`) is copied next to the app, so it is
+(`docs/user_guide.html`, and `.pdf` if generated) is copied next to the app, so it is
 published at `https://vicky-fengz.github.io/ETC5543-Monash-Sports/user_guide.html`,
 where the **User guide** link in the dashboard's navbar points
 (`USER_GUIDE_URL` in `R/config.R`).
@@ -104,5 +103,885 @@ and the PDF from the project root (RStudio Terminal):
 quarto render docs/user_guide.qmd
 ```
 
-This writes `docs/user_guide.html` and `docs/user_guide.pdf`. Commit both, so
-staff can open the PDF directly on GitHub.
+This regenerates `docs/user_guide.html`; it may also produce
+`docs/user_guide.pdf` when PDF output and its dependencies are available.
+Commit rendered artifacts that are intentionally tracked; the HTML guide
+is already included in this repository.
+
+
+---
+
+## 6. Detailed reference for future developers
+
+The sections below preserve the operational and technical details that were
+previously embedded in the project-root README. They belong here so the GitHub
+landing page stays concise. Treat the source workbook and its validated cleaned
+tables as the authority for numbers: a chart screenshot is not a source record.
+
+**Navigation:** [File map](#developer-handover-and-file-map) ·
+[New years](#adding-future-report-years) ·
+[Maintenance recipes](#common-maintenance-tasks) ·
+[Calculation rules](#important-calculation-and-reporting-rules) ·
+[Release checklist](#troubleshooting-and-release-checklist)
+
+
+## Project structure
+
+```text
+app.R                     # assembles the navigation and connects the modules
+README.Rmd                # editable R Markdown source for this GitHub README
+README.md                 # rendered/committed GitHub landing page
+LICENSE
+renv.lock                 # package versions (restore with renv::restore())
+.renvignore               # folders renv skips (deploy/ and local data)
+
+R/
+  _disable_autoload.R     # app.R sources R/ itself; stops Shiny loading it twice
+  config.R                # brand colours, theme, chart palettes, constants
+  ui_helpers.R            # shared UI pieces, chart hover helpers
+  calculations.R          # finance, revenue and facility calculations
+  reporting_context.R     # shared years, site identities and data availability
+  plots.R                 # dashboard charts (base R graphics)
+  forecasting.R           # forecast models and planning scenarios
+  forecast_plots.R        # forecasting charts
+  executive_visual_registry.R  # metadata/availability; fixed layouts live in module
+
+  data/                   # Excel import pipeline
+    load.R                # sources the data layer in dependency order
+    common.R              # helpers shared by all report types
+    extensibility.R       # additional fields and metric definitions
+    monthly_site/         # import.R, validation.R, cleaning.R
+    venues/               # import.R, validation.R, cleaning.R
+    business_unit_templates/  # import.R, validation.R, cleaning.R
+
+  mod_executive_dashboard.R   # Overview, Site and Venues executive views
+  mod_overview.R
+  mod_site_comparison.R
+  mod_site_detail.R
+  mod_venues_operations.R
+  mod_forecasting.R
+  mod_data_upload.R
+
+config/
+  metric_definitions.csv  # units and aggregation rules for imported metrics
+
+data/
+  sample/                 # synthetic workbooks with the report layouts (random values)
+
+docs/
+  user_guide.qmd          # for Monash Sport staff: step-by-step guide (Quarto source)
+  user_guide.pdf, .html   # rendered user guide
+  user_guide.css          # look of the HTML user guide
+  images/user_guide/      # screenshots used in the user guide (synthetic data)
+  maintainer_guide.md     # for maintainers: RStudio, full tests, publishing
+  dashboard_design.md     # brand colours, typography and layout rules
+  data_dictionary.md      # every cleaned table and column
+  excel_templates.md      # how to fill in and extend the templates
+  forecasting.md          # forecasting method, assumptions and checks
+
+report/
+  report.qmd              # project report (Quarto): title, authors and text
+  _quarto.yml             # PDF and website settings
+  report.pdf, index.html  # rendered report (PDF and website)
+  README.md               # what the other report folders hold
+
+slides/
+  slides.qmd              # project presentation (Quarto, Monash theme)
+  slides.html             # rendered presentation
+  _extensions/            # quarto-monash presentation theme
+
+deploy/
+  build_shinylive.R       # builds the static browser version into _site/
+
+.github/workflows/
+  deploy-shinylive.yml    # publishes _site/ to GitHub Pages on every push
+  tests.yml               # runs the sample test suite on every push
+
+tests/
+  run_tests.R             # regression tests (see Testing)
+  run_sample_tests.R      # same, plus parsing every workbook in data/sample
+  run_full_tests.R        # same, on the original reports (see docs/maintainer_guide.md)
+  README.md               # what each test file checks and how to run them
+  fixtures_site_venues.R  # shared test fixtures
+  helper_parse_cache.R    # parses each sample workbook once per run
+  test_*.R                # one file per area
+  snapshots/              # accepted key figures for the sample workbooks
+
+www/
+  styles.css              # dashboard styles (brand variables at the top)
+  browser_downloads.js    # browser-compatible downloads for Shinylive
+  brand/                  # official Monash logo used in the navbar
+  templates/              # blank Excel report templates
+```
+
+Each part has a specific role:
+
+- `R/data/*/import.R` reads the uploaded workbooks and required worksheets,
+  `validation.R` identifies structural problems and reconciliation
+  differences, and `cleaning.R` converts workbook layouts into
+  analysis-ready tables.
+- `R/mod_*.R` files pair page UI and server logic. Page-specific reactive
+  calculations are usually inside the server module; reusable calculations
+  may live in `R/calculations.R` or `R/reporting_context.R`.
+- `config/metric_definitions.csv` is read at startup, so include it when
+  distributing the project.
+- Chart colours are defined once in `CHART_COLOURS` in `R/config.R`; page
+  colours are CSS variables at the top of `www/styles.css`.
+
+
+## Developer handover and file map
+
+**For the next Monash Sport developer:** begin with `app.R`, which sources the
+R files in dependency order and passes one shared uploaded-data reactive to all
+pages. Avoid copying calculations into multiple page modules. The imported
+report formats, source years and aggregation rules are more important to
+preserve than any individual chart styling choice.
+
+### Application entry point and shared logic
+
+| File | What it owns | Change it when... |
+|---|---|---|
+| [`app.R`](../app.R) | Navigation, loading order, shared report-data reactive and module wiring | Adding a major page/module or an app-wide dependency |
+| [`R/config.R`](../R/config.R) | Brand colours, constants, chart settings, user guide URL and known names | Changing shared branding or configuration |
+| [`R/reporting_context.R`](../R/reporting_context.R) | Available years, report-family selection, discovered sites and site identity | A new year/site is not appearing or source identity rules change |
+| [`R/ui_helpers.R`](../R/ui_helpers.R) | Shared KPI, navbar, chart hover and presentation UI helpers | Changing a UI pattern used across several pages |
+| [`R/calculations.R`](../R/calculations.R) | Organisation-, site- and facility-level financial calculations | Fixing income, expenses, revenue, discounts or financial reconciliation |
+| [`R/plots.R`](../R/plots.R) | Standard base-R chart drawing, line-gap behaviour and Executive Site/Venues charts | Changing chart aesthetics, chart grouping or axis/legend behaviour |
+| [`R/executive_visual_registry.R`](../R/executive_visual_registry.R) | Executive visual metadata and report-family availability checks | Registering a visual or changing metadata; note that the three current layouts are rendered directly by their module |
+| [`R/forecasting.R`](../R/forecasting.R) | History preparation, model selection, forecast/backtest calculations and payroll/pricing scenarios | Changing forecast logic or business planning assumptions |
+| [`R/forecast_plots.R`](../R/forecast_plots.R) | Forecasting-specific charts | Changing forecast, scenario or interval displays |
+| [`R/_disable_autoload.R`](../R/_disable_autoload.R) | Prevents Shiny double-sourcing files that `app.R` loads explicitly | Changing the application loading strategy (rare) |
+
+### Page modules
+
+Each `mod_*.R` module pairs UI (`mod_*_ui`) with server logic
+(`mod_*_server`). Changes to inputs, outputs, hover readouts and chart placement
+normally belong in the relevant module, not in `app.R`.
+
+| File | Purpose | Typical maintenance |
+|---|---|---|
+| [`R/mod_executive_dashboard.R`](../R/mod_executive_dashboard.R) | Fixed Overview, Site and Venues executive views; KPI cards, chart outputs, year comparisons, rankings, summaries and insights | Update an executive KPI, add a summary/insight or connect a chart and its hover readout |
+| [`R/mod_overview.R`](../R/mod_overview.R) | Organisation-wide financial overview and period selection | Adjust financial trends, date filters or hover readouts |
+| [`R/mod_site_comparison.R`](../R/mod_site_comparison.R) | Cross-site annual financial comparisons and facility drill-down | Update selected-site logic, financial comparison controls or line hover behaviour |
+| [`R/mod_site_detail.R`](../R/mod_site_detail.R) | Individual site visits, membership and enrolment analysis | Support a new detailed operational measure or monthly trend |
+| [`R/mod_venues_operations.R`](../R/mod_venues_operations.R) | Detailed attendance, hire, workforce, merchandise and other venues report analysis | Update an operational section, facility group, wage metric or section-specific chart |
+| [`R/mod_forecasting.R`](../R/mod_forecasting.R) | Forecasting controls, reactive scenarios, displayed results and downloads | Modify forecast user flow, planning inputs or exports |
+| [`R/mod_data_upload.R`](../R/mod_data_upload.R) | Report matching, uploads, warnings, deduplication, saved data and cleaned-data exports | Support a new upload family, saved-data contract or validation message |
+
+### Excel import and data-cleaning files
+
+**Start with `R/data/load.R`** to see the source order. Each report family
+separates extraction (`import.R`), transformation (`cleaning.R`) and checks
+(`validation.R`). Keep those responsibilities distinct.
+
+| File or folder | Role |
+|---|---|
+| [`R/data/load.R`](../R/data/load.R) | Sources the common helpers and the three report families in dependency order |
+| [`R/data/common.R`](../R/data/common.R) | Shared Excel cell, date, numerical and report-parsing helpers |
+| [`R/data/extensibility.R`](../R/data/extensibility.R) | Captures additional columns/metrics and applies metadata definitions for changing templates |
+| [`R/data/monthly_site/import.R`](../R/data/monthly_site/import.R) | Reads Monthly Site Report workbook layout |
+| [`R/data/monthly_site/cleaning.R`](../R/data/monthly_site/cleaning.R) | Standardises Monthly Site finance, discounts and revenue records |
+| [`R/data/monthly_site/validation.R`](../R/data/monthly_site/validation.R) | Checks Monthly Site structure and reconciliations |
+| [`R/data/venues/import.R`](../R/data/venues/import.R) | Reads Venues Tracking Report worksheets |
+| [`R/data/venues/cleaning.R`](../R/data/venues/cleaning.R) | Standardises attendance, facility hire, memberships, wages, merchandise and other venues datasets |
+| [`R/data/venues/validation.R`](../R/data/venues/validation.R) | Checks Venues structure, totals and consistency |
+| [`R/data/business_unit_templates/import.R`](../R/data/business_unit_templates/import.R) | Reads Detailed Site / Business Unit workbook layouts |
+| [`R/data/business_unit_templates/cleaning.R`](../R/data/business_unit_templates/cleaning.R) | Standardises visits, memberships, enrolments, finance and related records |
+| [`R/data/business_unit_templates/validation.R`](../R/data/business_unit_templates/validation.R) | Checks Detailed Site workbook structure and reported totals |
+| [`config/metric_definitions.csv`](../config/metric_definitions.csv) | Classifies recognised metrics by unit and aggregation; edit when adding known measures within a supported layout |
+
+The schema of the resulting datasets is documented in the
+[data dictionary](../docs/data_dictionary.md). The [Excel template guide](../docs/excel_templates.md)
+explains how far a workbook can change before parser code is needed.
+
+### Non-R files that matter
+
+| Path | Purpose / reason to update |
+|---|---|
+| [`www/styles.css`](../www/styles.css) | Responsive layout, colours, KPI cards, full-screen presentation and hover readout styles |
+| [`www/browser_downloads.js`](../www/browser_downloads.js) | Browser-specific downloads in Shinylive; check `tests/test_browser_downloads.cjs` when editing |
+| `www/templates/` | Blank workbooks; keep them consistent with parser requirements and test them |
+| `data/sample/` | **Synthetic** workbooks for demos and end-to-end tests; do not replace with actual Monash Sport reports |
+| [`docs/user_guide.qmd`](../docs/user_guide.qmd) | Staff-facing instructions; regenerate HTML/PDF and synthetic screenshots after UI changes |
+| [`docs/maintainer_guide.md`](../docs/maintainer_guide.md) | Developer's local setup, real-data testing and publishing details |
+| [`docs/data_dictionary.md`](../docs/data_dictionary.md) | Definitions of the imported datasets and columns |
+| [`tests/README.md`](../tests/README.md) and `tests/test_*.R` | Explains regression coverage; extend tests for every change to calculations or interface behaviour |
+| [`deploy/build_shinylive.R`](../deploy/build_shinylive.R) | Builds the browser-compatible static website |
+| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | GitHub Actions R and download test pipeline |
+| [`.github/workflows/deploy-shinylive.yml`](../.github/workflows/deploy-shinylive.yml) | Build-and-publish pipeline for GitHub Pages, triggered by pushes to `main` |
+| [`renv.lock`](../renv.lock) | Recorded R package versions used by collaborators and CI |
+
+
+## Data architecture
+
+Each report type follows this workflow:
+
+```text
+Excel files selected on the Data page
+        ↓
+temporary session copies and worksheet import
+        ↓
+structure and calculation validation
+        ↓
+standardised long tables
+        ↓
+dashboard calculations, charts and forecasts
+```
+
+Extracted tables keep source metadata such as `source_file`, `source_sheet`,
+`source_row` and `source_column`, so you can trace a dashboard value back to
+its original Excel cell.
+
+### Data-source summary
+
+| Report family | Upload area | Intended dashboard use |
+|---|---|---|
+| Monthly Site Reports | Monthly Site Reports | Executive Dashboard, Overview, Site & Facility Comparison and Forecasting |
+| Venues Tracking Reports | Venues Tracking Reports | Venues Operations, facility analysis and the casual-payroll reference for Forecasting |
+| Business Unit Site/Program Reports | Detailed Site Reports | Site Detail, visits, memberships and enrolments |
+
+
+## Data availability
+
+The Monash Sport source workbooks are **confidential and are not included**
+in this repository. Monash Sport staff can find how to store and upload them
+in the [user guide](../docs/user_guide.html). Everyone else can use the synthetic
+sample workbooks described below.
+
+### Synthetic sample data
+
+To try the dashboard without the confidential reports, use the **synthetic
+workbooks in `data/sample/`**. They follow the same folder structure, file
+names and Excel layouts as the original reports, so they can be uploaded on
+the Data page or used by the tests. They cover 2021-2025:
+
+```text
+data/sample/
+  Monthly Site Report/                                   # e.g. Monthly Site Report 2025 -December.xlsx
+  Business Unit Templates that feed master reports/<year>/  # e.g. Aquatics Site Report 2025.xlsx
+  Business Unit Tracking Reports/                         # e.g. 2025 Venues Tracking Report.xlsx
+```
+
+The sample workbooks exist only to check that the dashboard and its upload
+pipeline run end to end. The following has been hidden:
+
+- **All figures** (income, expenses, budgets, discounts, visits, memberships,
+  hours, wages and other numbers) are randomly generated and do not reflect
+  Monash Sport's actual results, trends or patterns.
+- **Free-text commentary**, such as monthly highlights, staff notes and help
+  text, has been removed, along with cell comments and file metadata.
+- **Names of external organisations** (e.g. partner institutions and user
+  groups) have been replaced with neutral names such as "Partner
+  Organisation A".
+- **Formulas and links** to other workbooks have been removed; the files
+  contain values only.
+
+The figures, charts and forecasts produced from these files carry no meaning
+about Monash Sport and must not be interpreted.
+
+Blank versions of each report layout are provided in `www/templates/` and can
+be downloaded from the Data page. The structure of every cleaned table is
+described in the [data dictionary](../docs/data_dictionary.md).
+
+
+## Data upload and review workflow
+
+Select your Excel workbooks from their existing folders on your computer. You
+do not need to move them into the application folder before uploading.
+
+The Data page has two tasks:
+
+- **Upload & Manage** lets you upload, parse and remove Excel workbooks.
+- **View Cleaned Data** lets you inspect and download the standardised tables
+  from successful imports.
+
+### Uploading files
+
+Everything is added through the **Add data** card: **Choose files** for
+selected files, or **Choose folder** for a whole folder (subfolders
+included). Both accept report workbooks (`.xlsx`, `.xls`) and saved data files
+(`.rds`, see below), so the same button is used the first time and every
+time after.
+
+- Each workbook is matched to its report family from its file name, using the
+  same naming rules as the importers, and parsed one after another. The
+  matching rules and blank templates are under **Excel templates and file
+  naming** in the same card.
+- A workbook whose name matches no family is not read yet. It is listed with a
+  **Choose report type** box: pick the type and select **Add**, or
+  **Dismiss** it. If the chosen type does not fit the workbook, the error says
+  so.
+- A workbook that is already loaded with the same name and contents is skipped,
+  so choosing the whole folder again only reads new or changed reports.
+  Content fingerprints are also kept in saved data. Older saves without a
+  fingerprint still load; selecting the Excel file again checks it by parsing
+  it once.
+- Other files in the selection are ignored, and a summary under the buttons
+  lists what was matched, skipped, left for a type or ignored.
+
+While files are parsing, the buttons are paused and a progress message is
+shown, and a failed transfer is explained in plain words. The module copies
+each workbook into a temporary session directory, keeps its original filename
+for traceability, and runs the matching import, cleaning and validation
+pipeline. Your original workbook stays unchanged.
+
+The module processes one file at a time. The page shows overall parsing
+progress and a status row for each upload:
+
+| Upload status | Meaning and action |
+|---|---|
+| `queued` or `parsing` | The workbook is waiting or is currently being read, cleaned and validated |
+| `ready` | Parsing completed without validation errors; the cleaned data are available to the dashboard |
+| `failed` | The file type, workbook structure, parser or validation produced a blocking error; its data are excluded from the dashboard |
+
+The status row displays the relevant warning count or error message. For files
+with warnings, select **View details** beneath the progress line to inspect the
+original messages and a short explanation of their impact. Notes are grouped
+by worksheet; notes without a worksheet appear under **File-level notes**.
+Details are collapsed by default and do not open a popup. The successful status
+remains `ready`, including when warnings are present.
+
+A warning does not block a file or alter its extracted values. A validation
+error or parser exception does block it, because continuing could silently
+mislabel data. If failed validation also supplies warnings, those notes can be
+inspected without including that file's data in the dashboard.
+
+A file with the same report family and filename as an existing upload replaces
+the session copy after it passes parsing and validation. If the replacement
+fails, the previous ready file and its dashboard data stay available.
+
+Only one file per report year is used (per business unit and year for
+Detailed Site Reports). A second file for a year that is already loaded
+under another name, such as `Monthly Site Report 2025 -November.xlsx` next
+to `-December.xlsx`, is marked `failed` and names the file already in use,
+because using both would count the same figures twice. Two more checks
+block a file: a year in the file name that differs from the year inside the
+workbook (Monthly Site Reports and Venues Tracking Reports), and a workbook
+without any figures, such as a blank template.
+
+Use the remove button beside a status row to delete the temporary upload and
+its parsed result. Your original Excel file stays unchanged.
+
+### Saving and loading parsed data
+
+Parsing every workbook takes several minutes in the browser version, so the
+cleaned data can be kept in a file and loaded again:
+
+- **Save current data**, at the top of the **Uploaded files** card, downloads
+  one `.rds` file with the cleaned tables, warning notes and a manifest for
+  every `ready` file. Raw workbooks are not included. A line above the file
+  list says what will be saved, and the file name records the years, file
+  count and save date, for example
+  `monash-sport-saved-data_2021-2025_39-files_saved-2026-10-31.rds`.
+- Choosing that file in **Add data** restores those files in a few seconds
+  without reading the workbooks again. A summary then shows when the data was
+  saved, the files and years per report family, and the list of source files;
+  data saved more than 30 days ago is flagged as possibly out of date.
+- The saved file can be chosen together with the reports, for example by
+  choosing the report folder that holds it. The saved data is loaded first;
+  reports with the same name and contents are skipped, and changed versions replace
+  their saved copies.
+- Loaded files behave like uploads: they can be removed, and the session can
+  be saved again.
+
+Files that are not saved dashboard data, are damaged, or were saved by a
+different version of the cleaned tables are refused with a message, and the
+current session is left unchanged. When the importers change the shape of
+their output, increase `BASIC_SAVED_DATA_VERSION` in `R/mod_data_upload.R`
+so older saved files ask for the workbooks to be uploaded again.
+
+The saved file contains the same confidential figures as the reports. Store
+it where the reports are kept and never commit it to this repository.
+
+### Viewing cleaned data
+
+Open **View Cleaned Data** and select the report family. The preview supports:
+
+- multiple reporting years;
+- worksheet-style navigation based on `source_sheet`;
+- Measure and Value type filters for Monthly Site Reports;
+- free-text search across displayed columns;
+- column sorting and adjustable row pagination; and
+- downloading the filtered result as an Excel workbook, with one worksheet per
+  represented `source_sheet`.
+
+The preview uses the parsed R objects. You can filter, sort and move between
+pages without reading the Excel files again.
+
+The preview shows cleaned tables. To check a value in its original Excel
+context, use `source_file`, `source_sheet`, `source_row` and `source_column` to
+find the cell in your original workbook.
+
+### New projects, audiences and indicators
+
+Uploads can grow within the supported report layouts:
+
+- Direct/Indirect Visits locate each month's columns from the next month or
+  YTD heading. New activity rows and audience columns are retained, and the
+  audience total check includes the new categories.
+- Memberships, Enrollments and Venues Membership Tracking retain new labelled
+  indicator columns. Merchandise Tracking also retains unfamiliar indicators.
+- Monthly and Detailed Site Finance accept new discount categories. Reported
+  Total Revenue is located at the beginning of each business-unit group and
+  reconciled against actual income plus the extracted discount categories.
+- The field audit checks recognised Monthly/Detailed finance data areas,
+  Detailed visits/member areas, and Venues membership/merchandise areas. Values
+  without a recognised column, and non-numeric contents in numeric fields,
+  are retained in `additional_data` with their original text and source positions.
+  They appear in the same source-sheet preview/export and are excluded from
+  existing chart totals. The corresponding warning explains where to look.
+  Existing discount subtotal columns are retained there for reference without
+  triggering an unfamiliar-field warning or double-counting discounts.
+- New worksheets without a supported layout are reported in **View details**.
+  They require an extraction rule; they are not silently treated as finance or
+  membership data. Dashboard/chart/helper/budget worksheets remain intentional
+  exclusions. The field audit is not a cell-by-cell audit of the entire workbook;
+  the chosen Casual Hours summary and reporting-year wage scope still apply.
+
+Metric definitions are automatic. Existing defaults identify known counts,
+currencies and rates. Unfamiliar indicators retain their name and reported
+value with internal Unknown/None definitions. Users do not configure them when
+uploading. Internal `unit` and `aggregation` columns are omitted from the ordinary
+preview and cleaned Excel download; the imported R objects retain them.
+New indicators do not automatically become chart/forecast targets.
+
+Default definitions are delivered in
+[`config/metric_definitions.csv`](../config/metric_definitions.csv). Its columns are
+`family,dataset,metric,unit,aggregation`; names are matched without case/spacing
+differences. Supported units are Unknown, Count, Currency, Rate, Hours and Text;
+aggregations are None, Sum, Last and Mean. Restart the app after changing the
+CSV. The file is loaded once, and must be included when distributing the app.
+The default definitions live outside the parsing code in this file.
+
+### Standard Excel templates
+
+Each upload card includes **Download Excel template**. The three blank
+workbooks are bundled in `www/templates/`. Each has input areas, formula totals
+and a guide to the required headings, supported additions and filename/year
+rules. Download the matching template, complete it and upload the saved file.
+The example year is 2026; change the guide's Reporting year and Save As with
+the matching year before uploading completed data.
+
+- Monthly Site: organisation Finance Summary plus one example site, with
+  Income, Expenses, Discounts and Total Revenue. Update the organisation links
+  to include every site when adding more site worksheets.
+- Detailed Site: Finance, Direct Visits, Indirect Visits, Memberships and
+  Enrollments. Rename activity rows and insert new activities before Total;
+  repeated audience/indicator additions must be consistent across months.
+- Venues Tracking: all nine supported worksheets, including the selected
+  Casual Hours summary and the reporting-year Casual Salaries block.
+
+Amber cells are editable inputs. Grey labels and dark headings identify the
+required structure. Calculated cells should retain their formulas. Blank is
+unreported; enter zero only for a confirmed zero. Blank templates are starting
+files rather than reported data. Unknown fields can be viewed/downloaded, but
+new business relationships and arbitrary layouts require extraction rules.
+
+See [Excel template guide](../docs/excel_templates.md) for instructions and
+the specific extension boundaries for each worksheet.
+
+### Session scope
+
+Uploads last only for the current session. Refreshing or closing the dashboard
+clears the temporary files and parsed results; use **Save current data** to
+keep the cleaned data on your own computer. Nothing is stored on a server.
+
+
+## Report contents
+
+Each report family produces the data and checks described below. Use **View
+Cleaned Data** to browse the cleaned rows by source worksheet.
+
+### 1. Monthly Site Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | Monthly Income and Expenses by site, business unit, Budget, Actual and Variance |
+| `discounts` | Monthly discount opportunities, including Student, Staff, Other and additional labelled categories |
+| `total_revenue` | Annual `Actual Income + Discount Opportunity` reconciliation against the workbook value |
+| `files` | Discovered files and report years |
+| `validation` | Import, structure and calculation issues |
+
+Summary rows give site totals. The Monash Sport summary row gives the total
+for the organisation.
+
+### 2. Venues Tracking Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | MTD Finance values by fund, metric and value type |
+| `attendance` | Facility, activity and customer/category attendance with Month and YTD periods |
+| `facility_hire` | Facility-hire revenue and transaction measures with Month and YTD periods |
+| `court_hire` | Annual Court Hire comparisons by activity, including previous year, report year, growth achieved, monthly values and reported totals |
+| `membership` | Membership measures such as New, Renewed, Active and Retention |
+| `online_sales` | Online revenue by site, category and Month/YTD period, with reporting flags for incomplete months |
+| `merchandise` | Equipment hire, equipment sales and Monash Sport merchandise revenue/transaction measures |
+| `casual_hours` | Monthly summary only: budgeted hours, paid hours and variance, plus the reported total |
+| `casual_wages` | Budget, actual and variance for the salary-year block matching each workbook's report year |
+| `*_checks` | Independent monthly-to-YTD and finance reconciliation checks |
+
+The source workbook's `MTD Total` and `YTD Total` rows stay separate from
+fund-level rows to avoid double counting.
+
+### 3. Business Unit Site and Program Reports
+
+Outputs:
+
+| Object | Description |
+|---|---|
+| `finance` | Monthly and reported annual Finance values, including Profit/Loss |
+| `visits` | Direct and Indirect visits by activity, audience, month and YTD |
+| `memberships` | Monthly membership counts and shares where a Memberships sheet exists |
+| `enrollments` | Monthly enrolment measures; multiple labelled Month blocks are supported |
+| `discounts` | Discount opportunities retained from the Finance sheet |
+| `total_revenue` | Independently recalculated Total Revenue and validation status |
+
+`visit_type` distinguishes Direct and Indirect visits. Common `audience` values
+include Student, Staff, Community and Total. Additional labelled audience
+columns keep their workbook names. `period_type` distinguishes Month and YTD
+values.
+
+Visit formulas can store fractional values even when Excel displays whole
+people. Visit checks allow a difference of one visit by default. Financial
+checks use a tolerance of one cent.
+
+
+## Validation
+
+Validation keeps extracted data available and records source discrepancies in
+check tables and validation notes. It does not silently overwrite or discard a
+discrepancy.
+
+Common statuses are:
+
+| Status | Meaning |
+|---|---|
+| `pass` | Reported value agrees with the independently calculated value within tolerance |
+| `fail` | Both values exist but do not reconcile |
+| `missing_reported_value` | Components exist but the workbook has no reported total |
+| `missing_components` | A reported total exists but some required detail is absent |
+| `missing_monthly_values` | An annual/YTD value cannot be fully checked against monthly data |
+
+Warnings allow extraction to continue. Blocking validation errors and parser
+errors exclude the affected file from the dashboard. Review the file's status
+and **View details** in **Upload & Manage**, then correct and upload the workbook
+again if needed.
+
+
+## Adding future report years
+
+Upload the new year's workbook through the matching report-family card in
+**Upload & Manage**. Keep its filename and reporting year consistent, and
+preserve the required headings and worksheet structure. The importers recognise
+years and row positions within the supported layouts.
+
+| Report type | Example future filename | Required recognisable structure |
+|---|---|---|
+| Monthly Site Report | `Monthly Site Report 2026 - December.xlsx` | Finance sections labelled Income, Expenses, months, Budget, Actual and Variance |
+| Venues Tracking Report | `2026 Venues Tracking Report.xlsx` | Labelled Finance, Attendance, Facility Hire, Court Hire year comparison, Membership, Online Sales, Merchandise, Casual Hours and Casual Wages sheets; a year prefix such as `2026 Casual Hours` and a comparison name such as `Court Hire 2025 vs 2026` are accepted |
+| Business Unit report | `Aquatics Site Report 2026.xlsx` | Finance, Direct Visits and Indirect Visits; Memberships and Enrollments are optional |
+
+If a workbook's structure changes, review its parsing status and any **View
+details** notes. Check the available cleaned rows before using the new year's
+data in the dashboard.
+
+
+## Forecasting and business planning
+
+The **Forecasting** page uses monthly Income and Expenses from Monthly Site
+Reports. It selects history and models automatically, so you do not need to
+choose a statistical model. It does not forecast Net Result.
+
+Choose a 3/6/12-month horizon, a price rise (%) and a casual-payroll mode:
+
+- **Quick estimate** is the default. Enter the additional pay rise (%). Venues
+  Tracking Reports supply the historical Casual Salaries reference. The
+  predicted payroll is not a headcount budget or a measure of all staff costs.
+- **Manual adjustment** uses one signed **Monthly payroll adjustment (AUD)**
+  entered in **Your plan**. Positive amounts add costs, negative amounts reduce
+  costs, and 0 leaves costs unchanged. You do not need Venues wage data.
+
+Choose the payroll method in **More options**; only one method applies at a
+time. A manual amount adjusts the Overall financial forecast by an additional
+monthly amount. It is not a full replacement payroll budget, so do not deduct
+savings from departures already reflected in the forecast. The amount applies
+each month from the selected effective date, without compounding. The system
+rejects blank amounts and reductions that would make any month's total
+Expenses negative.
+
+The page calculates the minimum income growth and price increase needed to
+cover costs over the selected period, including any existing shortfall.
+**Price sensitivity** appears in **Income needed to cover costs**. Use
+**More options** to set the payroll method, history, pricing, demand and timing.
+Settings apply directly and stay in effect when the panel is closed.
+**Monthly plan** and both CSV downloads are always visible below the results.
+
+Validation runs internally, and the assumptions CSV records the selected model
+names. Missing years remain gaps and are not filled with zero. Model accuracy
+is assessed only when continuous history supports rolling-origin validation.
+
+See [Forecasting and practical planning](../docs/forecasting.md) for the formulas,
+data checks, limitations, model comparison and testing instructions.
+
+
+## Common maintenance tasks
+
+These procedures are intended for a Monash Sport successor maintaining the
+application after handover. Make changes on a branch, preserve source data
+confidentiality, and validate both **the calculated values** and **the display**.
+
+### A. Load the next reporting year (usually no code change)
+
+1. Obtain the authorised new-year workbooks from Monash Sport's existing
+   internal storage. Do not add these files to Git.
+2. Check the reporting year in the filename, the year inside the workbook,
+   worksheet names and required headings against the [Excel template guide](../docs/excel_templates.md).
+3. In the **Data** page, remove an older version for the *same* year if it
+   would otherwise conflict, then upload the current workbook(s). Read all
+   warnings and confirm each workbook reaches `ready`.
+4. In **View Cleaned Data**, confirm the year, site names, metrics and
+   reported totals. Trace suspect values with `source_file`, `source_sheet`,
+   `source_row` and `source_column`.
+5. Check the new year in Overview, Executive Dashboard, Site Comparison,
+   Site Detail and Venues Operations as applicable. A year with no supported
+   report data must remain unavailable, not automatically become zero.
+6. Run the regression suite before distributing an updated app. **Uploading
+   a new year alone does not require redeploying the code** if the existing
+   importer supports its layout.
+
+### B. An Excel workbook changes its column names or structure
+
+1. Make a **sanitised synthetic copy** of the new layout, keeping no genuine
+   financial, member or staff values. Reproduce the structure causing the issue.
+2. Identify the report family in `R/data/monthly_site/`, `R/data/venues/` or
+   `R/data/business_unit_templates/`.
+3. Update the relevant `import.R` only for how cells/sections are located;
+   update `cleaning.R` for the standardised output shape; update
+   `validation.R` for structural and numerical checks.
+4. For a new *recognised indicator* within an existing structure, check
+   `config/metric_definitions.csv` and `R/data/extensibility.R` before adding
+   a new parser branch. Unexpected fields may already be retained as
+   `additional_data` without entering calculations.
+5. Update `docs/data_dictionary.md`, sample workbook(s) and blank templates
+   if the output or supported input structure changed.
+6. Add a test in `tests/test_data_pipeline_regressions.R`,
+   `tests/test_extensible_imports.R` or the report-family test; verify both
+   valid and invalid examples.
+7. If the **saved cleaned-table contract** changes, review and increment
+   `BASIC_SAVED_DATA_VERSION` in `R/mod_data_upload.R`. Older `.rds` files may
+   need re-importing from Excel.
+8. Run sample and, when authorised, real-data tests before releasing.
+
+### C. Add a new site, business unit, facility or activity
+
+1. First upload its workbook. The application discovers many new site names,
+   years and labelled report categories automatically.
+2. Check `R/reporting_context.R` if it is absent from a site list or is
+   attributed to the wrong campus/business unit.
+3. Check the relevant clean table before changing a chart. Source totals
+   and detail rows may describe the same activity and must not be summed.
+4. For a genuinely new measure, add a source-aware calculation in
+   `R/calculations.R` or the appropriate detailed page helper, then expose
+   it through the module and, if necessary, `R/plots.R`.
+5. Extend `tests/test_reporting_context.R`, the relevant page test and
+   cross-page consistency tests. Do not hard-code a list of 2025 sites or
+   fixed year choices into chart functions.
+
+### D. Change a KPI, chart, hover feature or executive insight
+
+1. Determine the **source dataset and aggregation definition** first. Use
+   `docs/data_dictionary.md` and the existing calculation helper.
+2. Update the calculation in `R/calculations.R` or a relevant reusable page
+   helper. For Venues, first inspect the existing totals in
+   `R/mod_venues_operations.R` before duplicating logic.
+3. Update the page module in `R/mod_*.R` (KPI specs, chart input/output,
+   hover readout, summary table or insights).
+4. Update drawing in `R/plots.R` or `R/forecast_plots.R`; check legend
+   placement, year labels, missing-period gaps and readability at both
+   laptop and wide-screen sizes.
+5. Update `www/styles.css` only if layout changes are necessary.
+6. If registering a visual for metadata/availability purposes, inspect
+   `R/executive_visual_registry.R`. **The current Executive Overview, Site
+   and Venues layouts are rendered directly; editing the registry alone
+   will not add a visible chart.**
+7. Add or update `tests/test_executive_dashboard.R`, the relevant page test
+   and `tests/test_cross_page_consistency.R` when a shared value changes.
+   Verify Year Review, Comparison and hover readouts together.
+
+### E. Update forecasting or business-planning assumptions
+
+1. Find the calculation in `R/forecasting.R` and read the methods and
+   limitations in `docs/forecasting.md` before changing it.
+2. Update controls and outputs in `R/mod_forecasting.R`, and plots in
+   `R/forecast_plots.R` where applicable.
+3. Preserve the distinction between historical actuals, model forecasts,
+   wage scenarios and pricing assumptions. Test incomplete histories,
+   zero values, missing years and boundary inputs.
+4. Update the forecasting tests, guide and assumptions/download labels.
+
+### F. Update the website or documentation
+
+1. For changes to this landing page, edit `README.Rmd` and regenerate
+   `README.md` using the command in [Editing this README](#editing-the-main-readme).
+   Commit **both** files to Git.
+2. Modify other source files on a Git branch and run the tests in [Testing](#testing).
+3. If the interface changed, update `docs/user_guide.qmd` and generate new
+   **synthetic-data** screenshots. Render the guide with
+   `quarto render docs/user_guide.qmd`.
+4. Confirm no confidential data, private `.rds`, raw workbooks or credentials
+   appear in the changes. Review `git status`, `git diff --check` and the
+   pull request diff.
+5. Merge/push to `main` only after review. GitHub Actions runs sample tests,
+   builds the Shinylive site and publishes to GitHub Pages when successful.
+6. Check the deployed dashboard, upload one synthetic workbook and verify
+   a chart and downloaded file. See the [maintainer guide](../docs/maintainer_guide.md)
+   for local builds and publishing details.
+
+
+## Important calculation and reporting rules
+
+These rules protect Monash Sport from misleading KPIs or comparisons. Keep
+them in mind when adding new reports or new charts.
+
+| Rule | Why it matters |
+|---|---|
+| **Reported totals vs detail** | A worksheet may contain a section total and the component rows behind it. Prefer the validated reported total or a correctly derived total, **not both**. This applies to facility hire, merchandise, attendance and financial summaries. |
+| **YTD vs Month** | Reported YTD values and individual monthly values overlap. Never add a YTD figure to the corresponding monthly figures. |
+| **Missing vs zero** | A blank/unreported value is `NA`/unavailable. Show a genuine zero only when the report confirms it. Incomplete histories must not be silently filled. |
+| **Membership snapshots** | Active Members describes a point in time; use the latest valid snapshot for the reporting context rather than adding membership counts across months. |
+| **Visits** | Use the source's Direct and Indirect visit definitions, and do not add audience/component totals to their own breakdowns. |
+| **Enrolment types** | Aquatics *Total Active* and Participation Programs enrolments are different metrics. Do not combine them into one programme-total KPI without a valid common definition. |
+| **Wages** | The Executive Venues wage figure is **Casual Wages**, not an organisation-wide payroll total. A budget difference must identify its sign convention (for example, Budget minus Actual). |
+| **Merchandise** | The reported revenue includes equipment hire/sales and Monash Sport merchandise, so names should disclose that scope. Transactions are not necessarily unique customers. |
+| **Year comparisons** | Report the year and matching site/category coverage. Missing annual or monthly data creates a visible gap; never draw a continuous trend through an unreported year. |
+| **Forecasts and scenarios** | Forecasts are model outputs based on available history, not confirmed future results. Payroll and pricing scenario inputs must remain explicit assumptions. |
+| **Source traceability** | Keep original file/sheet/row/column metadata in cleaned tables so a number can be checked back against an Excel cell. |
+
+
+## Troubleshooting and release checklist
+
+| Symptom | First place to check | Suggested action |
+|---|---|---|
+| New workbook shows `failed` | Data page **View details**, then report-family `import.R` and `validation.R` | Check filename-year match, sheet headings, duplicate reports and required totals |
+| Chart says no data | Data page cleaned preview; `R/reporting_context.R`; relevant module | Verify the year, report family, missing-value status and supported metric |
+| Site absent from choices | `R/reporting_context.R` and source manifest | Check reporting unit/campus identity and that the workbook is `ready` |
+| KPI disagrees with detailed page | Shared `R/calculations.R` or Venues helper; `tests/test_cross_page_consistency.R` | Check summary/detail overlap, year selection and aggregation rule |
+| Trend has a gap | Source workbook and cleaned rows | Check for an unreported period; do **not** interpolate or connect it without a justified data rule |
+| Hover is blank/wrong | `plotOutput(..., hover=...)`, its `renderText`, plot coordinate mapping | Ensure chart sorting and bar/line coordinates match the hover lookup |
+| New chart causes cramped layout | `www/styles.css`, chart drawing functions | Check a laptop-width screen and Presentation View; avoid placing legends over data |
+| Saved `.rds` no longer loads | `R/mod_data_upload.R` saved-data version | Re-upload source workbooks after a real schema change; do not bypass compatibility checks |
+| Published site differs from local | GitHub Actions logs and `deploy/build_shinylive.R` | Check tests/build completion and whether the right branch was deployed |
+
+**Before every release:**
+
+```r
+# Run from the repository root.
+Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")  # optional: simpler debugging
+source("tests/run_tests.R")
+source("tests/run_sample_tests.R")
+
+# Monash Sport maintainers only, with authorised reports in data/raw/:
+# source("tests/run_full_tests.R")
+```
+
+Then test the application with synthetic data: upload and remove a report;
+review an Executive Dashboard KPI and hover readout; switch reporting years;
+inspect Site Detail, Venues Operations and Forecasting; and check any modified
+feature in both desktop R and the browser-deployed build. Only then publish.
+
+
+## Editing the main README
+
+`README.Rmd` is the **editable source**. `README.md` is the GitHub-facing version
+produced from it. Keep both in the repository so a future Monash Sport developer
+can update the documentation without losing the source.
+
+From the project root in RStudio, after restoring the project's packages:
+
+```r
+rmarkdown::render("README.Rmd", output_file = "README.md")
+```
+
+The source contains Markdown and standard code fences, **not executable R code
+chunks**, so rendering the README should not import report files or run the app.
+Review the rendered `README.md`, follow its local links and commit both files:
+
+```bash
+git add README.Rmd README.md
+git commit -m "docs: update Monash Sport README and maintainer notes"
+```
+
+If `README.Rmd` and `README.md` differ after rendering, treat `README.Rmd` as
+the source of truth. A future maintainer should edit it rather than updating
+the generated Markdown directly.
+
+
+## Testing
+
+Run the regression tests from the project root in R or RStudio:
+
+```r
+source("tests/run_tests.R")
+```
+
+They cover data import helpers, uploads and validation, every dashboard
+page's calculations (Overview, Site Comparison, Site Detail, Venues
+Operations, Forecasting, Executive Dashboard), chart helpers, and a smoke
+test that draws every Site Detail and Venues chart. The run ends with
+`ALL TESTS PASSED`. Three tests check the app as it is used:
+
+- `test_upload_realworld.R` runs the real importers on the sample workbooks
+  for situations met in practice: two files for the same report year (the
+  second is not used), a file name whose year differs from the workbook, a
+  blank template, unreadable or empty workbooks, saved data that overlaps
+  the session, and a new report year reaching the year filters.
+- `test_app_smoke.R` starts the whole app from `app.R`, sets every control
+  to the value it shows when the page opens, and renders every output on
+  every page with no data, one report type at a time, one year, and one file
+  of each type; the headline figures of each loaded report type must appear.
+- `test_cross_page_consistency.R` checks that Overview, the Executive
+  Dashboard, Site Comparison and the Forecasting history show the same
+  income, expenses, net result and budget variance.
+
+The test files run in groups on several R processes at once, so the run
+takes about a minute on a machine with eight or more processor cores. To run
+them one after another in the current session, for example while debugging,
+first run `Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`.
+
+The full suite adds three steps that parse a complete set of workbooks:
+`test_real_upload_parsers.R`, `test_key_numbers.R` and the full-set part of
+`test_app_smoke.R` (which also loads the set from saved data). It takes
+about three minutes. Run it on the synthetic workbooks in `data/sample/`:
+
+```r
+source("tests/run_sample_tests.R")
+```
+
+`test_key_numbers.R` compares the dashboard's annual figures and the totals
+of every cleaned table with an accepted snapshot
+(`tests/snapshots/sample_key_numbers.csv` for the sample workbooks), so a
+code change cannot alter the numbers unnoticed. After an intended change,
+rerun with `Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = "true")`, review
+the differences in the file and keep it.
+
+Monash Sport maintainers with the original reports can run the same suite on
+them; see section 2 of the [maintainer guide](../docs/maintainer_guide.md).
+
+
+## Performance and website deployment
+
+The live dashboard is a [Shinylive](https://posit-dev.github.io/r-shinylive/)
+export: R runs inside the browser through WebAssembly, so GitHub Pages only
+serves the code and uploaded reports never leave the user's computer. The
+first visit downloads R and the packages (about 30 seconds); later visits use
+the browser cache.
+
+Browser R runs on a single thread and is several times slower than desktop
+R, so parsing a full set of reports takes a few minutes. The importers cache
+each worksheet's cell values and build tables in one step to keep this short,
+and **Save current data** lets users skip parsing on later visits. Run the
+app from RStudio for the fastest parsing.
