@@ -28,7 +28,7 @@ EXECUTIVE_SOURCE_LABELS <- c(
 EXECUTIVE_VISUAL_REGISTRY <- list(
 
   # -----------------------------------------------------------------------
-  # Monthly Site Reports
+  # Executive Overview: preserve the existing financial presentation
   # -----------------------------------------------------------------------
 
   monthly_income_expenses = list(
@@ -70,93 +70,81 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     supports_comparison = TRUE
   ),
 
-  site_performance = list(
-    id = "site_performance",
-    title = "Site Performance Over Time",
-    category = "Finance",
-    focus = "Site",
-    source_group = "monthly",
-    required_data = "finance",
-    default_selected = TRUE,
-    preferred_size = "wide",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  site_ranking = list(
-    id = "site_ranking",
-    title = "Site Ranking",
-    category = "Finance",
-    focus = "Site",
-    source_group = "monthly",
-    required_data = "finance",
-    default_selected = TRUE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  site_budget_performance = list(
-    id = "site_budget_performance",
-    title = "Site Budget Performance",
-    category = "Finance",
-    focus = "Site",
-    source_group = "monthly",
-    required_data = "finance",
-    default_selected = TRUE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  site_revenue_opportunity = list(
-    id = "site_revenue_opportunity",
-    title = "Revenue Opportunity",
-    category = "Finance",
-    focus = "Site",
-    source_group = "monthly",
-    required_data = c(
-      "finance",
-      "discounts"
-    ),
-    default_selected = TRUE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  site_discount_mix = list(
-    id = "site_discount_mix",
-    title = "Discount Mix",
-    category = "Finance",
-    focus = "Site",
-    source_group = "monthly",
-    required_data = "discounts",
-    default_selected = TRUE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
   revenue_capture = list(
     id = "revenue_capture",
     title = "Revenue Capture",
     category = "Finance",
     focus = "Overview",
     source_group = "monthly",
-    required_data = c(
-      "finance",
-      "discounts"
-    ),
+    required_data = c("finance", "discounts"),
     default_selected = TRUE,
     preferred_size = "standard",
     supports_year_review = TRUE,
     supports_comparison = TRUE
   ),
 
-    site_values = list(
-    id = "site_values",
-    title = "Site Values",
+  # -----------------------------------------------------------------------
+  # Executive Sites: fixed set of four charts and a financial rankings table
+  # -----------------------------------------------------------------------
+  # The UI renders the charts directly; this registry documents their source
+  # requirements and supports availability checks. A missing workbook is
+  # unavailable, not zero. Memberships use the latest valid snapshot.
+
+  site_finances = list(
+    id = "site_finances",
+    title = "Income, Expenses & Net Result",
+    category = "Finance",
+    focus = "Site",
+    source_group = "monthly",
+    required_data = "finance",
+    default_selected = TRUE,
+    preferred_size = "standard",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
+  ),
+
+  site_visits = list(
+    id = "site_visits",
+    title = "Visits Across Sites",
+    category = "Finance",
+    focus = "Site",
+    source_group = "detailed",
+    required_data = "visits",
+    default_selected = TRUE,
+    preferred_size = "standard",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
+  ),
+
+  site_memberships = list(
+    id = "site_memberships",
+    title = "Active Memberships",
+    category = "Finance",
+    focus = "Site",
+    source_group = "detailed",
+    required_data = "memberships",
+    default_selected = TRUE,
+    preferred_size = "standard",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
+  ),
+
+  site_enrolments = list(
+    id = "site_enrolments",
+    title = "Enrolments & Targets",
+    category = "Finance",
+    focus = "Site",
+    source_group = "detailed",
+    required_data = "enrollments",
+    default_selected = TRUE,
+    preferred_size = "standard",
+    supports_year_review = TRUE,
+    supports_comparison = TRUE
+  ),
+
+  site_rankings = list(
+    id = "site_rankings",
+    title = "Site Financial Rankings",
     category = "Finance",
     focus = "Site",
     source_group = "monthly",
@@ -168,97 +156,8 @@ EXECUTIVE_VISUAL_REGISTRY <- list(
     supports_comparison = TRUE
   ),
 
-
   # -----------------------------------------------------------------------
-  # Detailed Site Reports
-  # -----------------------------------------------------------------------
-
-  facility_ranking = list(
-    id = "facility_ranking",
-    title = "Facility Ranking",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = "finance",
-    default_selected = FALSE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  facility_performance = list(
-    id = "facility_performance",
-    title = "Facility Performance Over Time",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = "finance",
-    default_selected = FALSE,
-    preferred_size = "wide",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  facility_discount_mix = list(
-    id = "facility_discount_mix",
-    title = "Facility Discount Mix",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = "discounts",
-    default_selected = FALSE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  facility_discount_trend = list(
-    id = "facility_discount_trend",
-    title = "Discount Opportunity Trend",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = "discounts",
-    default_selected = FALSE,
-    preferred_size = "wide",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  facility_revenue_opportunity = list(
-    id = "facility_revenue_opportunity",
-    title = "Actual vs Potential Revenue",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = c(
-      "finance",
-      "discounts"
-    ),
-    default_selected = FALSE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  facility_capture_rate = list(
-    id = "facility_capture_rate",
-    title = "Facility Revenue Capture Rate",
-    category = "Finance",
-    focus = "Site",
-    source_group = "detailed",
-    required_data = c(
-      "finance",
-      "discounts"
-    ),
-    default_selected = FALSE,
-    preferred_size = "standard",
-    supports_year_review = TRUE,
-    supports_comparison = TRUE
-  ),
-
-  # -----------------------------------------------------------------------
-  # Supporting components
+  # Overview supporting component
   # -----------------------------------------------------------------------
 
   key_insights = list(

@@ -219,25 +219,24 @@ executive_available_years <- function(
   )
 
 
-  if (
-    focus %in%
-      c(
-        "Overview",
-        "Site"
-      )
-  ) {
-
-    monthly_reports <-
-      executive_source_data(
-        dashboard_data = dashboard_data,
-        source_group = "monthly"
-      )
-
-    return(
-      reporting_monthly_years(
-        monthly_reports
-      )
+  if (identical(focus, "Overview")) {
+    monthly_reports <- executive_source_data(
+      dashboard_data = dashboard_data, source_group = "monthly"
     )
+    return(reporting_monthly_years(monthly_reports))
+  }
+
+  if (identical(focus, "Site")) {
+    monthly_reports <- executive_source_data(
+      dashboard_data = dashboard_data, source_group = "monthly"
+    )
+    detailed_reports <- executive_source_data(
+      dashboard_data = dashboard_data, source_group = "detailed"
+    )
+    return(reporting_normalize_years(c(
+      reporting_monthly_years(monthly_reports),
+      reporting_detailed_years(detailed_reports)
+    )))
   }
 
 
@@ -1215,6 +1214,105 @@ executive_supporting_components_ui <- function(
   )
 }
 
+
+# -------------------------------------------------------------------------
+# Executive Sites: fixed presentation cards (no visual-selection controls)
+# -------------------------------------------------------------------------
+# All four plots show every reporting unit for the selected year(s). The
+# more detailed activity, audience and facility breakdowns remain on the
+# existing Site Detail and Site Comparison pages.
+
+executive_site_dashboard_ui <- function(ns, context_label) {
+  # Keep the shared Overview chart UI untouched. Only Sites receives the
+  # fixed header legends and chart-level exact-value hover readouts.
+  charts <- list(
+    list(id = "site_finances", title = "Income, Expenses & Net Result",
+         legend = c("Income", "Expenses")),
+    list(id = "site_visits", title = "Visits Across Sites",
+         legend = c("Direct", "Indirect")),
+    list(id = "site_memberships", title = "Active Memberships",
+         legend = character()),
+    list(id = "site_enrolments", title = "Enrolments & Targets",
+         legend = c("Reported", "Target"))
+  )
+
+  shiny::div(
+    class = "executive-site-grid",
+    style = paste0("display:grid;grid-template-columns:",
+                   "repeat(auto-fit,minmax(min(100%,430px),1fr));",
+                   "gap:10px;margin-bottom:10px;"),
+    shiny::tagList(lapply(charts, function(chart) {
+      legend <- if (length(chart$legend) == 0L) NULL else {
+        shiny::div(
+          class = "executive-site-header-legend",
+          shiny::tagList(lapply(seq_along(chart$legend), function(i) {
+            shiny::span(
+              class = "executive-site-legend-item",
+              shiny::span(class = paste0("executive-site-legend-swatch ",
+                                         if (i == 1L) "primary" else "secondary")),
+              chart$legend[[i]]
+            )
+          }))
+        )
+      }
+      bslib::card(
+        class = "executive-visual-card executive-site-visual-card",
+        full_screen = TRUE,
+        bslib::card_header(
+          shiny::div(
+            class = "executive-visual-card-header",
+            shiny::div(
+              class = "executive-visual-card-heading",
+              shiny::div(class = "chart-header-title", chart$title),
+              shiny::div(class = "chart-header-subtitle", context_label)
+            ),
+            legend
+          )
+        ),
+        shiny::plotOutput(
+          ns(paste0("executive_plot_", chart$id)),
+          height = "305px",
+          hover = shiny::hoverOpts(
+            id = ns(paste0("executive_hover_", chart$id)),
+            delay = 125, delayType = "debounce"
+          )
+        ),
+        shiny::div(
+          class = "executive-site-hover-readout",
+          shiny::textOutput(ns(paste0("executive_hover_value_", chart$id)),
+                            inline = TRUE)
+        )
+      )
+    }))
+  )
+}
+
+executive_site_rankings_card_ui <- function(ns) {
+  bslib::card(
+    class = "executive-dashboard-table-card executive-site-rankings-card",
+    full_screen = TRUE,
+    bslib::card_header(
+      shiny::div(class = "chart-header-title", "Site Financial Rankings")
+    ),
+    shiny::div(class = "executive-site-rankings-table",
+               shiny::tableOutput(ns("site_rankings_table")))
+  )
+}
+
+# Supporting insights are intentionally independent from Overview insights:
+# they explain site rankings and operational coverage for the chosen year.
+executive_site_insights_card_ui <- function(ns) {
+  bslib::card(
+    class = "executive-insights-card executive-site-insights-card",
+    full_screen = TRUE,
+    bslib::card_header("Site Key Insights"),
+    shiny::div(
+      class = "executive-site-insights-content",
+      shiny::uiOutput(ns("site_key_insights"))
+    )
+  )
+}
+
 mod_executive_dashboard_ui <- function(id) {
 
   ns <- shiny::NS(id)
@@ -1297,24 +1395,16 @@ mod_executive_dashboard_ui <- function(id) {
                     )
                   ),
 
-                  conditionalPanel(
-                    condition =
-                      "input.dashboard_section == 'site'",
-
-                    uiOutput(
-                      ns("site_selector")
-                    ),
-
-                    ns = ns
-                  ),
+                  # The Sites presentation compares all reporting units.
+                  # Individual-site drill-downs remain on Site Detail.
 
                   div(
                     class = "executive-dashboard-actions",
 
-                    # Visual selection remains available for Site and Metrics.
-                    # Overview uses a consistent set of charts.
+                    # Fixed Overview/Sites charts need no visual picker.
+                    # The legacy picker remains for the later Venues redesign.
                     conditionalPanel(
-                      condition = "input.dashboard_section != 'finance'",
+                      condition = "input.dashboard_section == 'metrics'",
                       actionButton(
                         ns("choose_visuals"),
                         "Choose Visuals",
@@ -1351,9 +1441,8 @@ mod_executive_dashboard_ui <- function(id) {
 
                   col_widths = c(
                     2,
-                    4,
-                    2,
-                    4
+                    5,
+                    5
                   )
                 )
               ),
@@ -1578,33 +1667,11 @@ mod_executive_dashboard_server <- function(
 
             "All Monash Sport"
 
-          } else if (
-            identical(
-              focus,
-              "Metrics"
-            )
-          ) {
-
+          } else if (identical(focus, "Metrics")) {
             "All Venues"
-
           } else {
-
-            monthly_reports <-
-              executive_source_data(
-                dashboard_data =
-                  dashboard_data_value(),
-                source_group =
-                  "monthly"
-              )
-
-            executive_reconcile_site_selection(
-              site =
-                input$site,
-              choices =
-                executive_site_choices(
-                  monthly_reports
-                )
-            )
+            # Site is a fixed all-sites executive comparison.
+            "All Monash Sport"
           }
 
 
@@ -2104,23 +2171,11 @@ mod_executive_dashboard_server <- function(
 
             "All Monash Sport"
 
-          } else if (
-            identical(
-              focus,
-              "Metrics"
-            )
-          ) {
-
+          } else if (identical(focus, "Metrics")) {
             "All Venues"
-
           } else {
-
-            executive_reconcile_site_selection(
-              site =
-                input$site,
-              choices =
-                available_executive_sites()
-            )
+            # No individual Site selector on the executive presentation.
+            "All Monash Sport"
           }
 
         list(
@@ -2137,6 +2192,363 @@ mod_executive_dashboard_server <- function(
             effective_site
         )
       })
+
+
+      # ---------------------------------------------------------------
+      # Executive Site presentation data
+      # ---------------------------------------------------------------
+      # Finance uses the existing validated Annual Site Summary. Operational
+      # metrics are grouped by report year + reporting unit + campus, then
+      # calculated using the same helpers as Site Detail. We never sum YTD
+      # and monthly values or add successive membership snapshots together.
+
+      executive_site_financial_rows <- reactive({
+        rows <- calculate_site_annual_finance(executive_monthly_reports())
+        years <- executive_selected_years()
+        rows[rows$report_year %in% years, , drop = FALSE]
+      })
+
+      # Reusable operational data preparation for any requested year.
+      # Site charts still use only the selected reporting year(s).
+      executive_site_operational_for_years <- function(years) {
+        reports <- executive_detailed_site_reports()
+        years <- suppressWarnings(as.integer(years))
+        years <- years[!is.na(years)]
+        empty <- data.frame(
+          report_year = integer(), site = character(),
+          direct = double(), indirect = double(),
+          active_members = double(), measure = character(),
+          actual = double(), target = double(),
+          report_unit = character(), campus = character(),
+          stringsAsFactors = FALSE
+        )
+        if (is.null(reports) || !is.list(reports) ||
+            length(years) == 0L) return(empty)
+
+        table_names <- c("visits", "memberships", "enrollments")
+        datasets <- lapply(table_names, function(name) {
+          data <- reports[[name]]
+          if (is.null(data) || !is.data.frame(data) ||
+              !all(c("report_year", "report_unit", "campus") %in% names(data))) {
+            return(NULL)
+          }
+          data[!is.na(data$report_year) & data$report_year %in% years &
+                 !is.na(data$report_unit) & nzchar(trimws(data$report_unit)),
+               , drop = FALSE]
+        })
+        names(datasets) <- table_names
+        keys <- lapply(datasets, function(data) {
+          if (is.null(data) || nrow(data) == 0L) return(NULL)
+          unique(data[c("report_year", "report_unit", "campus")])
+        })
+        keys <- Filter(Negate(is.null), keys)
+        if (length(keys) == 0L) return(empty)
+        keys <- unique(do.call(rbind, keys))
+        keys$campus <- as.character(keys$campus)
+        keys$campus[is.na(keys$campus) | !nzchar(keys$campus)] <- "Unspecified"
+
+        catalogue <- reporting_detailed_site_catalogue(reports)
+        catalogue_keys <- if (nrow(catalogue) > 0L) {
+          reporting_site_identity_key(catalogue$report_unit, catalogue$campus)
+        } else character()
+        known <- if (exists("KNOWN_SITE_CATALOGUE", inherits = TRUE)) {
+          get("KNOWN_SITE_CATALOGUE", inherits = TRUE)
+        } else NULL
+
+        result <- lapply(seq_len(nrow(keys)), function(i) {
+          year <- as.integer(keys$report_year[[i]])
+          unit <- trimws(as.character(keys$report_unit[[i]]))
+          campus <- keys$campus[[i]]
+          key <- reporting_site_identity_key(unit, campus)
+          catalogue_index <- match(key, catalogue_keys)
+          site_name <- if (!is.na(catalogue_index)) {
+            as.character(catalogue$display_name[[catalogue_index]])
+          } else if (!is.null(known)) {
+            known_index <- match(key, reporting_site_identity_key(
+              known$report_unit, known$campus))
+            if (!is.na(known_index)) as.character(known$display_name[[known_index]])
+            else paste(unit, campus, sep = " · ")
+          } else paste(unit, campus, sep = " · ")
+
+          subset_for <- function(name) {
+            data <- datasets[[name]]
+            if (is.null(data) || nrow(data) == 0L) return(NULL)
+            mask <- !is.na(data$report_year) & data$report_year == year &
+              reporting_site_identity_key(data$report_unit, data$campus) == key
+            data[!is.na(mask) & mask, , drop = FALSE]
+          }
+          visits <- subset_for("visits")
+          memberships <- subset_for("memberships")
+          enrollments <- subset_for("enrollments")
+
+          direct <- site_detail_visit_value(visits, "Direct", "Total")
+          indirect <- site_detail_visit_value(visits, "Indirect", "Total")
+          active <- site_detail_latest_membership_value(memberships, "Total Active")
+
+          # Preserve distinct enrolment definitions, especially Aquatics and
+          # Participation Programs, instead of combining unlike measures.
+          enrolment_measure <- "Total Active"
+          if (!is.null(enrollments) && nrow(enrollments) > 0L &&
+              "metric" %in% names(enrollments)) {
+            actual_choices <- c("Total Active", "Total Enrolments", "Enrolments")
+            available <- unique(as.character(enrollments$metric))
+            matched <- actual_choices[actual_choices %in% available]
+            if (length(matched) > 0L) enrolment_measure <- matched[[1L]]
+          }
+          enrolment <- site_detail_latest_enrolment_metric(enrollments, enrolment_measure)
+          target <- site_detail_latest_enrolment_metric(enrollments, "Target")
+          data.frame(
+            report_year = year, site = site_name, direct = direct,
+            indirect = indirect, active_members = active,
+            measure = enrolment_measure, actual = enrolment$value,
+            target = target$value, report_unit = unit, campus = campus,
+            stringsAsFactors = FALSE
+          )
+        })
+        rows <- do.call(rbind, result)
+        rownames(rows) <- NULL
+        rows
+      }
+
+      # Preserve the existing selected-year behaviour for charts.
+      executive_site_operational_rows <- reactive({
+        executive_site_operational_for_years(
+          executive_selected_years()
+        )
+      })
+
+      executive_site_visits_rows <- reactive({
+        x <- executive_site_operational_rows()
+        x[c("report_year", "site", "direct", "indirect")]
+      })
+      executive_site_membership_rows <- reactive({
+        x <- executive_site_operational_rows()
+        x[c("report_year", "site", "active_members")]
+      })
+      executive_site_enrolment_rows <- reactive({
+        x <- executive_site_operational_rows()
+        x <- x[is.finite(x$actual) | is.finite(x$target), , drop = FALSE]
+        x[c("report_year", "site", "measure", "actual", "target")]
+      })
+
+      executive_site_snapshot_kpis <- function(year) {
+        # Retrieve the requested year's operational records,
+        # even when it isn't selected in the chart filters.
+        x <- executive_site_operational_for_years(year)
+        finance <- executive_site_financial_rows()
+        finance <- executive_site_financial_rows()
+        if (length(year) == 0L || is.na(year)) {
+          return(list(visits = NA_real_, visit_sites = 0L, visit_names = character(),
+                      members = NA_real_, member_sites = 0L, member_names = character(),
+                      programmes = NA_real_, programme_sites = 0L, programme_names = character(),
+                      sites = 0L))
+        }
+        x <- x[x$report_year == year, , drop = FALSE]
+        finance <- finance[finance$report_year == year, , drop = FALSE]
+        complete_visits <- is.finite(x$direct) & is.finite(x$indirect)
+        member_rows <- is.finite(x$active_members)
+        programme_rows <- grepl("participation program", x$report_unit,
+                                ignore.case = TRUE) & is.finite(x$actual)
+        reported_sites <- unique(c(as.character(finance$site), as.character(x$site)))
+        reported_sites <- reported_sites[!is.na(reported_sites) & nzchar(reported_sites)]
+        list(
+          visits = if (any(complete_visits)) sum(x$direct[complete_visits] +
+                         x$indirect[complete_visits]) else NA_real_,
+          visit_sites = sum(complete_visits),
+          visit_names = sort(unique(x$site[complete_visits])),
+          members = if (any(member_rows)) sum(x$active_members[member_rows]) else NA_real_,
+          member_sites = sum(member_rows),
+          member_names = sort(unique(x$site[member_rows])),
+          programmes = if (any(programme_rows)) sum(x$actual[programme_rows]) else NA_real_,
+          programme_sites = sum(programme_rows),
+          programme_names = sort(unique(x$site[programme_rows])),
+          sites = length(reported_sites)
+        )
+      }
+
+      output$executive_plot_site_finances <- renderPlot({
+        x <- executive_site_financial_rows()
+        validate(need(nrow(x) > 0L &&
+                      any(is.finite(x$income_actual) & is.finite(x$expenses_actual)),
+                      "No site financial totals are available for the selected year(s)."))
+        plot_executive_site_finances(x)
+      })
+
+      output$executive_plot_site_visits <- renderPlot({
+        x <- executive_site_visits_rows()
+        validate(need(nrow(x) > 0L &&
+                      any(is.finite(x$direct) | is.finite(x$indirect)),
+                      "No reported Site visit totals are available for the selected year(s)."))
+        plot_executive_site_visits(x)
+      })
+
+      output$executive_plot_site_memberships <- renderPlot({
+        x <- executive_site_membership_rows()
+        validate(need(nrow(x) > 0L && any(is.finite(x$active_members)),
+                      "No active membership snapshots are reported for the selected year(s)."))
+        plot_executive_site_memberships(x)
+      })
+
+      output$executive_plot_site_enrolments <- renderPlot({
+        x <- executive_site_enrolment_rows()
+        validate(need(nrow(x) > 0L &&
+                      any(is.finite(x$actual) | is.finite(x$target)),
+                      "No comparable enrolment measures are available for the selected year(s)."))
+        plot_executive_site_enrolments(x)
+      })
+
+      # ---------------------------------------------------------------
+      # Executive Sites: per-row exact-value hover readouts
+      # ---------------------------------------------------------------
+      # Base R horizontal bar charts place the first row at y = n and the
+      # last at y = 1. Match chart sorting before converting hovered y.
+      executive_site_hover_rows <- function(data, chart) {
+        required <- switch(
+          chart,
+          site_finances = c("income_actual", "expenses_actual", "net_actual"),
+          site_visits = c("direct", "indirect"),
+          site_memberships = "active_members",
+          site_enrolments = c("measure", "actual", "target")
+        )
+        key <- if (identical(chart, "site_enrolments")) {
+          c("report_year", "site", "measure")
+        } else {
+          c("report_year", "site")
+        }
+        rows <- executive_site_plot_rows(data, required, "Site hover", key = key)
+        single_year <- length(unique(rows$report_year)) == 1L
+        if (identical(chart, "site_finances") && single_year) {
+          rows <- rows[order(-rows$income_actual, rows$site,
+                             na.last = TRUE), , drop = FALSE]
+        }
+        if (identical(chart, "site_visits") && single_year) {
+          totals <- ifelse(is.finite(rows$direct) & is.finite(rows$indirect),
+                           rows$direct + rows$indirect, NA_real_)
+          rows <- rows[order(-totals, rows$site, na.last = TRUE), , drop = FALSE]
+        }
+        if (identical(chart, "site_memberships")) {
+          rows <- rows[is.finite(rows$active_members), , drop = FALSE]
+          if (single_year) {
+            rows <- rows[order(-rows$active_members, rows$site), , drop = FALSE]
+          }
+        }
+        if (identical(chart, "site_enrolments") && single_year) {
+          rows <- rows[order(rows$site, rows$measure), , drop = FALSE]
+        }
+        rows
+      }
+
+      executive_site_hover_text <- function(data, hover, chart) {
+        instruction <- "Hover over a site bar to inspect exact values."
+        if (is.null(hover) || is.null(hover$y) ||
+            !is.finite(hover$y)) return(instruction)
+        rows <- tryCatch(executive_site_hover_rows(data, chart),
+                         error = function(e) NULL)
+        if (is.null(rows) || nrow(rows) == 0L) return(instruction)
+        y <- round(hover$y)
+        if (abs(hover$y - y) > 0.46 || y < 1L || y > nrow(rows)) {
+          return(instruction)
+        }
+        record <- rows[nrow(rows) - as.integer(y) + 1L, , drop = FALSE]
+        value_count <- function(field) {
+          value <- suppressWarnings(as.numeric(record[[field]][[1L]]))
+          if (!is.finite(value)) return("Not reported")
+          format(round(value), big.mark = ",", scientific = FALSE, trim = TRUE)
+        }
+        value_currency <- function(field) {
+          format_executive_hover_value(record[[field]])
+        }
+        label <- paste0(record$site[[1L]], " (", record$report_year[[1L]], ")")
+        details <- switch(chart,
+          site_finances = paste0(
+            "Income ", value_currency("income_actual"),
+            " | Expenses ", value_currency("expenses_actual"),
+            " | Net Result ", value_currency("net_actual")
+          ),
+          site_visits = paste0(
+            "Direct ", value_count("direct"),
+            " | Indirect ", value_count("indirect"),
+            " | Total ",
+            if (is.finite(record$direct[[1L]]) &&
+                is.finite(record$indirect[[1L]])) {
+              executive_site_format_count(record$direct[[1L]] +
+                                          record$indirect[[1L]])
+            } else "Not reported"
+          ),
+          site_memberships = paste0("Active Members ",
+                                    value_count("active_members")),
+          site_enrolments = paste0(
+            record$measure[[1L]], ": ", value_count("actual"),
+            " | Target ", value_count("target")
+          )
+        )
+        paste(label, details, sep = " | ")
+      }
+
+      output$executive_hover_value_site_finances <- renderText({
+        executive_site_hover_text(executive_site_financial_rows(),
+                                  input$executive_hover_site_finances,
+                                  "site_finances")
+      })
+      output$executive_hover_value_site_visits <- renderText({
+        executive_site_hover_text(executive_site_visits_rows(),
+                                  input$executive_hover_site_visits,
+                                  "site_visits")
+      })
+      output$executive_hover_value_site_memberships <- renderText({
+        executive_site_hover_text(executive_site_membership_rows(),
+                                  input$executive_hover_site_memberships,
+                                  "site_memberships")
+      })
+      output$executive_hover_value_site_enrolments <- renderText({
+        executive_site_hover_text(executive_site_enrolment_rows(),
+                                  input$executive_hover_site_enrolments,
+                                  "site_enrolments")
+      })
+
+      output$site_rankings_table <- renderTable({
+        x <- executive_site_financial_rows()
+        validate(need(nrow(x) > 0L, "No site financial rankings are available."))
+        x <- x[order(x$report_year, -x$income_actual, x$site,
+                     na.last = TRUE), , drop = FALSE]
+        rank_metric <- function(values, descending = TRUE) {
+          result <- rep(NA_integer_, length(values))
+          ok <- is.finite(values)
+          if (any(ok)) result[ok] <- as.integer(rank(if (descending) -values[ok]
+                                                          else values[ok],
+                                                      ties.method = "min"))
+          result
+        }
+        rank_for_year <- function(values, years, descending = TRUE) {
+          result <- rep(NA_integer_, length(values))
+          for (year in unique(years)) {
+            idx <- which(years == year)
+            result[idx] <- rank_metric(values[idx], descending)
+          }
+          result
+        }
+        money <- function(values) {
+          vapply(values, function(value) {
+            if (!is.finite(value)) return("—")
+            paste0(if (value < 0) "-" else "", "$",
+                   formatC(abs(value), format = "f", digits = 2, big.mark = ","))
+          }, character(1))
+        }
+        show_year <- length(unique(x$report_year)) > 1L
+        table <- data.frame(
+          Site = x$site,
+          `Income Rank` = rank_for_year(x$income_actual, x$report_year),
+          Income = money(x$income_actual),
+          `Expense Rank` = rank_for_year(x$expenses_actual, x$report_year),
+          Expenses = money(x$expenses_actual),
+          `Net Rank` = rank_for_year(x$net_actual, x$report_year),
+          `Net Result` = money(x$net_actual),
+          check.names = FALSE, stringsAsFactors = FALSE
+        )
+        if (show_year) table <- cbind(Year = x$report_year, table)
+        table
+      }, striped = TRUE, hover = TRUE, bordered = FALSE,
+      spacing = "s", rownames = FALSE)
 
       # -------------------------------------------------------------------
       # Executive Finance data
@@ -2161,21 +2573,6 @@ mod_executive_dashboard_server <- function(
             "detailed"
         )
       })
-
-      executive_facility_annual_finance <- reactive({
-
-        calculate_facility_annual_finance(
-          executive_detailed_site_reports()
-        )
-      })
-
-      executive_facility_annual_discounts <- reactive({
-
-        calculate_facility_annual_discounts(
-          executive_detailed_site_reports()
-        )
-      })
-
 
       executive_scoped_monthly_reports <- reactive({
 
@@ -2893,7 +3290,209 @@ mod_executive_dashboard_server <- function(
 
 
         # ---------------------------------------------------------------
-        # Overview / Site finance
+        # Sites: four operational KPIs, independently sourced from detailed
+        # reports. Missing sheets remain unavailable, never zero.
+        # ---------------------------------------------------------------
+        if (identical(focus, "Site")) {
+          year <- suppressWarnings(as.integer(context$year))
+          current <- executive_site_snapshot_kpis(year)
+          previous <- if (identical(context$view_mode, "Comparison") &&
+                          !is.null(context$comparison_year)) {
+            executive_site_snapshot_kpis(
+              suppressWarnings(as.integer(context$comparison_year))
+            )
+          } else NULL
+          comparison <- function(field, coverage = NULL) {
+            if (is.null(previous)) return(NULL)
+            # A year-on-year change is misleading if the contributing sites
+            # differ. Display an explicit coverage message instead.
+            if (!is.null(coverage) &&
+                !identical(current[[coverage]], previous[[coverage]])) {
+              return("Reporting coverage differs between years")
+            }
+            executive_count_change_label(current[[field]], previous[[field]],
+                                         context$comparison_year)
+          }
+          count_or_dash <- function(value) {
+            if (!is.finite(value)) "—" else executive_format_count(value)
+          }
+          
+          # -------------------------------------------------------------
+          # Visits Growth
+          # Year Review compares with the preceding calendar year.
+          # Comparison uses the explicitly selected comparison year.
+          # -------------------------------------------------------------
+
+          baseline_year <- if (
+            identical(context$view_mode, "Comparison") &&
+              !is.null(context$comparison_year)
+          ) {
+            as.integer(context$comparison_year)
+          } else {
+            year - 1L
+          }
+
+          baseline <- executive_site_snapshot_kpis(baseline_year)
+
+          same_visit_sites <-
+            length(current$visit_names) > 0L &&
+            identical(current$visit_names, baseline$visit_names)
+
+          comparable_visits <-
+            same_visit_sites &&
+            is.finite(current$visits) &&
+            is.finite(baseline$visits) &&
+            baseline$visits > 0
+
+          if (comparable_visits) {
+            growth <- 100 * (
+              current$visits - baseline$visits
+            ) / baseline$visits
+
+            growth_value <- paste0(
+              if (growth > 0) "+" else "",
+              formatC(growth, format = "f", digits = 1),
+              "%"
+            )
+
+            growth_note <- paste0("vs ", baseline_year)
+
+          } else {
+            growth_value <- "—"
+
+            growth_note <- if (
+              is.finite(current$visits) &&
+              is.finite(baseline$visits) &&
+              baseline$visits > 0
+            ) {
+              paste0("Reporting coverage differs vs ", baseline_year)
+            } else {
+              paste0("No comparable visit data for ", baseline_year)
+            }
+          }
+
+          # -------------------------------------------------------------
+          # Sites with Positive Net Result
+          # Count sites where annual Income exceeds Expenses.
+          # Exclude sites without a reported financial result.
+          # -------------------------------------------------------------
+
+          site_finance <- executive_site_financial_rows()
+
+          positive_sites <- function(selected_year) {
+            if (
+              length(selected_year) != 1L ||
+              is.na(selected_year)
+            ) {
+              return(list(
+                positive = NA_integer_,
+                total = 0L,
+                names = character()
+              ))
+            }
+
+            rows <- site_finance[
+              !is.na(site_finance$report_year) &
+                site_finance$report_year == selected_year &
+                !is.na(site_finance$site) &
+                is.finite(site_finance$net_actual),
+              ,
+              drop = FALSE
+            ]
+
+            site_names <- sort(unique(as.character(rows$site)))
+
+            list(
+              positive = if (nrow(rows) > 0L) {
+                sum(rows$net_actual > 0)
+              } else {
+                NA_integer_
+              },
+              total = length(site_names),
+              names = site_names
+            )
+          }
+
+          positive_current <- positive_sites(year)
+
+          positive_value <- if (
+            is.finite(positive_current$positive)
+          ) {
+            paste0(
+              positive_current$positive,
+              " / ",
+              positive_current$total
+            )
+          } else {
+            "—"
+          }
+
+          positive_note <- paste0(
+            "Sites with Net Result above $0 in ", year
+          )
+
+          if (
+            identical(context$view_mode, "Comparison") &&
+            !is.null(context$comparison_year)
+          ) {
+            positive_baseline <- positive_sites(
+              as.integer(context$comparison_year)
+            )
+
+            if (
+              is.finite(positive_current$positive) &&
+              is.finite(positive_baseline$positive) &&
+              identical(
+                positive_current$names,
+                positive_baseline$names
+              )
+            ) {
+              difference <-
+                positive_current$positive -
+                positive_baseline$positive
+
+              positive_note <- paste0(
+                if (difference > 0) "+" else "",
+                difference,
+                " positive sites vs ",
+                context$comparison_year
+              )
+            } else {
+              positive_note <-
+                "Comparison unavailable or reporting coverage differs"
+            }
+          }
+
+          return(list(
+            list(title = "Total Visits",
+                 value = count_or_dash(current$visits),
+                 comparison = if (!is.null(previous)) comparison("visits", "visit_names") else
+                   paste0(current$visit_sites, " sites reporting both visit types"),
+                 icon = "people"),
+            list(title = "Active Members", value = count_or_dash(current$members),
+                 comparison = if (!is.null(previous)) comparison("members", "member_names") else
+                   paste0(current$member_sites, " sites reporting"),
+                 icon = "person-badge"),
+            # Change in comparable visits across reporting years.
+            list(
+              title = "Visits Growth",
+              value = growth_value,
+              comparison = growth_note,
+              icon = "graph-up-arrow"
+            ),
+
+            # Share of sites generating a positive financial result.
+            list(
+              title = "Sites with Positive Net Result",
+              value = positive_value,
+              comparison = positive_note,
+              icon = "check-circle"
+            )
+          ))
+        }
+
+        # ---------------------------------------------------------------
+        # Overview financial KPIs (unchanged)
         # ---------------------------------------------------------------
 
         finance <-
@@ -3163,71 +3762,6 @@ mod_executive_dashboard_server <- function(
       # Executive all-site snapshot data
       # -------------------------------------------------------------------
 
-      executive_site_trend_finance <- reactive({
-
-        x <-
-          calculate_site_annual_finance(
-            executive_monthly_reports()
-          )
-
-        context <- executive_context()
-
-        selected_year <-
-          suppressWarnings(
-            as.integer(
-              context$year
-            )
-          )
-
-        if (
-          is.null(x) ||
-            !is.data.frame(x) ||
-            nrow(x) == 0L ||
-            is.na(selected_year)
-        ) {
-          return(
-            x[0, , drop = FALSE]
-          )
-        }
-
-        if (
-          identical(
-            context$view_mode,
-            "Comparison"
-          ) &&
-            !is.null(
-              context$comparison_year
-            )
-        ) {
-
-          comparison_year <-
-            suppressWarnings(
-              as.integer(
-                context$comparison_year
-              )
-            )
-
-          years <- c(
-            selected_year,
-            comparison_year
-          )
-
-          return(
-            x[
-              x$report_year %in% years,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x[
-          x$report_year <= selected_year,
-          ,
-          drop = FALSE
-        ]
-      })
-
       executive_snapshot_year <- reactive({
 
         context <- executive_context()
@@ -3296,190 +3830,6 @@ mod_executive_dashboard_server <- function(
       })
 
 
-      executive_site_snapshot_discounts <- reactive({
-
-        x <-
-          calculate_site_annual_discounts(
-            executive_monthly_reports()
-          )
-
-        year <- executive_snapshot_year()
-
-        if (is.na(year)) {
-          return(
-            x[0, , drop = FALSE]
-          )
-        }
-
-        x[
-          x$report_year == year,
-          ,
-          drop = FALSE
-        ]
-      })
-
-      executive_facility_snapshot_finance <- reactive({
-
-        context <- executive_context()
-
-        if (
-          is.null(context$site) ||
-            identical(
-              context$site,
-              "All Monash Sport"
-            )
-        ) {
-          return(
-            executive_facility_annual_finance()[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x <- executive_facility_annual_finance()
-
-        x <-
-          filter_facility_finance_by_site(
-            x,
-            context$site
-          )
-
-        year <- executive_snapshot_year()
-
-        if (is.na(year)) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x[
-          x$report_year == year,
-          ,
-          drop = FALSE
-        ]
-      })
-
-      executive_facility_snapshot_discounts <- reactive({
-
-        context <- executive_context()
-
-        x <- executive_facility_annual_discounts()
-
-        if (
-          is.null(x) ||
-            !is.data.frame(x) ||
-            nrow(x) == 0L
-        ) {
-          return(x)
-        }
-
-        if (
-          is.null(context$site) ||
-            identical(
-              context$site,
-              "All Monash Sport"
-            )
-        ) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x <-
-          filter_facility_discounts_by_site(
-            x,
-            context$site
-          )
-
-        year <- executive_snapshot_year()
-
-        if (is.na(year)) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x[
-          x$report_year == year,
-          ,
-          drop = FALSE
-        ]
-      })
-
-      executive_facility_trend_finance <- reactive({
-
-        context <- executive_context()
-
-        x <- executive_facility_annual_finance()
-
-        if (
-          is.null(x) ||
-            !is.data.frame(x) ||
-            nrow(x) == 0L
-        ) {
-          return(x)
-        }
-
-        if (
-          is.null(context$site) ||
-            identical(
-              context$site,
-              "All Monash Sport"
-            )
-        ) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x <-
-          filter_facility_finance_by_site(
-            x,
-            context$site
-          )
-
-        years <-
-          executive_context_trend_years(
-            context = context,
-            available_years =
-              x$report_year
-          )
-
-        if (length(years) == 0L) {
-          return(
-            x[
-              0,
-              ,
-              drop = FALSE
-            ]
-          )
-        }
-
-        x[
-          x$report_year %in% years,
-          ,
-          drop = FALSE
-        ]
-      })
-
       validate_executive_monthly_data <- function(
           x
       ) {
@@ -3521,49 +3871,6 @@ mod_executive_dashboard_server <- function(
               "No finance data is available",
               "for the selected Executive Dashboard context."
             )
-          )
-        )
-      }
-
-      validate_executive_site_snapshot_data <- function(
-          x,
-          empty_message
-      ) {
-
-        reports <-
-          executive_monthly_reports()
-
-        duplicate_years <-
-          overview_duplicate_report_years(
-            reports
-          )
-
-        validate(
-          need(
-            !is.null(reports),
-            paste(
-              "Upload at least one Monthly Site Report",
-              "on the Data page."
-            )
-          ),
-
-          need(
-            length(
-              duplicate_years
-            ) == 0L,
-            paste0(
-              "More than one Monthly Site Report is active for: ",
-              paste(
-                duplicate_years,
-                collapse = ", "
-              ),
-              ". Delete the superseded file on the Data page."
-            )
-          ),
-
-          need(
-            nrow(x) > 0L,
-            empty_message
           )
         )
       }
@@ -4058,678 +4365,72 @@ mod_executive_dashboard_server <- function(
         )
       })
       
-      # -------------------------------------------------------------------
-      # Executive Site Comparison plots
-      # -------------------------------------------------------------------
-
-      output$executive_plot_site_performance <-
-        renderPlot(
-          {
-
-            x <-
-              executive_site_trend_finance()
-
-            validate_executive_site_snapshot_data(
-              x,
-              paste(
-                "No site finance data is available",
-                "for the selected period."
-              )
-            )
-
-            metric <-
-              input$metric_site_performance
-
-            if (
-              is.null(metric) ||
-                !metric %in% FINANCE_METRICS
-            ) {
-              metric <- "Net Result"
-            }
-
-            values <-
-              site_finance_values(
-                x,
-                metric,
-                "Actual"
-              )
-
-            validate(
-              need(
-                any(
-                  is.finite(values)
-                ),
-                paste(
-                  "No Actual",
-                  metric,
-                  "values are available for the selected period."
-                )
-              )
-            )
-
-            plot_site_performance_over_time(
-              x,
-              metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-
-      output$executive_plot_site_ranking <-
-        renderPlot(
-          {
-
-            x <-
-              executive_site_snapshot_finance()
-
-            validate_executive_site_snapshot_data(
-              x,
-              paste(
-                "No site finance data is available",
-                "for the selected year."
-              )
-            )
-
-            metric <-
-              input$metric_site_ranking
-
-            if (
-              is.null(metric) ||
-                !metric %in% FINANCE_METRICS
-            ) {
-              metric <- "Net Result"
-            }
-
-            values <-
-              site_finance_values(
-                x,
-                metric,
-                "Actual"
-              )
-
-            validate(
-              need(
-                any(
-                  is.finite(values)
-                ),
-                paste(
-                  "No Actual",
-                  metric,
-                  "values are available for the selected year."
-                )
-              )
-            )
-
-            plot_site_ranking(
-              x,
-              metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_site_budget_performance <-
-        renderPlot(
-          {
-
-            x <-
-              executive_site_snapshot_finance()
-
-            validate_executive_site_snapshot_data(
-              x,
-              paste(
-                "No site finance data is available",
-                "for the selected year."
-              )
-            )
-
-            metric <-
-              input$metric_site_budget_performance
-
-            if (
-              is.null(metric) ||
-                !metric %in% FINANCE_METRICS
-            ) {
-              metric <- "Net Result"
-            }
-
-            actual <-
-              site_finance_values(
-                x,
-                metric,
-                "Actual"
-              )
-
-            budget <-
-              site_finance_values(
-                x,
-                metric,
-                "Budget"
-              )
-
-            complete <-
-              is.finite(actual) &
-              is.finite(budget)
-
-            validate(
-              need(
-                any(complete),
-                paste(
-                  "Complete Budget and Actual",
-                  metric,
-                  "values are not available for the selected year."
-                )
-              )
-            )
-
-            plot_site_budget_performance(
-              x,
-              metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_site_revenue_opportunity <-
-        renderPlot(
-          {
-
-            x <-
-              executive_site_snapshot_revenue()
-
-            validate_executive_site_snapshot_data(
-              x,
-              paste(
-                "No site revenue opportunity data is available",
-                "for the selected year."
-              )
-            )
-
-            complete <-
-              is.finite(
-                x$actual_income
-              ) &
-              is.finite(
-                x$discount_opportunity
-              ) &
-              is.finite(
-                x$potential_revenue
-              )
-
-            validate(
-              need(
-                any(complete),
-                paste(
-                  "No complete revenue opportunity values",
-                  "are available for the selected year."
-                )
-              )
-            )
-
-            plot_site_revenue_opportunity(
-              x
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_site_discount_mix <-
-        renderPlot(
-          {
-
-            x <-
-              executive_site_snapshot_discounts()
-
-            validate_executive_site_snapshot_data(
-              x,
-              paste(
-                "No site discount data is available",
-                "for the selected year."
-              )
-            )
-
-            complete <-
-              is.finite(
-                x$student_discount
-              ) &
-              is.finite(
-                x$staff_discount
-              ) &
-              is.finite(
-                x$other_discount
-              ) &
-              is.finite(
-                x$total_discount
-              ) &
-              x$total_discount > 0
-
-            validate(
-              need(
-                any(complete),
-                paste(
-                  "No complete discount mix values",
-                  "are available for the selected year."
-                )
-              )
-            )
-
-            plot_site_discount_mix(
-              x
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      # -------------------------------------------------------------------
-      # Executive Facility plots
-      # -------------------------------------------------------------------
-
-      output$executive_plot_facility_ranking <-
-        renderPlot(
-          {
-
-            reports <-
-              executive_detailed_site_reports()
-
-            context <-
-              executive_context()
-
-            validate(
-              need(
-                !is.null(reports),
-                paste(
-                  "Upload the relevant Detailed Site Report",
-                  "on the Data page."
-                )
-              ),
-
-              need(
-                !identical(
-                  context$site,
-                  "All Monash Sport"
-                ),
-                paste(
-                  "Select a specific Site to view",
-                  "facility-level performance."
-                )
-              )
-            )
-
-            x <-
-              executive_facility_snapshot_finance()
-
-            validate(
-              need(
-                nrow(x) > 0L,
-                paste(
-                  "No facility finance data is available",
-                  "for the selected site and year."
-                )
-              )
-            )
-
-            metric <-
-              input$metric_facility_ranking
-
-            if (
-              is.null(metric) ||
-                !metric %in% FINANCE_METRICS
-            ) {
-              metric <- "Net Result"
-            }
-
-            values <-
-              facility_finance_values(
-                x,
-                metric,
-                "Actual"
-              )
-
-            validate(
-              need(
-                any(
-                  is.finite(values)
-                ),
-                paste(
-                  "No Actual",
-                  metric,
-                  "values are available for the selected site and year."
-                )
-              )
-            )
-
-            plot_facility_ranking(
-              x,
-              metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_facility_performance <-
-        renderPlot(
-          {
-
-            reports <-
-              executive_detailed_site_reports()
-
-            context <-
-              executive_context()
-
-            validate(
-              need(
-                !is.null(reports),
-                paste(
-                  "Upload the relevant Detailed Site Reports",
-                  "on the Data page."
-                )
-              ),
-
-              need(
-                !identical(
-                  context$site,
-                  "All Monash Sport"
-                ),
-                paste(
-                  "Select a specific Site to view",
-                  "facility-level performance."
-                )
-              )
-            )
-
-            x <-
-              executive_facility_trend_finance()
-
-            validate(
-              need(
-                nrow(x) > 0L,
-                paste(
-                  "No facility finance data is available",
-                  "for the selected site and period."
-                )
-              )
-            )
-
-            years <-
-              sort(
-                unique(
-                  x$report_year[
-                    !is.na(
-                      x$report_year
-                    )
-                  ]
-                )
-              )
-
-            validate(
-              need(
-                length(years) >= 2L,
-                paste(
-                  "Multiple Detailed Site Report years are required",
-                  "to show facility performance over time."
-                )
-              )
-            )
-
-            metric <-
-              input$metric_facility_performance
-
-            if (
-              is.null(metric) ||
-                !metric %in% FINANCE_METRICS
-            ) {
-              metric <- "Net Result"
-            }
-
-            values <-
-              facility_finance_values(
-                x,
-                metric,
-                "Actual"
-              )
-
-            validate(
-              need(
-                any(
-                  is.finite(values)
-                ),
-                paste(
-                  "No Actual",
-                  metric,
-                  "values are available for the selected site and period."
-                )
-              )
-            )
-
-            plot_facility_performance_over_time(
-              x,
-              metric
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-      
-      output$executive_plot_facility_discount_mix <-
-        renderPlot(
-          {
-
-            reports <-
-              executive_detailed_site_reports()
-
-            context <-
-              executive_context()
-
-            validate(
-              need(
-                !is.null(reports),
-                paste(
-                  "Upload the relevant Detailed Site Report",
-                  "on the Data page."
-                )
-              ),
-
-              need(
-                !identical(
-                  context$site,
-                  "All Monash Sport"
-                ),
-                paste(
-                  "Select a specific Site to view",
-                  "facility-level discount mix."
-                )
-              )
-            )
-
-            x <-
-              executive_facility_snapshot_discounts()
-
-            validate(
-              need(
-                nrow(x) > 0L,
-                paste(
-                  "No facility discount data is available",
-                  "for the selected site and year."
-                )
-              )
-            )
-
-            complete <-
-              is.finite(
-                x$student_discount
-              ) &
-              is.finite(
-                x$staff_discount
-              ) &
-              is.finite(
-                x$other_discount
-              ) &
-              is.finite(
-                x$total_discount
-              ) &
-              x$total_discount > 0
-
-            validate(
-              need(
-                any(complete),
-                paste(
-                  "No complete facility discount mix values",
-                  "are available for the selected site and year."
-                )
-              )
-            )
-
-            plot_facility_discount_mix(
-              x
-            )
-          },
-          res = 96,
-          bg = "white"
-        )
-            
-      # -------------------------------------------------------------------
-      # Executive Site Values table
-      # -------------------------------------------------------------------
-
-      output$site_values_table <- renderTable({
-
-        metric <- input$table_metric
-
-        if (
-          is.null(metric) ||
-            !metric %in%
-              c(
-                "Net Result",
-                "Budget Variance",
-                "Discount Opportunity",
-                "Revenue Capture Rate"
-              )
-        ) {
-          metric <- "Net Result"
+      # Old Executive Site and Facility chart outputs were retired when the
+      # fixed four-chart Sites view was introduced. Their shared calculation
+      # and plotting functions remain in the project for other dashboards.
+
+      # ---------------------------------------------------------------
+      # Executive Sites: factual single-year insights for presentations
+      # ---------------------------------------------------------------
+      output$site_key_insights <- renderUI({
+        context <- executive_context()
+        year <- suppressWarnings(as.integer(context$year))
+        if (length(year) == 0L || is.na(year[[1L]])) {
+          return(shiny::div(class = "text-secondary", "Select a reporting year."))
         }
-
-
-        if (
-          metric %in%
-            c(
-              "Net Result",
-              "Budget Variance"
-            )
-        ) {
-
-          x <-
-            executive_site_snapshot_finance()
-
-          validate_executive_site_snapshot_data(
-            x,
-            paste(
-              "No site finance values are available",
-              "for the selected year."
-            )
-          )
-
-          values <- switch(
-            metric,
-
-            "Net Result" =
-              x$net_actual,
-
-            "Budget Variance" =
-              x$budget_variance
-          )
-
-          display_values <-
-            format_compact_currency(
-              values
-            )
-
-        } else {
-
-          x <-
-            executive_site_snapshot_revenue()
-
-          validate_executive_site_snapshot_data(
-            x,
-            paste(
-              "No site revenue values are available",
-              "for the selected year."
-            )
-          )
-
-          values <- switch(
-            metric,
-
-            "Discount Opportunity" =
-              x$discount_opportunity,
-
-            "Revenue Capture Rate" =
-              x$capture_rate
-          )
-
-          if (
-            identical(
-              metric,
-              "Revenue Capture Rate"
-            )
-          ) {
-
-            display_values <-
-              ifelse(
-                is.finite(values),
-                sprintf(
-                  "%.1f%%",
-                  values * 100
-                ),
-                "—"
-              )
-
-          } else {
-
-            display_values <-
-              format_compact_currency(
-                values
-              )
+        year <- year[[1L]]
+        finance <- executive_site_financial_rows()
+        finance <- finance[!is.na(finance$report_year) &
+                             finance$report_year == year, , drop = FALSE]
+        operational <- executive_site_operational_rows()
+        operational <- operational[!is.na(operational$report_year) &
+                                     operational$report_year == year, , drop = FALSE]
+        insights <- character()
+        if (nrow(finance) > 0L && any(is.finite(finance$net_actual))) {
+          i <- which.max(replace(finance$net_actual,
+                                 !is.finite(finance$net_actual), -Inf))
+          insights <- c(insights, paste0(
+            "Highest Net Result: ", finance$site[[i]], " (",
+            format_compact_currency(finance$net_actual[[i]]), ")."
+          ))
+        }
+        if (nrow(operational) > 0L) {
+          complete <- is.finite(operational$direct) &
+            is.finite(operational$indirect)
+          if (any(complete)) {
+            v <- operational[complete, , drop = FALSE]
+            visits <- v$direct + v$indirect
+            i <- which.max(visits)
+            insights <- c(insights, paste0(
+              "Most visits: ", v$site[[i]], " (",
+              executive_site_format_count(visits[[i]]), ")."
+            ))
+          }
+          members <- operational[is.finite(operational$active_members), , drop = FALSE]
+          if (nrow(members) > 0L) {
+            i <- which.max(members$active_members)
+            insights <- c(insights, paste0(
+              "Most active members: ", members$site[[i]], " (",
+              executive_site_format_count(members$active_members[[i]]), ")."
+            ))
           }
         }
-
-
-        result <- data.frame(
-          Site = x$site,
-          Value = display_values,
-          raw_value = values,
-          stringsAsFactors = FALSE
+        kpis <- executive_site_snapshot_kpis(year)
+        if (!is.finite(kpis$programmes)) {
+          insights <- c(insights, paste0(
+            "Program enrolments were not reported for ", year,
+            "; Aquatics active enrolments are shown separately."
+          ))
+        }
+        if (length(insights) == 0L) {
+          return(shiny::div(class = "text-secondary",
+                            "No usable site insights are available."))
+        }
+        shiny::tags$ul(
+          class = "executive-insights-list",
+          shiny::tagList(lapply(insights, shiny::tags$li))
         )
-
-
-        result <-
-          result[
-            order(
-              -result$raw_value,
-              result$Site,
-              na.last = TRUE
-            ),
-            ,
-            drop = FALSE
-          ]
-
-
-        result$raw_value <- NULL
-
-        names(result)[[2L]] <- metric
-
-        result
-
-      },
-      striped = TRUE,
-      hover = TRUE,
-      bordered = FALSE,
-      spacing = "s")
+      })
 
       # -------------------------------------------------------------------
       # Executive Key Insights
@@ -4999,6 +4700,16 @@ mod_executive_dashboard_server <- function(
 
       output$finance_visual_grid <- renderUI({
 
+        if (identical(active_focus(), "Site")) {
+          context <- executive_context()
+          context_label <- executive_visual_context_label(
+            view_mode = context$view_mode, year = context$year,
+            comparison_year = context$comparison_year,
+            site = "All Sites"
+          )
+          return(executive_site_dashboard_ui(ns, context_label))
+        }
+
         context <- executive_context()
 
         context_label <-
@@ -5192,6 +4903,14 @@ mod_executive_dashboard_server <- function(
       # -------------------------------------------------------------------
 
       output$finance_supporting_components <- renderUI({
+
+        if (identical(active_focus(), "Site")) {
+          return(shiny::div(
+            class = "executive-site-bottom-grid",
+            executive_site_rankings_card_ui(ns),
+            executive_site_insights_card_ui(ns)
+          ))
+        }
 
         if (identical(active_focus(), "Overview")) {
 

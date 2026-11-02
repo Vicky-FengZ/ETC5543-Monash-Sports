@@ -7696,3 +7696,293 @@ plot_workforce_hours_variance <- function(
 
   invisible(NULL)
 }
+
+# -------------------------------------------------------------------------
+# Executive Site presentation charts
+# -------------------------------------------------------------------------
+# These four charts consume already-calculated, site-level summaries. They do
+# not aggregate workbook rows: the calling module must use the established
+# financial, visits, membership and enrolment calculation functions first.
+# This prevents YTD/monthly or total/detail double counting.
+
+executive_site_plot_rows <- function(data, required, description,
+                                     key = c("report_year", "site")) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
+    stop(paste0("No ", description, " values are available."), call. = FALSE)
+  }
+
+  missing <- setdiff(c("report_year", "site", required), names(data))
+  if (length(missing) > 0L) {
+    stop(paste0(description, " data is missing: ",
+                paste(missing, collapse = ", ")), call. = FALSE)
+  }
+
+  data$report_year <- suppressWarnings(as.integer(data$report_year))
+  data$site <- trimws(as.character(data$site))
+  valid <- !is.na(data$report_year) & !is.na(data$site) &
+    nzchar(data$site) & tolower(data$site) != "monash sport"
+  data <- data[valid, , drop = FALSE]
+
+  if (nrow(data) == 0L) {
+    stop(paste0("No valid ", description, " sites are available."),
+         call. = FALSE)
+  }
+
+  if (anyDuplicated(data[key])) {
+    stop(paste0(description, " contains duplicate site/year records. ",
+                "Summarise the source data before plotting."), call. = FALSE)
+  }
+
+  data[order(data$site, data$report_year), , drop = FALSE]
+}
+
+executive_site_plot_labels <- function(data) {
+  years <- unique(data$report_year)
+  if (length(years) > 1L) {
+    paste0(data$site, " (", data$report_year, ")")
+  } else {
+    data$site
+  }
+}
+
+executive_site_format_count <- function(values) {
+  ifelse(is.finite(values),
+         format(round(values), big.mark = ",", scientific = FALSE, trim = TRUE),
+         "Not reported")
+}
+
+# Draws two horizontal bars per reporting unit, reserving space on the right
+# for one factual annotation per unit. The two measures can be independently
+# missing; missing amounts are never treated as zero.
+executive_site_plot_pair_bars <- function(values_a, values_b, labels,
+                                          legend_labels, annotations = NULL,
+                                          currency = FALSE, stacked = FALSE,
+                                          show_legend = TRUE) {
+  values_a <- suppressWarnings(as.numeric(values_a))
+  values_b <- suppressWarnings(as.numeric(values_b))
+  n <- length(labels)
+  if (length(values_a) != n || length(values_b) != n || n == 0L) {
+    stop("Site chart values and labels must have equal nonzero lengths.",
+         call. = FALSE)
+  }
+  finite_values <- c(values_a[is.finite(values_a)],
+                     values_b[is.finite(values_b)])
+  if (length(finite_values) == 0L) {
+    stop("No finite values are available for this Site chart.",
+         call. = FALSE)
+  }
+  if (any(finite_values < 0)) {
+    stop("This Site bar chart requires nonnegative measures.", call. = FALSE)
+  }
+
+  combined_values <- if (isTRUE(stacked)) {
+    ifelse(is.finite(values_a), values_a, 0) +
+      ifelse(is.finite(values_b), values_b, 0)
+  } else {
+    finite_values
+  }
+  high <- max(c(0, combined_values))
+  high <- if (high > 0) high else 1
+  ticks <- pretty(c(0, high), n = 4)
+  ticks <- ticks[ticks >= 0 & ticks <= high]
+  rows <- rev(seq_len(n))
+  label_width <- max(nchar(labels), na.rm = TRUE)
+  left_margin <- if (label_width > 28L) 11.0 else if (label_width > 19L) 9.0 else 7.4
+  old_par <- par(mar = c(3.8, left_margin, 3.0, 1.0),
+                 xaxs = "i", yaxs = "i", family = "sans")
+  on.exit(par(old_par), add = TRUE)
+
+  plot(NA_real_, xlim = c(0, high * 1.55), ylim = c(0.45, n + 0.55),
+       axes = FALSE, xlab = "", ylab = "", type = "n")
+  abline(v = ticks, col = CHART_COLOURS[["grid"]], lwd = 1)
+
+  colours <- c(CHART_COLOURS[["primary"]], CHART_COLOURS[["secondary"]])
+  for (i in seq_len(n)) {
+    y <- rows[[i]]
+    if (isTRUE(stacked)) {
+      a <- if (is.finite(values_a[[i]])) values_a[[i]] else 0
+      b <- if (is.finite(values_b[[i]])) values_b[[i]] else 0
+      if (is.finite(values_a[[i]])) {
+        rect(0, y - 0.32, a, y + 0.32,
+             col = colours[[1L]], border = NA)
+      }
+      if (is.finite(values_b[[i]])) {
+        rect(a, y - 0.32, a + b, y + 0.32,
+             col = colours[[2L]], border = NA)
+      }
+    } else {
+      if (is.finite(values_a[[i]])) {
+        rect(0, y + 0.03, values_a[[i]], y + 0.39,
+             col = colours[[1L]], border = NA)
+      }
+      if (is.finite(values_b[[i]])) {
+        rect(0, y - 0.39, values_b[[i]], y - 0.03,
+             col = colours[[2L]], border = NA)
+      }
+    }
+    if (!is.null(annotations) && !is.na(annotations[[i]]) &&
+        nzchar(annotations[[i]])) {
+      text(high * 1.03, y, labels = annotations[[i]], adj = 0,
+           cex = 0.65, col = CHART_COLOURS[["text_strong"]])
+    }
+  }
+
+  axis(2, at = rows, labels = labels, las = 1, tick = FALSE,
+       cex.axis = if (n > 10L) 0.60 else 0.70,
+       col.axis = CHART_COLOURS[["muted"]])
+  axis(1, at = ticks,
+       labels = if (currency) format_compact_currency(ticks) else
+         executive_site_format_count(ticks),
+       tick = FALSE, cex.axis = 0.72,
+       col.axis = CHART_COLOURS[["muted"]])
+  # The Executive Sites board shows its legend in the card header, keeping
+  # plot labels clear. Other callers may opt into the original plot legend.
+  if (isTRUE(show_legend)) {
+    chart_legend("top", legend = legend_labels, fill = colours,
+                 border = NA, bty = "n", horiz = TRUE, cex = 0.76,
+                 inset = c(0, -0.02), xpd = NA)
+  }
+  invisible(NULL)
+}
+
+# Chart 1: Site Income versus Expenses, with Net Result shown as a label.
+# Expects calculate_site_annual_finance() output, filtered to one or two years.
+plot_executive_site_finances <- function(site_finance) {
+  data <- executive_site_plot_rows(
+    site_finance,
+    c("income_actual", "expenses_actual", "net_actual"),
+    "Site financial performance"
+  )
+  data$income_actual <- suppressWarnings(as.numeric(data$income_actual))
+  data$expenses_actual <- suppressWarnings(as.numeric(data$expenses_actual))
+  data$net_actual <- suppressWarnings(as.numeric(data$net_actual))
+  if (length(unique(data$report_year)) == 1L) {
+    data <- data[order(-data$income_actual, data$site, na.last = TRUE), , drop = FALSE]
+  }
+  net_labels <- ifelse(
+    is.finite(data$net_actual),
+    paste0("Net ", format_compact_currency(data$net_actual)),
+    "Net not reported"
+  )
+  executive_site_plot_pair_bars(
+    data$income_actual, data$expenses_actual,
+    executive_site_plot_labels(data),
+    c("Income", "Expenses"), annotations = net_labels, currency = TRUE,
+    show_legend = FALSE
+  )
+}
+
+# Chart 2: Visits across Sites. The inputs must be verified YTD totals or
+# fallback monthly totals from site_detail_visit_value(), not raw activity rows.
+# Plot partial Direct/Indirect components, but never call them Total Visits.
+plot_executive_site_visits <- function(site_visits) {
+  data <- executive_site_plot_rows(
+    site_visits, c("direct", "indirect"), "Site visits"
+  )
+  direct <- suppressWarnings(as.numeric(data$direct))
+  indirect <- suppressWarnings(as.numeric(data$indirect))
+  complete <- is.finite(direct) & is.finite(indirect)
+  totals <- ifelse(complete, direct + indirect, NA_real_)
+  if (length(unique(data$report_year)) == 1L) {
+    data_order <- order(-totals, data$site, na.last = TRUE)
+    data <- data[data_order, , drop = FALSE]
+    direct <- direct[data_order]
+    indirect <- indirect[data_order]
+    complete <- complete[data_order]
+    totals <- totals[data_order]
+  }
+  labels <- ifelse(
+    complete,
+    paste0("Total ", executive_site_format_count(totals)),
+    ifelse(is.finite(direct) & !is.finite(indirect), "Direct only",
+           ifelse(!is.finite(direct) & is.finite(indirect),
+                  "Indirect only", "Not reported"))
+  )
+  executive_site_plot_pair_bars(
+    direct, indirect, executive_site_plot_labels(data),
+    c("Direct", "Indirect"), annotations = labels, stacked = TRUE,
+    show_legend = FALSE
+  )
+}
+
+# Chart 3: Active Members. Each input row must be the most recent comparable
+# Total Active snapshot for that site and year, never a sum of monthly counts.
+plot_executive_site_memberships <- function(site_memberships) {
+  data <- executive_site_plot_rows(
+    site_memberships, "active_members", "Site active memberships"
+  )
+  values <- suppressWarnings(as.numeric(data$active_members))
+  if (any(is.finite(values) & values < 0)) {
+    stop("Active memberships cannot be negative.", call. = FALSE)
+  }
+  keep <- is.finite(values)
+  data <- data[keep, , drop = FALSE]
+  values <- values[keep]
+  if (length(values) == 0L) {
+    stop("No comparable active membership snapshots are available.",
+         call. = FALSE)
+  }
+  if (length(unique(data$report_year)) == 1L) {
+    order_index <- order(-values, data$site)
+    data <- data[order_index, , drop = FALSE]
+    values <- values[order_index]
+  }
+  high <- max(c(values, 1))
+  ticks <- pretty(c(0, high), n = 4)
+  ticks <- ticks[ticks >= 0 & ticks <= high]
+  labels <- executive_site_plot_labels(data)
+  n <- nrow(data)
+  rows <- rev(seq_len(n))
+  old_par <- par(mar = c(3.5, 8.5, 1.2, 1.1),
+                 xaxs = "i", yaxs = "i", family = "sans")
+  on.exit(par(old_par), add = TRUE)
+  plot(NA_real_, xlim = c(0, high * 1.25), ylim = c(0.45, n + 0.55),
+       axes = FALSE, xlab = "", ylab = "", type = "n")
+  abline(v = ticks, col = CHART_COLOURS[["grid"]])
+  for (i in seq_len(n)) {
+    rect(0, rows[[i]] - 0.32, values[[i]], rows[[i]] + 0.32,
+         col = CHART_COLOURS[["primary"]], border = NA)
+    text(values[[i]] + high * 0.02, rows[[i]],
+         labels = executive_site_format_count(values[[i]]),
+         cex = 0.74, adj = 0, col = CHART_COLOURS[["text_strong"]])
+  }
+  axis(2, at = rows, labels = labels, las = 1, tick = FALSE,
+       cex.axis = 0.70, col.axis = CHART_COLOURS[["muted"]])
+  axis(1, at = ticks, labels = executive_site_format_count(ticks),
+       tick = FALSE, cex.axis = 0.72,
+       col.axis = CHART_COLOURS[["muted"]])
+  invisible(NULL)
+}
+
+# Chart 4: Enrolment measures are deliberately kept separate. For example,
+# Aquatics Total Active is not added to Participation Program Enrolments.
+# Requires one record per site/year/measure, with Actual and optional Target.
+plot_executive_site_enrolments <- function(site_enrolments) {
+  data <- executive_site_plot_rows(
+    site_enrolments, c("measure", "actual", "target"),
+    "Site enrolments", key = c("report_year", "site", "measure")
+  )
+  data$measure <- trimws(as.character(data$measure))
+  if (any(is.na(data$measure) | !nzchar(data$measure))) {
+    stop("Enrolment measures must have clear source-specific labels.",
+         call. = FALSE)
+  }
+  actual <- suppressWarnings(as.numeric(data$actual))
+  target <- suppressWarnings(as.numeric(data$target))
+  if (length(unique(data$report_year)) == 1L) {
+    order_index <- order(data$site, data$measure)
+    data <- data[order_index, , drop = FALSE]
+    actual <- actual[order_index]
+    target <- target[order_index]
+  }
+  site_labels <- paste(data$site, "-", data$measure)
+  if (length(unique(data$report_year)) > 1L) {
+    site_labels <- paste0(site_labels, " (", data$report_year, ")")
+  }
+  annotations <- ifelse(is.finite(actual),
+                        executive_site_format_count(actual), "Not reported")
+  executive_site_plot_pair_bars(
+    actual, target, site_labels, c("Reported", "Target"),
+    annotations = annotations, show_legend = FALSE
+  )
+}

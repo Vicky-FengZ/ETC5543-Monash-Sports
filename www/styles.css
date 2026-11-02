@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------
-   Monash Sport theme (Option B). Brand colours follow the Monash brandbook:
+   Monash Sport theme. Brand colours follow the Monash brandbook:
    Monash blue leads, Blueberry anchors the navigation, Heritage and Electric
    blue are used sparingly as accents. Edit colours here, not in rules below.
    ------------------------------------------------------------------------- */
@@ -3174,5 +3174,271 @@ tr > :not(:first-child) {
     max-height: 145px;
     min-height: 0;
     overflow-y: auto;
+  }
+}
+
+
+/* ========================================================================
+   Executive Dashboard - Sites single-view presentation
+   SITE ONLY. The existing Overview, Venues, and other page rules are intact.
+   These selectors match the new executive_site_dashboard_ui() card classes.
+   ======================================================================== */
+
+/* Four fixed Site charts in two columns when there is sufficient width. */
+.executive-dashboard-page .executive-site-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: stretch;
+}
+
+.executive-dashboard-page .executive-site-grid > .executive-site-visual-card {
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.executive-dashboard-page .executive-site-grid .card-header {
+  padding: 8px 12px;
+}
+
+.executive-dashboard-page .executive-site-grid .chart-header-title {
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.executive-dashboard-page .executive-site-grid .shiny-plot-output {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Financial ranking card spans the available width below the four charts. */
+.executive-dashboard-page .executive-site-bottom-grid {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.executive-dashboard-page .executive-site-rankings-card {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.executive-dashboard-page .executive-site-rankings-table {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.executive-dashboard-page .executive-site-rankings-table table {
+  width: 100%;
+  min-width: 700px;
+  margin-bottom: 0;
+  font-size: 0.79rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.executive-dashboard-page .executive-site-rankings-table th,
+.executive-dashboard-page .executive-site-rankings-table td {
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.executive-dashboard-page .executive-site-rankings-table th:not(:first-child),
+.executive-dashboard-page .executive-site-rankings-table td:not(:first-child) {
+  text-align: right;
+}
+
+/* Fullscreen Site view: adapt to available browser height, not device type. */
+.executive-dashboard-page:fullscreen:has(.executive-site-grid) {
+  padding: 9px 13px !important;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-grid .card-header {
+  padding: 6px 10px !important;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-grid .shiny-plot-output {
+  /* Override the shared 200px presentation rule for Sites only. */
+  height: clamp(190px, calc((100dvh - 480px) / 2), 245px) !important;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-rankings-card {
+  max-height: clamp(155px, 23dvh, 235px);
+  overflow-y: auto;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-rankings-card .card-header {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-rankings-table table {
+  font-size: 0.75rem;
+}
+
+.executive-dashboard-page:fullscreen .executive-site-rankings-table th,
+.executive-dashboard-page:fullscreen .executive-site-rankings-table td {
+  padding: 3px 7px;
+}
+
+/* Short-height laptops: condense Site-only spacing without touching Overview. */
+@media (min-width: 961px) and (max-height: 900px) {
+  .executive-dashboard-page:fullscreen:has(.executive-site-grid)
+  .executive-dashboard-navigation {
+    margin-bottom: 4px;
+  }
+
+  .executive-dashboard-page:fullscreen:has(.executive-site-grid)
+  .executive-kpi-grid {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .executive-dashboard-page:fullscreen:has(.executive-site-grid)
+  .executive-kpi-card {
+    min-height: 54px;
+    padding: 6px 10px;
+  }
+
+  .executive-dashboard-page:fullscreen:has(.executive-site-grid)
+  .executive-kpi-value {
+    font-size: 1.15rem;
+  }
+
+  .executive-dashboard-page:fullscreen .executive-site-grid {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .executive-dashboard-page:fullscreen .executive-site-grid .shiny-plot-output {
+    height: clamp(180px, calc((100dvh - 455px) / 2), 205px) !important;
+  }
+
+  .executive-dashboard-page:fullscreen .executive-site-rankings-card {
+    max-height: 185px;
+  }
+}
+
+/* Narrow viewports: prioritise readable labels over forced side-by-side plots. */
+@media (max-width: 960px) {
+  .executive-dashboard-page .executive-site-grid,
+  .executive-dashboard-page:fullscreen .executive-site-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .executive-dashboard-page:fullscreen .executive-site-grid .shiny-plot-output {
+    height: 235px !important;
+  }
+}
+
+
+/* ========================================================================
+   Executive Sites: clear header legends, hover readouts and insights.
+   Appended without changing any existing Overview or Site CSS declarations.
+   ======================================================================== */
+.executive-dashboard-page .executive-site-grid .executive-visual-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 4px;
+}
+.executive-dashboard-page .executive-site-grid .executive-visual-card-heading {
+  flex: 1 1 190px;
+  width: auto;
+}
+.executive-dashboard-page .executive-site-header-legend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.executive-dashboard-page .executive-site-legend-item {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.executive-dashboard-page .executive-site-legend-swatch {
+  width: 11px;
+  height: 8px;
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 1px;
+}
+.executive-dashboard-page .executive-site-legend-swatch.primary {
+  background: var(--ms-monash-blue);
+}
+.executive-dashboard-page .executive-site-legend-swatch.secondary {
+  background: var(--ms-orange);
+}
+.executive-dashboard-page .executive-site-hover-readout {
+  min-height: 28px;
+  padding: 3px 12px 7px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 400;
+  color: var(--ms-text-secondary);
+  overflow-wrap: anywhere;
+}
+.executive-dashboard-page .executive-site-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.executive-dashboard-page .executive-site-bottom-grid > .card {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.executive-dashboard-page .executive-site-insights-content {
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.executive-dashboard-page .executive-site-insights-content ul {
+  padding-left: 18px;
+  margin: 0;
+}
+.executive-dashboard-page .executive-site-insights-content li + li {
+  margin-top: 7px;
+}
+.executive-dashboard-page .executive-site-bottom-grid .executive-site-rankings-table table {
+  width: 100%;
+  min-width: 650px;
+}
+.executive-dashboard-page .executive-site-bottom-grid .executive-site-rankings-table {
+  overflow-x: auto;
+}
+.executive-dashboard-page:fullscreen .executive-site-grid .executive-site-hover-readout {
+  min-height: 21px;
+  padding: 2px 10px 4px;
+  font-size: 0.69rem;
+}
+.executive-dashboard-page:fullscreen .executive-site-header-legend {
+  font-size: 0.69rem;
+}
+.executive-dashboard-page:fullscreen .executive-site-bottom-grid > .card {
+  max-height: clamp(155px, 23dvh, 235px);
+  overflow-y: auto;
+}
+@media (max-width: 1100px) {
+  .executive-dashboard-page .executive-site-bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

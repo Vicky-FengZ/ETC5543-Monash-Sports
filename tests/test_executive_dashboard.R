@@ -5,650 +5,120 @@ suppressPackageStartupMessages({
 })
 
 # -------------------------------------------------------------------------
-# Executive Dashboard registry tests
+# Executive Dashboard regression tests: Overview + fixed Sites presentation
 # -------------------------------------------------------------------------
+# This test file is sourced by tests/run_tests.R after the application's
+# data, calculation, plotting, registry, module and fixture helpers are loaded.
+# The separate Site Detail, Site Comparison and Venues tests remain unchanged.
 
-# Registry structure ------------------------------------------------------
+# Registry contract -------------------------------------------------------
+expected_overview_ids <- c(
+  "monthly_income_expenses", "annual_performance_trend",
+  "budget_vs_actual", "revenue_capture", "key_insights"
+)
+expected_site_ids <- c(
+  "site_finances", "site_visits", "site_memberships",
+  "site_enrolments", "site_rankings"
+)
+expected_overview_kpi_titles <- c(
+  "Total Income", "Total Expenses", "Net Result", "Budget Variance"
+)
+expected_site_kpi_titles <- c(
+  "Total Visits",
+  "Active Members",
+  "Visits Growth",
+  "Sites with Positive Net Result"
+)
 
 registry <- executive_registry_table()
-
 stopifnot(
-  is.data.frame(registry),
-  nrow(registry) == 17L,
-  length(unique(registry$id)) == nrow(registry),
-  all(
-    c(
-      "id",
-      "title",
-      "category",
-      "focus",
-      "component_type",
-      "source_group",
-      "source_label",
-      "required_data",
-      "default_selected",
-      "preferred_size",
-      "supports_year_review",
-      "supports_comparison"
-    ) %in% names(registry)
-  )
+  is.data.frame(registry), nrow(registry) == 10L,
+  !anyDuplicated(registry$id),
+  all(c("id", "title", "category", "focus", "component_type",
+        "source_group", "source_label", "required_data",
+        "default_selected", "preferred_size", "supports_year_review",
+        "supports_comparison") %in% names(registry)),
+  identical(executive_visual_ids(focus = "Overview"), expected_overview_ids),
+  identical(executive_visual_ids(focus = "Site"), expected_site_ids),
+  length(executive_visual_ids(focus = "Metrics")) == 0L,
+  identical(executive_default_visual_ids(category = "Finance", focus = "Overview"),
+            expected_overview_ids),
+  identical(executive_default_visual_ids(category = "Finance", focus = "Site"),
+            expected_site_ids),
+  identical(executive_visual_ids(component_type = "table"), "site_rankings"),
+  identical(executive_visual_ids(component_type = "insight"), "key_insights"),
+  length(executive_visual_ids(component_type = "graph")) == 8L,
+  identical(executive_visual_ids(source_group = "monthly"),
+            c("monthly_income_expenses", "annual_performance_trend",
+              "budget_vs_actual", "revenue_capture", "site_finances",
+              "site_rankings")),
+  identical(executive_visual_ids(source_group = "detailed"),
+            c("site_visits", "site_memberships", "site_enrolments")),
+  all(registry$supports_year_review), all(registry$supports_comparison)
 )
 
-# Executive focus grouping ------------------------------------------------
-
-overview_ids <- executive_visual_ids(
-  focus = "Overview"
+# Old Site/Facility visuals must no longer be registered in the Executive page.
+retired_site_ids <- c(
+  "site_performance", "site_ranking", "site_budget_performance",
+  "site_revenue_opportunity", "site_discount_mix", "site_values",
+  "facility_ranking", "facility_performance", "facility_discount_mix",
+  "facility_discount_trend", "facility_revenue_opportunity",
+  "facility_capture_rate"
 )
+stopifnot(!any(retired_site_ids %in% registry$id))
 
-site_ids <- executive_visual_ids(
-  focus = "Site"
-)
-
-metrics_ids <- executive_visual_ids(
-  focus = "Metrics"
-)
-
-
+# Required datasets are distinct; one uploaded report family does not imply
+# another is available. A missing worksheet is not a zero-valued worksheet.
+empty_summary <- executive_source_availability_summary(NULL)
 stopifnot(
-
-  identical(
-    overview_ids,
-    c(
-      "monthly_income_expenses",
-      "annual_performance_trend",
-      "budget_vs_actual",
-      "revenue_capture",
-      "key_insights"
-    )
-  ),
-
-  identical(
-    site_ids,
-    c(
-      "site_performance",
-      "site_ranking",
-      "site_budget_performance",
-      "site_revenue_opportunity",
-      "site_discount_mix",
-      "site_values",
-      "facility_ranking",
-      "facility_performance",
-      "facility_discount_mix",
-      "facility_discount_trend",
-      "facility_revenue_opportunity",
-      "facility_capture_rate"
-    )
-  ),
-
-  length(
-    metrics_ids
-  ) == 0L,
-
-  length(
-    overview_ids
-  ) +
-    length(
-      site_ids
-    ) ==
-    17L
+  identical(as.character(empty_summary$source_group),
+            c("monthly", "detailed", "supporting")),
+  identical(as.integer(empty_summary$total_visuals), c(6L, 3L, 1L)),
+  identical(as.integer(empty_summary$available_visuals), c(0L, 0L, 1L))
 )
 
-
-# Source grouping ---------------------------------------------------------
-
-monthly_ids <- executive_visual_ids(
-  source_group = "monthly"
-)
-
-detailed_ids <- executive_visual_ids(
-  source_group = "detailed"
-)
-
+minimal_monthly <- list(monthly_reports = list(
+  finance = data.frame(report_year = 2025L, site = "Aquatics Clayton", value = 1)
+))
+minimal_availability <- executive_registry_availability_table(minimal_monthly)
+check_available <- function(id) {
+  minimal_availability$available[match(id, minimal_availability$id)]
+}
 stopifnot(
-  length(monthly_ids) == 10L,
-  length(detailed_ids) == 6L,
-  length(
-    intersect(
-      monthly_ids,
-      detailed_ids
-    )
-  ) == 0L
+  isTRUE(check_available("site_finances")),
+  isTRUE(check_available("site_rankings")),
+  !check_available("site_visits"),
+  !check_available("site_memberships"),
+  !check_available("site_enrolments"),
+  !check_available("revenue_capture")
 )
 
-supporting_ids <- executive_visual_ids(
-  source_group = "supporting"
-)
-
+minimal_detailed <- list(site_reports = list(
+  visits = data.frame(report_year = 2025L, report_unit = "Aquatics",
+                      campus = "Clayton", value = 10),
+  memberships = data.frame(report_year = 2025L, report_unit = "Aquatics",
+                           campus = "Clayton", value = 5),
+  enrollments = data.frame(report_year = 2025L, report_unit = "Aquatics",
+                          campus = "Clayton", value = 4)
+))
 stopifnot(
-  identical(
-    supporting_ids,
-    "key_insights"
-  )
-)
-
-stopifnot(
-  length(
-    executive_visual_ids(
-      component_type = "graph"
-    )
-  ) == 15L,
-
-  identical(
-    executive_visual_ids(
-      component_type = "table"
-    ),
-    "site_values"
-  ),
-
-  identical(
-    executive_visual_ids(
-      component_type = "insight"
-    ),
-    "key_insights"
-  )
-)
-
-stopifnot(
-  identical(
-    executive_visual_source_label("monthly"),
-    "Monthly Site Reports"
-  ),
-  identical(
-    executive_visual_source_label("detailed"),
-    "Detailed Site Reports"
-  ),
-  identical(
-    executive_visual_source_label("supporting"),
-    "Supporting Components"
-  )
-)
-
-
-# Default Executive Finance set ------------------------------------------
-
-expected_defaults <- c(
-  "monthly_income_expenses",
-  "annual_performance_trend",
-  "budget_vs_actual",
-  "site_performance",
-  "site_ranking",
-  "site_budget_performance",
-  "site_revenue_opportunity",
-  "site_discount_mix",
-  "revenue_capture",
-  "site_values",
-  "key_insights"
-)
-
-expected_overview_defaults <- c(
-  "monthly_income_expenses",
-  "annual_performance_trend",
-  "budget_vs_actual",
-  "revenue_capture",
-  "key_insights"
-)
-
-expected_overview_kpi_titles <- c(
-  "Total Income",
-  "Total Expenses",
-  "Net Result",
-  "Budget Variance"
-)
-
-expected_site_defaults <- c(
-  "site_performance",
-  "site_ranking",
-  "site_budget_performance",
-  "site_revenue_opportunity",
-  "site_discount_mix",
-  "site_values"
-)
-
-stopifnot(
-  identical(
-    executive_default_visual_ids(),
-    expected_defaults
-  )
-)
-
-stopifnot(
-
-  identical(
-    executive_default_visual_ids(
-      category = "Finance",
-      focus = "Overview"
-    ),
-    expected_overview_defaults
-  ),
-
-  identical(
-    executive_default_visual_ids(
-      category = "Finance",
-      focus = "Site"
-    ),
-    expected_site_defaults
-  )
-)
-
-
-# -------------------------------------------------------------------------
-# No uploaded data
-# -------------------------------------------------------------------------
-
-empty_summary <-
-  executive_source_availability_summary(
-    NULL
-  )
-
-stopifnot(
-  nrow(empty_summary) == 3L
-)
-
-empty_supporting <- empty_summary[
-  empty_summary$source_group == "supporting",
-  ,
-  drop = FALSE
-]
-
-stopifnot(
-  nrow(empty_supporting) == 1L,
-  empty_supporting$available_visuals[[1L]] == 1L,
-  empty_supporting$total_visuals[[1L]] == 1L
-)
-
-empty_monthly <- empty_summary[
-  empty_summary$source_group == "monthly",
-  ,
-  drop = FALSE
-]
-
-empty_detailed <- empty_summary[
-  empty_summary$source_group == "detailed",
-  ,
-  drop = FALSE
-]
-
-stopifnot(
-  nrow(empty_monthly) == 1L,
-  empty_monthly$available_visuals[[1L]] == 0L,
-  empty_monthly$total_visuals[[1L]] == 10L,
-
-  nrow(empty_detailed) == 1L,
-  empty_detailed$available_visuals[[1L]] == 0L,
-  empty_detailed$total_visuals[[1L]] == 6L
-)
-
-
-# -------------------------------------------------------------------------
-# Monthly Site Reports only
-# -------------------------------------------------------------------------
-
-monthly_only_data <- list(
-
-  monthly_reports = list(
-
-    finance = data.frame(
-      value = 1,
-      stringsAsFactors = FALSE
-    ),
-
-    discounts = data.frame(
-      value = 1,
-      stringsAsFactors = FALSE
-    )
-  ),
-
-  site_reports = NULL,
-
-  venues_reports = NULL
-)
-
-monthly_summary <-
-  executive_source_availability_summary(
-    monthly_only_data
-  )
-
-monthly_row <- monthly_summary[
-  monthly_summary$source_group == "monthly",
-  ,
-  drop = FALSE
-]
-
-detailed_row <- monthly_summary[
-  monthly_summary$source_group == "detailed",
-  ,
-  drop = FALSE
-]
-
-stopifnot(
-  monthly_row$available_visuals[[1L]] == 10L,
-  monthly_row$total_visuals[[1L]] == 10L,
-
-  detailed_row$available_visuals[[1L]] == 0L,
-  detailed_row$total_visuals[[1L]] == 6L
-)
-
-
-monthly_availability <-
-  executive_registry_availability_table(
-    monthly_only_data
-  )
-
-stopifnot(
-  all(
-    monthly_availability$available[
-      monthly_availability$source_group ==
-        "monthly"
-    ]
-  ),
-  !any(
-    monthly_availability$available[
-      monthly_availability$source_group ==
-        "detailed"
-    ]
-  )
-)
-
-
-# -------------------------------------------------------------------------
-# Required-dataset availability
-# -------------------------------------------------------------------------
-
-finance_only_data <- list(
-
-  monthly_reports = list(
-
-    finance = data.frame(
-      value = 1,
-      stringsAsFactors = FALSE
-    ),
-
-    discounts = data.frame()
-  )
-)
-
-finance_only_availability <-
-  executive_registry_availability_table(
-    finance_only_data
-  )
-
-income_expenses_row <-
-  finance_only_availability[
-    finance_only_availability$id ==
-      "monthly_income_expenses",
-    ,
-    drop = FALSE
-  ]
-
-discount_mix_row <-
-  finance_only_availability[
-    finance_only_availability$id ==
-      "site_discount_mix",
-    ,
-    drop = FALSE
-  ]
-
-revenue_opportunity_row <-
-  finance_only_availability[
-    finance_only_availability$id ==
-      "site_revenue_opportunity",
-    ,
-    drop = FALSE
-  ]
-
-stopifnot(
-  income_expenses_row$available[[1L]],
-
-  !discount_mix_row$available[[1L]],
-  grepl(
-    "discounts",
-    discount_mix_row$availability_reason[[1L]],
-    fixed = TRUE
-  ),
-
-  !revenue_opportunity_row$available[[1L]],
-  grepl(
-    "discounts",
-    revenue_opportunity_row$availability_reason[[1L]],
-    fixed = TRUE
-  )
-)
-
-
-# -------------------------------------------------------------------------
-# Monthly + Detailed Site Reports
-# -------------------------------------------------------------------------
-
-complete_test_data <- monthly_only_data
-
-complete_test_data$site_reports <- list(
-
-  finance = data.frame(
-    value = 1,
-    stringsAsFactors = FALSE
-  ),
-
-  discounts = data.frame(
-    value = 1,
-    stringsAsFactors = FALSE
-  )
-)
-
-complete_summary <-
-  executive_source_availability_summary(
-    complete_test_data
-  )
-
-complete_monthly <- complete_summary[
-  complete_summary$source_group == "monthly",
-  ,
-  drop = FALSE
-]
-
-complete_detailed <- complete_summary[
-  complete_summary$source_group == "detailed",
-  ,
-  drop = FALSE
-]
-
-stopifnot(
-  complete_monthly$available_visuals[[1L]] == 10L,
-  complete_monthly$total_visuals[[1L]] == 10L,
-
-  complete_detailed$available_visuals[[1L]] == 6L,
-  complete_detailed$total_visuals[[1L]] == 6L
-)
-
-
-# Direct report-family objects are also supported -------------------------
-
-direct_monthly <- structure(
-  list(
-    finance = data.frame(
-      value = 1,
-      stringsAsFactors = FALSE
-    ),
-    discounts = data.frame(
-      value = 1,
-      stringsAsFactors = FALSE
-    )
-  ),
-  class = "monthly_site_report_data"
-)
-
-stopifnot(
+  all(executive_registry_availability_table(minimal_detailed)$available[
+    match(c("site_visits", "site_memberships", "site_enrolments"),
+          executive_registry_table()$id)
+  ]),
+  !executive_visual_availability(minimal_detailed, "site_finances")$available,
   executive_visual_availability(
-    direct_monthly,
-    "site_ranking"
-  )$available
-)
-
-# -------------------------------------------------------------------------
-# Context-aware Executive visual availability
-# -------------------------------------------------------------------------
-
-context_detailed_data <- list(
-
-  site_reports = list(
-
-    finance = data.frame(
-      report_year = c(
-        2025L,
-        2027L,
-        2027L
-      ),
-      report_unit = c(
-        "Aquatics",
-        "Aquatics",
-        "Esports"
-      ),
-      campus = c(
-        "Clayton",
-        "Clayton",
-        "Clayton"
-      ),
-      business_unit = c(
-        "Pool Hire",
-        "Pool Hire",
-        "Esports Arena"
-      ),
-      stringsAsFactors = FALSE
-    )
-  )
-)
-
-
-aquatics_2027_context <- list(
-  view_mode = "Year Review",
-  year = "2027",
-  comparison_year = NULL,
-  site = "Aquatics Clayton"
-)
-
-
-stopifnot(
-  executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      aquatics_2027_context
-  )$available
-)
-
-
-aquatics_2026_context <- list(
-  view_mode = "Year Review",
-  year = "2026",
-  comparison_year = NULL,
-  site = "Aquatics Clayton"
-)
-
-
-aquatics_2026_availability <-
-  executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      aquatics_2026_context
-  )
-
-
-stopifnot(
-  !aquatics_2026_availability$available,
-  grepl(
-    "selected context",
-    aquatics_2026_availability$reason,
-    fixed = TRUE
-  )
-)
-
-
-esports_2027_context <- list(
-  view_mode = "Year Review",
-  year = "2027",
-  comparison_year = NULL,
-  site = "Esports"
-)
-
-
-stopifnot(
-  executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      esports_2027_context
-  )$available
-)
-
-
-esports_2025_context <- list(
-  view_mode = "Year Review",
-  year = "2025",
-  comparison_year = NULL,
-  site = "Esports"
-)
-
-
-stopifnot(
+    minimal_detailed, "site_visits",
+    context = list(view_mode = "Year Review", year = "2025",
+                   comparison_year = NULL, site = "All Monash Sport")
+  )$available,
   !executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      esports_2025_context
+    minimal_detailed, "site_visits",
+    context = list(view_mode = "Comparison", year = "2025",
+                   comparison_year = "2024", site = "All Monash Sport")
   )$available
 )
-
-
-aquatics_comparison_context <- list(
-  view_mode = "Comparison",
-  year = "2027",
-  comparison_year = "2025",
-  site = "Aquatics Clayton"
-)
-
-
-stopifnot(
-  executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      aquatics_comparison_context
-  )$available
-)
-
-
-missing_comparison_context <- list(
-  view_mode = "Comparison",
-  year = "2027",
-  comparison_year = "2026",
-  site = "Aquatics Clayton"
-)
-
-
-stopifnot(
-  !executive_visual_availability(
-    dashboard_data =
-      context_detailed_data,
-    visual_id =
-      "facility_ranking",
-    context =
-      missing_comparison_context
-  )$available
-)
-
-cat(
-  "PASS Executive Dashboard visual registry\n"
-)
+cat("PASS Executive visual registry and reporting availability\n")
 
 # -------------------------------------------------------------------------
 # Executive Dashboard context helpers
@@ -1605,1782 +1075,434 @@ cat(
 )
 
 # -------------------------------------------------------------------------
-# Executive Dashboard visual picker
+# Fixed Sites presentation UI and graph contracts
 # -------------------------------------------------------------------------
-
-picker_test_data <- shiny::reactiveVal(
-  list(
-
-    monthly_reports = list(
-
-      finance = data.frame(
-        report_year = c(
-          2025L,
-          2026L
-        ),
-        date = as.Date(c(
-          "2025-01-01",
-          "2026-01-01"
-        )),
-        site = c(
-          "Aquatics Clayton",
-          "Aquatics Clayton"
-        ),
-        is_summary = c(
-          TRUE,
-          TRUE
-        ),
-        metric = c(
-          "Income",
-          "Income"
-        ),
-        value_type = c(
-          "Actual",
-          "Actual"
-        ),
-        value = c(
-          1,
-          1
-        ),
-        stringsAsFactors = FALSE
-      ),
-
-      discounts = data.frame(
-        report_year = c(
-          2025L,
-          2026L
-        ),
-        value = c(
-          1,
-          1
-        ),
-        stringsAsFactors = FALSE
-      )
-    ),
-
-    site_reports = NULL,
-
-    venues_reports = NULL
-  )
+site_ui_html <- htmltools::renderTags(
+  executive_site_dashboard_ui(shiny::NS("executive"), "Year Review · 2025")
+)$html
+rank_ui_html <- htmltools::renderTags(
+  executive_site_rankings_card_ui(shiny::NS("executive"))
+)$html
+stopifnot(
+  grepl("executive-site-grid", site_ui_html, fixed = TRUE),
+  grepl("executive-site-rankings-table", rank_ui_html, fixed = TRUE),
+  grepl("executive-site-rankings-card", rank_ui_html, fixed = TRUE),
+  all(vapply(c("site_finances", "site_visits", "site_memberships",
+               "site_enrolments"), function(id) {
+    grepl(paste0("executive-executive_plot_", id),
+          site_ui_html, fixed = TRUE)
+  }, logical(1))),
+  grepl("executive-site_rankings_table", rank_ui_html, fixed = TRUE),
+  !grepl("choose_visuals", site_ui_html, fixed = TRUE)
 )
 
-
-shiny::testServer(
-  mod_executive_dashboard_server,
-  args = list(
-    data = picker_test_data
-  ),
-  {
-
-    # ---------------------------------------------------------------------
-    # Finance is the default Executive Dashboard category
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      dashboard_section = "finance"
-    )
-
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        active_category(),
-        "Finance"
-      )
-    )
-
-    stopifnot(
-      identical(
-        active_focus(),
-        "Overview"
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Year Review context
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      view_mode = "Year Review",
-      year = "2026",
-      comparison_year = "2025",
-      site = "All Monash Sport"
-    )
-
-    session$flushReact()
-
-    year_review_context <- executive_context()
-
-    stopifnot(
-      identical(
-        year_review_context$view_mode,
-        "Year Review"
-      ),
-      identical(
-        year_review_context$year,
-        "2026"
-      ),
-      is.null(
-        year_review_context$comparison_year
-      ),
-      identical(
-        year_review_context$site,
-        "All Monash Sport"
-      ),
-      !"metric" %in%
-        names(year_review_context)
-    )
-
-    # Overview must remain organisation-wide even if a site input is supplied.
-      session$setInputs(
-        site = "Aquatics Clayton"
-      )
-
-      session$flushReact()
-
-      overview_scope_context <-
-        executive_context()
-
-      stopifnot(
-        identical(
-          overview_scope_context$site,
-          "All Monash Sport"
-        )
-      )
-
-      # Restore the browser input for the remaining tests in this block.
-      session$setInputs(
-        site = "All Monash Sport"
-      )
-
-      session$flushReact()
-    
-    # ---------------------------------------------------------------------
-    # Overview content contract
-    # ---------------------------------------------------------------------
-
-    overview_kpi_specs <-
-      executive_kpi_specs()
-
-    stopifnot(
-
-      length(
-        overview_kpi_specs
-      ) == 4L,
-
-      identical(
-        vapply(
-          overview_kpi_specs,
-          function(spec) {
-            spec$title
-          },
-          character(1)
-        ),
-        expected_overview_kpi_titles
-      ),
-
-      identical(
-        vapply(
-          overview_kpi_specs,
-          function(spec) {
-            spec$output_id
-          },
-          character(1)
-        ),
-        c(
-          "kpi_total_income",
-          "kpi_total_expenses",
-          "kpi_net_result",
-          "kpi_budget_variance"
-        )
-      ),
-
-      identical(
-        executive_context()$site,
-        "All Monash Sport"
-      )
-    )
-
-
-    # ---------------------------------------------------------------------
-    # Comparison context
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      view_mode = "Comparison",
-      comparison_year = "2025"
-    )
-
-    session$flushReact()
-
-    comparison_context <- executive_context()
-
-    stopifnot(
-      identical(
-        comparison_context$view_mode,
-        "Comparison"
-      ),
-      identical(
-        comparison_context$year,
-        "2026"
-      ),
-      identical(
-        comparison_context$comparison_year,
-        "2025"
-      ),
-      identical(
-        comparison_context$site,
-        "All Monash Sport"
-      ),
-      !"metric" %in%
-        names(comparison_context)
-    )
-
-    # ---------------------------------------------------------------------
-    # Overview Year Review vs Comparison year selection
-    # ---------------------------------------------------------------------
-
-    # Year Review includes only the selected year
-    # for monthly finance calculations.
-
-    stopifnot(
-      identical(
-        executive_context_years(
-          year_review_context
-        ),
-        2026L
-      )
-    )
-
-    # Historical trend visuals retain available years
-    # up to the selected reporting year.
-
-    stopifnot(
-      identical(
-        executive_context_trend_years(
-          context = year_review_context,
-          available_years = c(
-            2024L,
-            2025L,
-            2026L,
-            2027L
-          )
-        ),
-        c(
-          2024L,
-          2025L,
-          2026L
-        )
-      )
-    )
-
-    # Comparison mode uses exactly the two
-    # selected reporting years.
-
-    stopifnot(
-      identical(
-        executive_context_years(
-          comparison_context
-        ),
-        c(
-          2025L,
-          2026L
-        )
-      )
-    )
-
-    stopifnot(
-      identical(
-        executive_context_trend_years(
-          context = comparison_context,
-          available_years = c(
-            2024L,
-            2025L,
-            2026L,
-            2027L
-          )
-        ),
-        c(
-          2025L,
-          2026L
-        )
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Overview KPI values and comparison labels
-    # ---------------------------------------------------------------------
-
-    current_finance <- executive_kpi_finance()
-
-    previous_finance <-
-      executive_kpi_comparison_finance()
-
-    comparison_kpis <- executive_kpi_specs()
-
-    kpi_fields <- c(
-      "income_actual",
-      "expenses_actual",
-      "net_actual",
-      "budget_variance"
-    )
-
-    stopifnot(
-      length(comparison_kpis) == 4L,
-      identical(
-        executive_context()$site,
-        "All Monash Sport"
-      )
-    )
-
-    # Current and comparison KPI values must come
-    # from their respective selected reporting years.
-
-    if (!is.null(current_finance)) {
-      stopifnot(
-        nrow(current_finance) == 1L,
-        current_finance$report_year[[1L]] == 2026L
-      )
-    }
-
-    if (!is.null(previous_finance)) {
-      stopifnot(
-        nrow(previous_finance) == 1L,
-        previous_finance$report_year[[1L]] == 2025L
-      )
-    }
-
-    # Every KPI must show a comparison only when
-    # both years have a finite corresponding value.
-
-    for (i in seq_along(kpi_fields)) {
-
-      field <- kpi_fields[[i]]
-
-      has_comparable_values <-
-        !is.null(current_finance) &&
-        !is.null(previous_finance) &&
-        is.finite(current_finance[[field]][[1L]]) &&
-        is.finite(previous_finance[[field]][[1L]])
-
-      comparison_label <-
-        comparison_kpis[[i]]$comparison
-
-      if (has_comparable_values) {
-
-        expected_difference <-
-          current_finance[[field]][[1L]] -
-          previous_finance[[field]][[1L]]
-
-        expected_label <- paste0(
-          if (expected_difference > 0) "+" else "",
-          format_compact_currency(expected_difference),
-          " vs 2025"
-        )
-
-        stopifnot(
-          identical(
-            comparison_label,
-            expected_label
-          )
-        )
-
-      } else {
-
-        stopifnot(
-          is.null(comparison_label)
-        )
-      }
-    }
-
-    # ---------------------------------------------------------------------
-    # Overview visual data and context consistency
-    # ---------------------------------------------------------------------
-
-    overview_data_checks <- function(
-      view_mode,
-      expected_years
-    ) {
-
-      context <- executive_context()
-
-      stopifnot(
-        identical(context$view_mode, view_mode),
-        identical(context$site, "All Monash Sport")
-      )
-
-      monthly_finance <- executive_monthly_finance()
-      annual_finance <- executive_annual_finance()
-      annual_revenue <- executive_annual_revenue()
-
-      check_years <- function(x, allowed_years) {
-        stopifnot(
-          is.data.frame(x),
-          "report_year" %in% names(x)
-        )
-
-        if (nrow(x) > 0L) {
-          stopifnot(
-            !anyNA(x$report_year),
-            all(
-              x$report_year %in% allowed_years
-            )
-          )
-        }
-      }
-
-      # Income vs Expenses and Budget vs Actual
-      # use the selected year(s).
-      check_years(
-        monthly_finance,
-        expected_years
-      )
-
-      # Annual Performance Trend and Revenue Capture
-      # use historical trend years in Year Review,
-      # or exactly two years in Comparison.
-      trend_years <- executive_context_trend_years(
-        context = context,
-        available_years = c(
-          2024L, 2025L, 2026L, 2027L
-        )
-      )
-
-      check_years(
-        annual_finance,
-        trend_years
-      )
-
-      check_years(
-        annual_revenue,
-        trend_years
-      )
-
-      invisible(TRUE)
-    }
-
-
-    # Comparison mode
-    overview_data_checks(
-      view_mode = "Comparison",
-      expected_years = c(2025L, 2026L)
-    )
-
-
-    # Year Review mode
-    session$setInputs(
-      view_mode = "Year Review",
-      year = "2026"
-    )
-
-    session$flushReact()
-
-    overview_data_checks(
-      view_mode = "Year Review",
-      expected_years = 2026L
-    )
-
-
-    # Restore Comparison mode so subsequent
-    # existing tests retain their expected context.
-    session$setInputs(
-      view_mode = "Comparison",
-      year = "2026",
-      comparison_year = "2025"
-    )
-
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        executive_context()$view_mode,
-        "Comparison"
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Final Executive Overview validation
-    # ---------------------------------------------------------------------
-
-    # Verify that KPI values remain consistent with
-    # the currently selected reporting year.
-
-    session$setInputs(
-      view_mode = "Year Review",
-      year = "2026"
-    )
-
-    session$flushReact()
-
-    year_review_kpis <- executive_kpi_specs()
-    year_review_finance <- executive_kpi_finance()
-
-    kpi_fields <- c(
-      "income_actual",
-      "expenses_actual",
-      "net_actual",
-      "budget_variance"
-    )
-
-    stopifnot(
-      length(year_review_kpis) == 4L,
-
-      identical(
-        executive_context()$view_mode,
-        "Year Review"
-      ),
-
-      is.null(
-        executive_kpi_comparison_finance()
-      ),
-
-      all(
-        vapply(
-          year_review_kpis,
-          function(spec) {
-            is.null(spec$comparison)
-          },
-          logical(1)
-        )
-      )
-    )
-
-    # Compare each displayed KPI with the
-    # underlying annual finance value.
-
-    for (i in seq_along(kpi_fields)) {
-
-      expected_value <- "—"
-
-      if (
-        !is.null(year_review_finance) &&
-        is.data.frame(year_review_finance) &&
-        nrow(year_review_finance) > 0L
-      ) {
-
-        field <- kpi_fields[[i]]
-
-        value <- year_review_finance[[field]][[1L]]
-
-        if (is.finite(value)) {
-          expected_value <-
-            format_compact_currency(value)
-        }
-      }
-
-      stopifnot(
-        identical(
-          year_review_kpis[[i]]$value,
-          expected_value
-        )
-      )
-    }
-
-
-    # Switch back to Comparison and verify
-    # the selected reporting context.
-
-    session$setInputs(
-      view_mode = "Comparison",
-      year = "2026",
-      comparison_year = "2025"
-    )
-
-    session$flushReact()
-
-    comparison_kpis <- executive_kpi_specs()
-
-    stopifnot(
-      identical(
-        executive_context()$view_mode,
-        "Comparison"
-      ),
-
-      identical(
-        executive_context()$year,
-        "2026"
-      ),
-
-      identical(
-        executive_context()$comparison_year,
-        "2025"
-      ),
-
-      identical(
-        executive_context()$site,
-        "All Monash Sport"
-      ),
-
-      length(comparison_kpis) == 4L,
-
-      identical(
-        vapply(
-          comparison_kpis,
-          function(spec) {
-            spec$title
-          },
-          character(1)
-        ),
-        expected_overview_kpi_titles
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Visual metrics are independent of the dashboard context
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      metric_annual_performance_trend = c(
-        "Income",
-        "Expenses",
-        "Net Result"
-      ),
-      metric_budget_vs_actual = "Expenses",
-      metric_site_ranking = "Income",
-      metric_facility_performance = "Expenses"
-    )
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        input$metric_annual_performance_trend,
-        c(
-          "Income",
-          "Expenses",
-          "Net Result"
-        )
-      ),
-
-      identical(
-        input$metric_budget_vs_actual,
-        "Expenses"
-      ),
-
-      identical(
-        input$metric_site_ranking,
-        "Income"
-      ),
-
-      identical(
-        input$metric_facility_performance,
-        "Expenses"
-      ),
-
-      !"metric" %in%
-        names(
-          executive_context()
-        )
-    )
-
-    # ---------------------------------------------------------------------
-    # Default seven graphs + table + insight are retained
-    # ---------------------------------------------------------------------
-
-    stopifnot(
-      identical(
-        selected_visuals$Overview,
-        expected_overview_defaults
-      )
-    )
-
-
-    # ---------------------------------------------------------------------
-    # Monthly data makes all 10 Monthly Site visuals available
-    # ---------------------------------------------------------------------
-
-    overview_registry <- picker_registry()
-
-      stopifnot(
-        identical(
-          overview_registry$id,
-          c(
-            "monthly_income_expenses",
-            "annual_performance_trend",
-            "budget_vs_actual",
-            "revenue_capture",
-            "key_insights"
-          )
-        )
-      )
-    
-      # ---------------------------------------------------------------------
-      # Overview visual configuration contract
-      # ---------------------------------------------------------------------
-
-      expected_visual_ids <- c(
-        "monthly_income_expenses",
-        "annual_performance_trend",
-        "budget_vs_actual",
-        "revenue_capture",
-        "key_insights"
-      )
-
-      stopifnot(
-        all(
-          overview_registry$focus == "Overview"
-        ),
-
-        all(
-          vapply(
-            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
-            function(spec) {
-              isTRUE(spec$default_selected)
-            },
-            logical(1)
-          )
-        ),
-
-        all(
-          vapply(
-            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
-            function(spec) {
-              isTRUE(spec$supports_year_review)
-            },
-            logical(1)
-          )
-        ),
-
-        all(
-          vapply(
-            EXECUTIVE_VISUAL_REGISTRY[expected_visual_ids],
-            function(spec) {
-              isTRUE(spec$supports_comparison)
-            },
-            logical(1)
-          )
-        ),
-
-        all(
-          overview_registry$source_group[
-            overview_registry$id != "key_insights"
-          ] == "monthly"
-        ),
-
-        identical(
-          EXECUTIVE_VISUAL_REGISTRY[["key_insights"]]$component_type,
-          "insight"
-        ),
-
-        identical(
-          EXECUTIVE_VISUAL_REGISTRY[["revenue_capture"]]$required_data,
-          c("finance", "discounts")
-        )
-      )
-
-      monthly_registry <- overview_registry[
-        overview_registry$source_group ==
-          "monthly",
-        ,
-        drop = FALSE
-      ]
-
-      detailed_registry <- overview_registry[
-        overview_registry$source_group ==
-          "detailed",
-        ,
-        drop = FALSE
-      ]
-
-      supporting_registry <- overview_registry[
-        overview_registry$source_group ==
-          "supporting",
-        ,
-        drop = FALSE
-      ]
-
-
-      stopifnot(
-
-        nrow(monthly_registry) == 4L,
-        all(
-          monthly_registry$available
-        ),
-
-        nrow(detailed_registry) == 0L,
-
-        nrow(supporting_registry) == 1L,
-        supporting_registry$available[[1L]],
-
-        identical(
-          supporting_registry$id[[1L]],
-          "key_insights"
-        ),
-
-        all(
-          overview_registry$focus ==
-            "Overview"
-        )
-      ) 
-
-    # ---------------------------------------------------------------------
-    # Apply a custom visual selection
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      visuals_monthly = c(
-        "monthly_income_expenses",
-        "budget_vs_actual"
-      ),
-      apply_visuals = 1
-    )
-
-    session$flushReact()
-
-      stopifnot(
-        identical(
-          selected_visuals$Overview,
-          c(
-            "monthly_income_expenses",
-            "budget_vs_actual"
-          )
-        )
-      )
-
-      session$setInputs(
-        dashboard_section = "site"
-      )
-
-      session$flushReact()
-    
-      stopifnot(
-        identical(
-          dashboard_contexts$Overview$site,
-          "All Monash Sport"
-        ),
-
-        identical(
-          dashboard_contexts$Overview$year,
-          "2026"
-        ),
-
-        identical(
-          dashboard_contexts$Overview$view_mode,
-          "Comparison"
-        ),
-
-        identical(
-          dashboard_contexts$Overview$comparison_year,
-          "2025"
-        )
-      )
-
-      session$setInputs(
-        view_mode = "Year Review",
-        year = "2026",
-        site = "Aquatics Clayton"
-      )
-
-      session$flushReact()
-
-      site_scope_context <-
-        executive_context()
-
-      stopifnot(
-        identical(
-          active_category(),
-          "Finance"
-        ),
-
-        identical(
-          active_focus(),
-          "Site"
-        ),
-
-        identical(
-          site_scope_context$site,
-          "Aquatics Clayton"
-        )
-      )
-
-      stopifnot(
-        identical(
-          selected_visuals$Site,
-          expected_site_defaults
-        )
-      )
-    
-    site_registry <- picker_registry()
-
-      stopifnot(
-        nrow(site_registry) > 0L,
-        all(
-          site_registry$focus == "Site"
-        )
-      )
-
-    # ---------------------------------------------------------------------
-    # Table and insight components can be selected
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      visuals_monthly = "site_values",
-      visuals_detailed = character(),
-      apply_visuals = 2
-    )
-
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        selected_visuals$Site,
-        "site_values"
-      )
-    )
-
-
-    # ---------------------------------------------------------------------
-    # Unavailable visuals must not be applied
-    # ---------------------------------------------------------------------
-    # Facility Ranking requires Detailed Site Report finance data.
-    # It is intentionally supplied here even though Detailed Site Reports
-    # are absent, to ensure the module removes unavailable selections.
-
-    session$setInputs(
-      visuals_monthly = "site_ranking",
-      visuals_detailed = "facility_ranking",
-      visuals_supporting = character(),
-      apply_visuals = 3
-    )
-
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        selected_visuals$Site,
-        "site_ranking"
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Overview, Site and Metrics maintain independent selections
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      dashboard_section = "metrics"
-    )
-
-    session$flushReact()
-
-    stopifnot(
-      identical(
-        dashboard_contexts$Site$site,
-        "Aquatics Clayton"
-      ),
-
-      identical(
-        dashboard_contexts$Site$view_mode,
-        "Year Review"
-      ),
-
-      identical(
-        dashboard_contexts$Site$year,
-        "2026"
-      )
-    )
-
-    metrics_scope_context <-
-      executive_context()
-
-    stopifnot(
-
-      identical(
-        active_category(),
-        "Metrics"
-      ),
-
-      identical(
-        active_focus(),
-        "Metrics"
-      ),
-
-      identical(
-        metrics_scope_context$site,
-        "All Venues"
-      ),
-
-      length(
-        selected_visuals$Metrics
-      ) == 0L,
-
-      nrow(
-        picker_registry()
-      ) == 0L,
-
-      identical(
-        selected_visuals$Overview,
-        c(
-          "monthly_income_expenses",
-          "budget_vs_actual"
-        )
-      ),
-          identical(
-            selected_visuals$Site,
-            "site_ranking"
-          )
-        )
-
-      # ---------------------------------------------------------------------
-      # Focus scopes remain independent after switching
-      # ---------------------------------------------------------------------
-
-      session$setInputs(
-        dashboard_section = "site"
-      )
-
-      session$flushReact()
-    
-      stopifnot(
-        identical(
-          dashboard_contexts$Metrics$site,
-          "All Venues"
-        ),
-
-        identical(
-          dashboard_contexts$Metrics$view_mode,
-          "Year Review"
-        )
-      )
-
-      site_round_trip_context <-
-        executive_context()
-
-      stopifnot(
-        identical(
-          active_focus(),
-          "Site"
-        ),
-
-        identical(
-          site_round_trip_context$site,
-          "Aquatics Clayton"
-        ),
-
-        identical(
-          dashboard_contexts$Site$site,
-          "Aquatics Clayton"
-        )
-      )
-
-      # ---------------------------------------------------------------------
-      # Return to Overview and confirm selections were preserved
-      # ---------------------------------------------------------------------
-
-      session$setInputs(
-        dashboard_section = "finance"
-      )
-
-      session$flushReact()
-
-      overview_round_trip_context <-
-        executive_context()
-
-      stopifnot(
-
-        identical(
-          active_category(),
-          "Finance"
-        ),
-
-        identical(
-          active_focus(),
-          "Overview"
-        ),
-
-        identical(
-          overview_round_trip_context$site,
-          "All Monash Sport"
-        ),
-
-        identical(
-          selected_visuals$Overview,
-          c(
-            "monthly_income_expenses",
-            "budget_vs_actual"
-          )
-        ),
-
-      identical(
-        selected_visuals$Site,
-        "site_ranking"
-      )
-    )
-  }
+# Build 2025 and 2026 finance for three reporting sites. The first site also
+# has operational reports. The organisation-wide total is deliberately absent;
+# the finance calculation must derive it from site summaries.
+finance_fixture <- expand.grid(
+  report_year = c(2025L, 2026L),
+  site = c("Health & Fitness Clayton", "Peninsula", "Participation Programs"),
+  metric = c("Income", "Expenses"),
+  value_type = c("Actual", "Budget"),
+  stringsAsFactors = FALSE
+)
+finance_fixture$is_summary <- TRUE
+finance_fixture$date <- as.Date(sprintf("%d-12-01", finance_fixture$report_year))
+finance_fixture$value <- ifelse(
+  finance_fixture$metric == "Income", 1000, 650
+) + ifelse(finance_fixture$value_type == "Budget", -100, 0) +
+  ifelse(finance_fixture$report_year == 2026L, 150, 0) +
+  ifelse(finance_fixture$site == "Peninsula", 100, 0)
+
+site_fixture <- make_site_detail_fixture()
+programme_enrolments <- data.frame(
+  report_year = 2025L, report_unit = "Participation Programs",
+  campus = "Clayton", date = as.Date(c("2025-01-01", "2025-03-01",
+                                           "2025-01-01", "2025-03-01")),
+  month = c(1L, 3L, 1L, 3L),
+  metric = c("Total Enrolments", "Total Enrolments", "Target", "Target"),
+  value = c(15, 20, 30, 40), stringsAsFactors = FALSE
+)
+site_fixture$enrollments <- rbind(site_fixture$enrollments,
+                                  programme_enrolments)
+
+executive_fixture <- shiny::reactiveVal(list(
+  monthly_reports = list(finance = finance_fixture),
+  site_reports = site_fixture,
+  venues_reports = NULL
+))
+
+# Calculation and chart preconditions ------------------------------------
+annual_site_finance <- calculate_site_annual_finance(
+  list(finance = finance_fixture)
+)
+stopifnot(
+  nrow(annual_site_finance) == 6L,
+  all(annual_site_finance$net_actual ==
+        annual_site_finance$income_actual - annual_site_finance$expenses_actual),
+  !"Monash Sport" %in% annual_site_finance$site,
+  length(unique(annual_site_finance$site)) == 3L
 )
 
-# -------------------------------------------------------------------------
-# Visual picker respects selected Executive context
-# -------------------------------------------------------------------------
-
-context_picker_data <- shiny::reactiveVal(
-  list(
-
-    monthly_reports = list(
-
-      finance = data.frame(
-        report_year = c(
-          2026L,
-          2027L,
-          2027L
-        ),
-        site = c(
-          "Aquatics Clayton",
-          "Aquatics Clayton",
-          "Esports"
-        ),
-        value = c(
-          1,
-          1,
-          1
-        ),
-        stringsAsFactors = FALSE
-      )
-    ),
-
-    site_reports = list(
-
-      finance = data.frame(
-        report_year = c(
-          2025L,
-          2027L
-        ),
-        report_unit = c(
-          "Aquatics",
-          "Aquatics"
-        ),
-        campus = c(
-          "Clayton",
-          "Clayton"
-        ),
-        business_unit = c(
-          "Pool Hire",
-          "Pool Hire"
-        ),
-        stringsAsFactors = FALSE
-      )
-    ),
-
-    venues_reports = NULL
-  )
+# Test chart helpers with deliberately incomplete data. Missing Direct or
+# Indirect must stay missing; a user cannot infer a verified Total Visits.
+visits_fixture <- data.frame(
+  report_year = c(2025L, 2025L),
+  site = c("Health & Fitness Clayton", "Peninsula"),
+  direct = c(315, 40), indirect = c(30, NA_real_),
+  stringsAsFactors = FALSE
 )
-
-
-shiny::testServer(
-  mod_executive_dashboard_server,
-  args = list(
-    data = context_picker_data
-  ),
-  {
-
-    # Move to Site focus first.
-    session$setInputs(
-      dashboard_section = "site"
-    )
-
-    session$flushReact()
-
-
-    # Aquatics has Detailed finance data in 2027.
-    session$setInputs(
-      view_mode = "Year Review",
-      year = "2027",
-      site = "Aquatics Clayton"
-    )
-
-    session$flushReact()
-
-
-    registry_2027 <- picker_registry()
-
-    facility_2027 <- registry_2027[
-      registry_2027$id ==
-        "facility_ranking",
-      ,
-      drop = FALSE
-    ]
-
-
-    stopifnot(
-      nrow(facility_2027) == 1L,
-      isTRUE(
-        facility_2027$available[[1L]]
-      )
-    )
-
-
-    # The same visual must become unavailable when the selected
-    # year has no Detailed Site Report data.
-    session$setInputs(
-      year = "2026"
-    )
-
-    session$flushReact()
-
-
-    registry_2026 <- picker_registry()
-
-    facility_2026 <- registry_2026[
-      registry_2026$id ==
-        "facility_ranking",
-      ,
-      drop = FALSE
-    ]
-
-
-    stopifnot(
-      nrow(facility_2026) == 1L,
-      !facility_2026$available[[1L]],
-      grepl(
-        "selected context",
-        facility_2026$availability_reason[[1L]],
-        fixed = TRUE
-      )
-    )
-
-
-    # Selecting a site with no Detailed report must also make the
-    # facility visual unavailable.
-    session$setInputs(
-      year = "2027",
-      site = "Esports"
-    )
-
-    session$flushReact()
-
-
-    registry_esports <- picker_registry()
-
-    facility_esports <- registry_esports[
-      registry_esports$id ==
-        "facility_ranking",
-      ,
-      drop = FALSE
-    ]
-
-
-    stopifnot(
-      nrow(facility_esports) == 1L,
-      !facility_esports$available[[1L]]
-    )
-  }
+membership_fixture <- data.frame(
+  report_year = 2025L, site = "Health & Fitness Clayton",
+  active_members = 510, stringsAsFactors = FALSE
 )
-
-# -------------------------------------------------------------------------
-# Future years and newly discovered sites
-# -------------------------------------------------------------------------
-
-future_executive_data <- shiny::reactiveVal(
-  list(
-
-    monthly_reports = list(
-
-      finance = data.frame(
-        report_year = c(
-          2027L,
-          2028L
-        ),
-        site = c(
-          "Esports",
-          "Esports"
-        ),
-        value = c(
-          100,
-          125
-        ),
-        stringsAsFactors = FALSE
-      ),
-
-      discounts = data.frame(
-        report_year = c(
-          2027L,
-          2028L
-        ),
-        site = c(
-          "Esports",
-          "Esports"
-        ),
-        value = c(
-          10,
-          12
-        ),
-        stringsAsFactors = FALSE
-      )
-    ),
-
-    site_reports = list(
-
-      finance = data.frame(
-        report_year = c(
-          2027L,
-          2028L
-        ),
-        report_unit = c(
-          "Esports",
-          "Esports"
-        ),
-        campus = c(
-          "Clayton",
-          "Clayton"
-        ),
-        business_unit = c(
-          "Esports Arena",
-          "Esports Arena"
-        ),
-        stringsAsFactors = FALSE
-      )
-    ),
-
-    venues_reports = NULL
-  )
+enrolment_fixture <- data.frame(
+  report_year = c(2025L, 2025L),
+  site = c("Health & Fitness Clayton", "Participation Programs"),
+  measure = c("Total Active", "Total Enrolments"),
+  actual = c(90, 20), target = c(100, 40),
+  stringsAsFactors = FALSE
 )
-
-future_monthly_fixture <- list(
-
-  finance = data.frame(
-    report_year = c(
-      2028L,
-      2028L
-    ),
-    site = c(
-      "Aquatics Clayton",
-      "Esports"
-    ),
-    value = c(
-      100,
-      200
-    ),
-    stringsAsFactors = FALSE
-  ),
-
-  discounts = data.frame(
-    report_year = c(
-      2028L,
-      2028L
-    ),
-    site = c(
-      "Aquatics Clayton",
-      "Esports"
-    ),
-    value = c(
-      10,
-      20
-    ),
-    stringsAsFactors = FALSE
-  )
-)
-
-
-future_esports_reports <-
-  executive_filter_monthly_reports_by_site(
-    monthly_reports =
-      future_monthly_fixture,
-    site =
-      "Esports"
-  )
-
 
 stopifnot(
-  nrow(
-    future_esports_reports$finance
-  ) == 1L,
-
-  identical(
-    future_esports_reports$finance$site[[1L]],
-    "Esports"
-  ),
-
-  identical(
-    future_esports_reports$finance$report_year[[1L]],
-    2028L
-  ),
-
-  nrow(
-    future_esports_reports$discounts
-  ) == 1L
+  identical(executive_site_plot_labels(visits_fixture), visits_fixture$site),
+  identical(executive_site_plot_labels(
+    rbind(visits_fixture, transform(visits_fixture, report_year = 2026L)))[[1L]],
+    "Health & Fitness Clayton (2025)"),
+  identical(executive_site_format_count(1234), "1,234"),
+  identical(executive_site_format_count(NA_real_), "Not reported"),
+  isTRUE(all.equal(site_detail_visit_value(site_fixture$visits[
+    site_fixture$visits$report_unit == "Health & Fitness" &
+      site_fixture$visits$report_year == 2025L, , drop = FALSE
+  ], "Direct", "Total"), 315)),
+  identical(site_detail_latest_membership_value(site_fixture$memberships,
+                                                 "Total Active"), 510)
 )
 
+# Every new Executive Site plot must be able to draw its documented input.
+plot_file <- tempfile(fileext = ".pdf")
+grDevices::pdf(plot_file, width = 12, height = 8, onefile = TRUE)
+plot_error <- tryCatch({
+  plot_executive_site_finances(
+    annual_site_finance[annual_site_finance$report_year == 2025L, ]
+  )
+  plot_executive_site_visits(visits_fixture)
+  plot_executive_site_memberships(membership_fixture)
+  plot_executive_site_enrolments(enrolment_fixture)
+  NULL
+}, error = function(e) e)
+grDevices::dev.off()
+unlink(plot_file)
+if (!is.null(plot_error)) stop(plot_error)
+
+# Explicitly reject duplicate site/year inputs, which would overcount a site.
+duplicate_error <- tryCatch({
+  plot_executive_site_visits(rbind(visits_fixture, visits_fixture[1L, ]))
+  NULL
+}, error = function(e) conditionMessage(e))
+stopifnot(is.character(duplicate_error),
+          grepl("duplicate", duplicate_error, ignore.case = TRUE))
+cat("PASS fixed Sites visual layout and plot inputs\n")
+
+# -------------------------------------------------------------------------
+# Executive module regression: protect Overview and verify Site behaviour
+# -------------------------------------------------------------------------
 shiny::testServer(
   mod_executive_dashboard_server,
-  args = list(
-    data = future_executive_data
-  ),
+  args = list(data = executive_fixture),
   {
-
-    session$setInputs(
-      dashboard_section = "site",
-      view_mode = "Year Review",
-      year = "2028",
-      site = "Esports"
-    )
-
+    session$setInputs(dashboard_section = "finance")
     session$flushReact()
+    stopifnot(identical(active_focus(), "Overview"),
+              identical(active_category(), "Finance"),
+              identical(available_executive_years(), c(2025L, 2026L)))
 
-
+    session$setInputs(view_mode = "Year Review", year = "2025",
+                      site = "Peninsula")
+    session$flushReact()
+    overview_context <- executive_context()
+    overview_kpis <- executive_kpi_specs()
     stopifnot(
-      identical(
-        available_executive_sites(),
-        c(
-          "All Monash Sport",
-          "Esports"
-        )
-      )
+      identical(overview_context$site, "All Monash Sport"),
+      identical(overview_context$view_mode, "Year Review"),
+      is.null(overview_context$comparison_year),
+      identical(vapply(overview_kpis, `[[`, character(1), "title"),
+                expected_overview_kpi_titles),
+      identical(vapply(overview_kpis, `[[`, character(1), "output_id"),
+                c("kpi_total_income", "kpi_total_expenses",
+                  "kpi_net_result", "kpi_budget_variance"))
     )
 
-
-    future_site_selector_html <-
-      output$site_selector$html
-
-
+    # The displayed financial KPIs must be backed by the same annual figures
+    # as the Overview charts, not independently recomputed Site totals.
+    kpi_finance <- executive_kpi_finance()
     stopifnot(
-      grepl(
-        "All Monash Sport",
-        future_site_selector_html,
-        fixed = TRUE
-      ),
-
-      grepl(
-        "Esports",
-        future_site_selector_html,
-        fixed = TRUE
-      )
+      !is.null(kpi_finance), nrow(kpi_finance) == 1L,
+      kpi_finance$report_year[[1L]] == 2025L,
+      isTRUE(all.equal(kpi_finance$net_actual[[1L]],
+                       kpi_finance$income_actual[[1L]] -
+                         kpi_finance$expenses_actual[[1L]]))
     )
 
-    future_context <-
-      executive_context()
-
-
+    # Overview's selected-year figures and historical series remain separate.
     stopifnot(
-      identical(
-        future_context$year,
-        "2028"
-      ),
-      identical(
-        future_context$site,
-        "Esports"
-      )
+      identical(executive_selected_years(), 2025L),
+      all(executive_monthly_finance()$report_year == 2025L),
+      all(executive_annual_finance()$report_year <= 2025L)
     )
 
+    session$setInputs(view_mode = "Comparison", year = "2026",
+                      comparison_year = "2025")
+    session$flushReact()
     stopifnot(
-      identical(
-        executive_context_years(
-          future_context
-        ),
-        2028L
-      )
+      identical(executive_context_years(executive_context()),
+                c(2025L, 2026L)),
+      identical(executive_context()$site, "All Monash Sport"),
+      identical(executive_context()$view_mode, "Comparison"),
+      length(executive_kpi_specs()) == 4L
     )
+    comparison_finance <- executive_kpi_comparison_finance()
+    stopifnot(
+      !is.null(comparison_finance), nrow(comparison_finance) == 1L,
+      comparison_finance$report_year[[1L]] == 2025L,
+      executive_kpi_finance()$report_year[[1L]] == 2026L
+    )
+    cat("PASS Overview KPI and Year Review/Comparison regression\n")
+
 
     # ---------------------------------------------------------------------
-    # Removing the selected Site must clear stale Executive scope.
+    # Retained Overview regression: exact KPI labels and period boundaries
     # ---------------------------------------------------------------------
+    # A UI that merely renders four cards could still display the wrong
+    # comparison values. Verify the signed differences against report data.
+    current_finance <- executive_kpi_finance()
+    previous_finance <- executive_kpi_comparison_finance()
+    comparison_specs <- executive_kpi_specs()
+    overview_fields <- c("income_actual", "expenses_actual", "net_actual",
+                         "budget_variance")
+    stopifnot(!is.null(current_finance), !is.null(previous_finance),
+              length(comparison_specs) == length(overview_fields))
 
-    future_executive_data(
-      list(
-
-        monthly_reports = list(
-
-          finance = data.frame(
-            report_year = 2028L,
-            site = "Aquatics Clayton",
-            value = 100,
-            stringsAsFactors = FALSE
-          ),
-
-          discounts = data.frame(
-            report_year = 2028L,
-            site = "Aquatics Clayton",
-            value = 10,
-            stringsAsFactors = FALSE
-          )
-        ),
-
-        site_reports = NULL,
-
-        venues_reports = NULL
-      )
-    )
-
-    session$flushReact()
-
-
-    stopifnot(
-      identical(
-        available_executive_sites(),
-        c(
-          "All Monash Sport",
-          "Aquatics Clayton"
+    for (index in seq_along(overview_fields)) {
+      field <- overview_fields[[index]]
+      current_value <- current_finance[[field]][[1L]]
+      previous_value <- previous_finance[[field]][[1L]]
+      actual_label <- comparison_specs[[index]]$comparison
+      if (is.finite(current_value) && is.finite(previous_value)) {
+        difference <- current_value - previous_value
+        expected_label <- paste0(
+          if (difference > 0) "+" else "",
+          format_compact_currency(difference), " vs 2025"
         )
-      )
-    )
-
-
-    removed_site_selector_html <-
-      output$site_selector$html
-
-
-    stopifnot(
-      grepl(
-        "All Monash Sport",
-        removed_site_selector_html,
-        fixed = TRUE
-      ),
-
-      !grepl(
-        "Esports",
-        removed_site_selector_html,
-        fixed = TRUE
-      )
-    )
-
-
-    # Explicitly simulate stale browser state.
-    session$setInputs(
-      site = "Esports"
-    )
-
-    session$flushReact()
-
-
-    removed_site_context <-
-      executive_context()
-
-
-    stopifnot(
-      identical(
-        removed_site_context$site,
-        "All Monash Sport"
-      )
-    )
-
-    # Restore the future-site fixture for the remaining tests.
-
-      future_executive_data(
-        list(
-
-          monthly_reports = list(
-
-            finance = data.frame(
-              report_year = c(
-                2027L,
-                2028L
-              ),
-              site = c(
-                "Esports",
-                "Esports"
-              ),
-              value = c(
-                100,
-                125
-              ),
-              stringsAsFactors = FALSE
-            ),
-
-            discounts = data.frame(
-              report_year = c(
-                2027L,
-                2028L
-              ),
-              site = c(
-                "Esports",
-                "Esports"
-              ),
-              value = c(
-                10,
-                12
-              ),
-              stringsAsFactors = FALSE
-            )
-          ),
-
-          site_reports = list(
-
-            finance = data.frame(
-              report_year = c(
-                2027L,
-                2028L
-              ),
-              report_unit = c(
-                "Esports",
-                "Esports"
-              ),
-              campus = c(
-                "Clayton",
-                "Clayton"
-              ),
-              business_unit = c(
-                "Esports Arena",
-                "Esports Arena"
-              ),
-              stringsAsFactors = FALSE
-            )
-          ),
-
-          venues_reports = NULL
-        )
-      )
-
-      session$flushReact()
-
-      session$setInputs(
-        site = "Esports"
-      )
-
-      session$flushReact()
-
-    future_registry <- picker_registry()
-
-    future_site_ranking <- future_registry[
-      future_registry$id ==
-        "site_ranking",
-      ,
-      drop = FALSE
-    ]
-
-    future_facility_ranking <- future_registry[
-      future_registry$id ==
-        "facility_ranking",
-      ,
-      drop = FALSE
-    ]
-
-
-    stopifnot(
-      nrow(future_site_ranking) == 1L,
-      isTRUE(
-        future_site_ranking$available[[1L]]
-      ),
-
-      nrow(future_facility_ranking) == 1L,
-      isTRUE(
-        future_facility_ranking$available[[1L]]
-      )
-    )
-
-
-    # Future-year comparison must also work without any APP_YEARS
-    # assumption inside the Executive context/availability layer.
-    session$setInputs(
-      view_mode = "Comparison",
-      year = "2028",
-      comparison_year = "2027",
-      site = "Esports"
-    )
-
-    session$flushReact()
-
-
-    future_comparison_context <-
-      executive_context()
-
-
-    stopifnot(
-      identical(
-        executive_context_years(
-          future_comparison_context
-        ),
-        c(
-          2027L,
-          2028L
-        )
-      )
-    )
-
-
-    comparison_registry <-
-      picker_registry()
-
-
-    comparison_facility_ranking <-
-      comparison_registry[
-        comparison_registry$id ==
-          "facility_ranking",
-        ,
-        drop = FALSE
-      ]
-
-
-    stopifnot(
-      nrow(
-        comparison_facility_ranking
-      ) == 1L,
-
-      isTRUE(
-        comparison_facility_ranking$available[[1L]]
-      )
-    )
-
-    # ---------------------------------------------------------------------
-    # Dynamic Site scope remains independent across focus round trips.
-    # ---------------------------------------------------------------------
-
-    session$setInputs(
-      dashboard_section = "metrics"
-    )
-
-    session$flushReact()
-
-    future_metrics_context <-
-      executive_context()
-
-    stopifnot(
-      identical(
-        active_focus(),
-        "Metrics"
-      ),
-
-      identical(
-        future_metrics_context$site,
-        "All Venues"
-      )
-    )
-
-
-    session$setInputs(
-      dashboard_section = "finance"
-    )
-
-    session$flushReact()
-
-    future_overview_context <-
-      executive_context()
-
-    stopifnot(
-      identical(
-        active_focus(),
-        "Overview"
-      ),
-
-      identical(
-        future_overview_context$site,
-        "All Monash Sport"
-      )
-    )
-
-
-    session$setInputs(
-      dashboard_section = "site"
-    )
-
-    session$flushReact()
-
-    future_site_round_trip_context <-
-      executive_context()
-
-    stopifnot(
-      identical(
-        active_focus(),
-        "Site"
-      ),
-
-      identical(
-        future_site_round_trip_context$site,
-        "Esports"
-      ),
-
-      "Esports" %in%
-        available_executive_sites()
-    )
+        stopifnot(identical(actual_label, expected_label))
+      } else {
+        stopifnot(is.null(actual_label))
       }
+    }
+
+    # Year Review must use only its selected year for monthly plots, but
+    # historical years up to that year for annual charts. Switching back to
+    # Comparison must use the two selected years, without leaking context.
+    session$setInputs(view_mode = "Year Review", year = "2026")
+    session$flushReact()
+    stopifnot(
+      identical(executive_selected_years(), 2026L),
+      all(executive_monthly_finance()$report_year == 2026L),
+      all(executive_annual_finance()$report_year <= 2026L),
+      is.null(executive_kpi_comparison_finance()),
+      all(vapply(executive_kpi_specs(), function(x) is.null(x$comparison),
+                 logical(1)))
     )
 
-  cat(
-    "PASS Executive Dashboard visual picker\n"
+    year_review_finance <- executive_kpi_finance()
+    year_review_specs <- executive_kpi_specs()
+    for (index in seq_along(overview_fields)) {
+      value <- year_review_finance[[overview_fields[[index]]]][[1L]]
+      expected_value <- if (is.finite(value)) {
+        format_compact_currency(value)
+      } else {
+        "—"
+      }
+      stopifnot(identical(year_review_specs[[index]]$value, expected_value))
+    }
+
+    session$setInputs(view_mode = "Comparison", year = "2026",
+                      comparison_year = "2025")
+    session$flushReact()
+    stopifnot(
+      identical(executive_context()$view_mode, "Comparison"),
+      identical(executive_context()$site, "All Monash Sport"),
+      identical(executive_selected_years(), c(2025L, 2026L)),
+      all(executive_monthly_finance()$report_year %in% c(2025L, 2026L)),
+      all(executive_annual_finance()$report_year %in% c(2025L, 2026L))
+    )
+    cat("PASS detailed Overview KPI and period-boundary regression\n")
+
+    # Site: all reporting units are visible without an individual site filter.
+    session$setInputs(dashboard_section = "site")
+    session$flushReact()
+    session$setInputs(view_mode = "Year Review", year = "2025")
+    session$flushReact()
+    stopifnot(
+      identical(active_focus(), "Site"),
+      identical(executive_context()$site, "All Monash Sport"),
+      identical(executive_selected_years(), 2025L),
+      nrow(executive_site_financial_rows()) == 3L,
+      length(unique(executive_site_financial_rows()$site)) == 3L
+    )
+
+    operational <- executive_site_operational_rows()
+    hf <- operational[operational$report_unit == "Health & Fitness" &
+                        operational$report_year == 2025L, , drop = FALSE]
+    prog <- operational[operational$report_unit == "Participation Programs" &
+                          operational$report_year == 2025L, , drop = FALSE]
+    stopifnot(
+      nrow(hf) == 1L, nrow(prog) == 1L,
+      isTRUE(all.equal(hf$direct, 315)),
+      isTRUE(all.equal(hf$indirect, 30)),
+      isTRUE(all.equal(hf$active_members, 510)),
+      isTRUE(all.equal(hf$actual, 90)),
+      identical(hf$measure[[1L]], "Total Active"),
+      isTRUE(all.equal(prog$actual, 20)),
+      identical(prog$measure[[1L]], "Total Enrolments")
+    )
+
+    current <- executive_site_snapshot_kpis(2025L)
+    site_kpis <- executive_kpi_specs()
+    stopifnot(
+      isTRUE(all.equal(current$visits, 345)),
+      current$visit_sites == 1L,   # Peninsula reports Direct only.
+      isTRUE(all.equal(current$members, 510)),
+      current$member_sites == 1L,
+      isTRUE(all.equal(current$programmes, 20)),
+      current$programme_sites == 1L,
+      current$sites >= 3L,
+      identical(vapply(site_kpis, `[[`, character(1), "title"),
+                expected_site_kpi_titles),
+      length(site_kpis) == 4L,
+      identical(site_kpis[[1L]]$value, "345"),
+      identical(site_kpis[[2L]]$value, "510"),
+      # The fixture has no 2024 comparison visits.
+      identical(site_kpis[[3L]]$value, "—"),
+      # All three financial sites have a positive Net Result.
+      identical(site_kpis[[4L]]$value, "3 / 3")
+    )
+
+    # Only one selected year is used for the Site board in Year Review.
+    stopifnot(
+      all(executive_site_visits_rows()$report_year == 2025L),
+      all(executive_site_membership_rows()$report_year == 2025L),
+      all(executive_site_enrolment_rows()$report_year == 2025L)
+    )
+
+    # Site Comparison must use exactly the two selected years; rankings are
+    # calculated within each year, not across the two years combined.
+    session$setInputs(view_mode = "Comparison", year = "2026",
+                      comparison_year = "2025")
+    session$flushReact()
+    stopifnot(
+      identical(executive_context_years(executive_context()),
+                c(2025L, 2026L)),
+      all(executive_site_financial_rows()$report_year %in% c(2025L, 2026L)),
+      nrow(executive_site_financial_rows()) == 6L,
+      length(executive_kpi_specs()) == 4L
+    )
+
+    # The set of sites contributing visits changes between years. A numerical
+    # comparison would be misleading; the KPI must acknowledge that coverage.
+    compare_site_kpis <- executive_kpi_specs()
+    stopifnot(grepl("Reporting coverage differs",
+                    compare_site_kpis[[1L]]$comparison, fixed = TRUE))
+    cat("PASS Sites operational measures, rankings and comparison context\n")
+  }
+)
+
+
+# -------------------------------------------------------------------------
+# Newly discovered reporting units and future years remain supported
+# -------------------------------------------------------------------------
+# The Executive Sites dashboard must not hard-code the six sample site names,
+# nor ignore future reporting years not listed in the current templates.
+future_finance <- finance_fixture[
+  finance_fixture$report_year == 2026L &
+    finance_fixture$site == "Peninsula", , drop = FALSE
+]
+future_finance$report_year <- 2027L
+future_finance$site <- "Esports"
+future_finance$date <- as.Date("2027-12-01")
+future_reports <- shiny::reactiveVal(list(
+  monthly_reports = list(finance = rbind(finance_fixture, future_finance)),
+  site_reports = NULL,
+  venues_reports = NULL
+))
+
+shiny::testServer(mod_executive_dashboard_server,
+                  args = list(data = future_reports), {
+  session$setInputs(dashboard_section = "site")
+  session$flushReact()
+  stopifnot(2027L %in% available_executive_years(),
+            "Esports" %in% available_executive_sites())
+
+  session$setInputs(view_mode = "Year Review", year = "2027")
+  session$flushReact()
+  stopifnot(
+    identical(executive_context()$year, "2027"),
+    identical(executive_context()$site, "All Monash Sport"),
+    "Esports" %in% executive_site_financial_rows()$site,
+    all(executive_site_financial_rows()$report_year == 2027L)
   )
+  # Replacing the uploaded set must reconcile a now-missing selected year.
+  future_reports(list(monthly_reports = list(finance = finance_fixture),
+                      site_reports = NULL, venues_reports = NULL))
+  session$flushReact()
+  stopifnot(
+    !2027L %in% available_executive_years(),
+    !"Esports" %in% available_executive_sites()
+  )
+})
+cat("PASS newly discovered Site and future-year regression\n")
+
+cat("PASS test_executive_dashboard.R\n")
+
+
+# -------------------------------------------------------------------------
+# Executive Sites presentation regressions (card legends, hover, insights)
+# -------------------------------------------------------------------------
+site_ui_html <- paste(as.character(executive_site_dashboard_ui(
+  shiny::NS("test-site"), "Year Review · 2025 · All Sites"
+)), collapse = "")
+site_insights_html <- paste(as.character(
+  executive_site_insights_card_ui(shiny::NS("test-site"))
+), collapse = "")
+stopifnot(
+  grepl("executive-site-header-legend", site_ui_html, fixed = TRUE),
+  grepl("executive_hover_site_finances", site_ui_html, fixed = TRUE),
+  grepl("executive_hover_site_visits", site_ui_html, fixed = TRUE),
+  grepl("executive_hover_site_memberships", site_ui_html, fixed = TRUE),
+  grepl("executive_hover_site_enrolments", site_ui_html, fixed = TRUE),
+  grepl("executive_hover_value_site_finances", site_ui_html, fixed = TRUE),
+  grepl("site_key_insights", site_insights_html, fixed = TRUE)
+)
+
+shiny::testServer(mod_executive_dashboard_server,
+                  args = list(data = executive_fixture), {
+  session$setInputs(dashboard_section = "site", view_mode = "Year Review",
+                    year = "2025")
+  session$flushReact()
+  rows <- executive_site_visits_rows()
+  prepared <- executive_site_hover_rows(rows, "site_visits")
+  text <- executive_site_hover_text(rows,
+                                    list(x = 1, y = nrow(prepared)),
+                                    "site_visits")
+  stopifnot(
+    grepl("Direct", text, fixed = TRUE),
+    grepl("Indirect", text, fixed = TRUE),
+    grepl("Total", text, fixed = TRUE)
+  )
+  stopifnot(grepl("Hover over", executive_site_hover_text(rows, NULL,
+                "site_visits"), fixed = TRUE))
+  insights <- output$site_key_insights$html
+  stopifnot(grepl("Highest Net Result", insights, fixed = TRUE),
+            grepl("Most visits", insights, fixed = TRUE))
+})
+cat("PASS Sites legends, exact-value hover and site-specific insights\n")
