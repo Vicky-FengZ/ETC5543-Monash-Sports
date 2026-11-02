@@ -56,6 +56,9 @@ load_test_setup <- function() {
     source(file, local = globalenv())
   }
   install_test_parse_cache()
+  # Forecasting plan inputs update at once (the app waits for a pause in
+  # typing); test_forecasting_layout.R checks the delay itself.
+  options(monash_sport.forecast_input_delay = 0)
   invisible(TRUE)
 }
 

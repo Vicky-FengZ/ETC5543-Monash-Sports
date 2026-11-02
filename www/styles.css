@@ -31,6 +31,15 @@ body {
   background-color: var(--ms-page-bg);
 }
 
+/* Busy indicators give a recalculating output a minimum height so its
+   spinner can show. For an output that is empty (a status note that only
+   appears when there is something to say) that pushes everything below it
+   down and back up on every update, so the charts jump. Empty outputs keep
+   no height; the charts themselves still show their own spinner. */
+.shiny-html-output.recalculating:empty {
+  min-height: 0 !important;
+}
+
 /* Forecasting: a planning workflow with clearly separated assumptions. */
 .forecast-controls { margin-bottom: 20px; }
 .forecast-controls .bslib-grid { margin-bottom: 0 !important; }
