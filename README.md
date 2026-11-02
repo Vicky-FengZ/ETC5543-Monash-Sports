@@ -15,8 +15,12 @@ uploaded reports never leave your computer).
 **Who this repository is for**
 
 - **Monash Sport staff** using the dashboard with their own reports: start
-  with the [user guide](docs/user_guide.md), which explains how to run the
-  dashboard, store the report workbooks and upload them.
+  with the [user guide](docs/user_guide.pdf) (PDF; also as a web page,
+  `docs/user_guide.html`), a step-by-step guide for non-technical users
+  covering every page, forecasting and common problems.
+- **Maintainers** looking after the code: see the
+  [maintainer guide](docs/maintainer_guide.md) for running the dashboard from
+  RStudio, testing on the real reports and publishing a new version.
 - **Reviewers and other readers** without access to the confidential reports:
   follow the [Quick start](#quick-start) with the synthetic workbooks in
   `data/sample/` and run `tests/run_sample_tests.R` (see [Testing](#testing)).
@@ -47,7 +51,7 @@ compared without navigating the files by hand.
 
 | Page | What it shows | Data needed |
 |---|---|---|
-| Executive Dashboard | One-page, presentation-ready summary of finance KPIs and charts you choose, with a full-screen Presentation View | Monthly Site Reports; Detailed Site Reports add facility charts |
+| Executive Dashboard | One-page, presentation-ready summary in three views: Overview (finance KPIs, four standard charts whose exact values show on hover, a Financial Summary table and key insights), Site and Metrics (charts you choose); a year can be reviewed alone or compared with another, and Presentation View shows it full screen | Monthly Site Reports; Detailed Site Reports add facility charts |
 | Overview | Organisation-wide income, expenses, budget variance and revenue opportunity over time | Monthly Site Reports |
 | Site Comparison | Sites side by side, then a facility breakdown for one site | Monthly Site Reports, Detailed Site Reports |
 | Detailed Analysis → Site Detail | Visits, memberships and enrolments for one site and year | Detailed Site Reports |
@@ -86,7 +90,7 @@ successful imports.
 
 The Monash Sport source workbooks are **confidential and are not included**
 in this repository. Monash Sport staff can find how to store and upload them
-in the [user guide](docs/user_guide.md). Everyone else can use the synthetic
+in the [user guide](docs/user_guide.pdf). Everyone else can use the synthetic
 sample workbooks described below.
 
 ### Synthetic sample data
@@ -151,8 +155,11 @@ time after.
   **Choose report type** box: pick the type and select **Add**, or
   **Dismiss** it. If the chosen type does not fit the workbook, the error says
   so.
-- A workbook that is already loaded with the same name and size is skipped,
+- A workbook that is already loaded with the same name and contents is skipped,
   so choosing the whole folder again only reads new or changed reports.
+  Content fingerprints are also kept in saved data. Older saves without a
+  fingerprint still load; selecting the Excel file again checks it by parsing
+  it once.
 - Other files in the selection are ignored, and a summary under the buttons
   lists what was matched, skipped, left for a type or ignored.
 
@@ -216,7 +223,7 @@ cleaned data can be kept in a file and loaded again:
   data saved more than 30 days ago is flagged as possibly out of date.
 - The saved file can be chosen together with the reports, for example by
   choosing the report folder that holds it. The saved data is loaded first;
-  reports with the same name and size are skipped, and newer versions replace
+  reports with the same name and contents are skipped, and changed versions replace
   their saved copies.
 - Loaded files behave like uploads: they can be removed, and the session can
   be saved again.
@@ -529,7 +536,11 @@ data/
   sample/                 # synthetic workbooks with the report layouts (random values)
 
 docs/
-  user_guide.md           # for Monash Sport staff: running, storing and uploading reports
+  user_guide.qmd          # for Monash Sport staff: step-by-step guide (Quarto source)
+  user_guide.pdf, .html   # rendered user guide
+  user_guide.css          # look of the HTML user guide
+  images/user_guide/      # screenshots used in the user guide (synthetic data)
+  maintainer_guide.md     # for maintainers: RStudio, full tests, publishing
   dashboard_design.md     # brand colours, typography and layout rules
   data_dictionary.md      # every cleaned table and column
   excel_templates.md      # how to fill in and extend the templates
@@ -556,7 +567,7 @@ deploy/
 tests/
   run_tests.R             # regression tests (see Testing)
   run_sample_tests.R      # same, plus parsing every workbook in data/sample
-  run_full_tests.R        # same, on the original reports (see docs/user_guide.md)
+  run_full_tests.R        # same, on the original reports (see docs/maintainer_guide.md)
   README.md               # what each test file checks and how to run them
   fixtures_site_venues.R  # shared test fixtures
   helper_parse_cache.R    # parses each sample workbook once per run
@@ -592,8 +603,10 @@ quarto render report/report.qmd
 quarto render slides/slides.qmd
 ```
 
-The report is rendered twice, as a PDF in the Monash report format and as a
-one-page website, both into `report/_output/` (see `report/README.md`).
+The report is rendered twice, as a PDF in the Monash report format
+(`report/report.pdf`) and as a one-page website (`report/index.html`); see
+`report/README.md`. Rendering runs R code, so knitr is recorded in
+`renv.lock` with the dashboard's packages.
 
 The slides use the bundled `quarto-monash` theme in `slides/_extensions/` and
 need no R packages. `slides/slides.html` is the rendered, self-contained
@@ -649,7 +662,7 @@ rerun with `Sys.setenv(MONASH_SPORT_UPDATE_KEY_NUMBERS = "true")`, review
 the differences in the file and keep it.
 
 Monash Sport maintainers with the original reports can run the same suite on
-them; see section 6 of the [user guide](docs/user_guide.md).
+them; see section 2 of the [maintainer guide](docs/maintainer_guide.md).
 
 ## Performance and website deployment
 
@@ -670,3 +683,8 @@ app from RStudio for the fastest parsing.
 The code and documentation are released under the [MIT Licence](LICENSE).
 Monash University and Monash Sport names, logos and brand assets, and the
 Monash Sport report data, are not covered by this licence.
+
+The Quarto templates in `slides/_extensions/` and `report/_extensions/` come
+from [quarto-monash](https://github.com/quarto-monash) (CC0). The fonts
+bundled with the report template (Fira Sans, XCharter, Font Awesome Free)
+keep their own open licences.

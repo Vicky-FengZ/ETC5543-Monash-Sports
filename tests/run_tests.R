@@ -7,6 +7,14 @@
 # MONASH_SPORT_TEST_WORKERS=1 to run everything in this R session, one file
 # after another, for example when debugging a failing test.
 
+# Use the project's package library (renv) even when this R session was not
+# started in the project (for example after setwd()). Otherwise the tests
+# run on whatever versions are installed elsewhere, which can be older than
+# the ones recorded in renv.lock.
+if (file.exists(file.path("renv", "activate.R")) && !nzchar(Sys.getenv("RENV_PROJECT"))) {
+  source(file.path("renv", "activate.R"))
+}
+
 required <- c("shiny", "bslib", "bsicons", "readxl", "writexl")
 missing <- required[!vapply(required, requireNamespace, logical(1L), quietly = TRUE)]
 
@@ -56,6 +64,9 @@ load_test_setup <- function() {
     source(file, local = globalenv())
   }
   install_test_parse_cache()
+  # Forecasting plan inputs update at once (the app waits for a pause in
+  # typing); test_forecasting_layout.R checks the delay itself.
+  options(monash_sport.forecast_input_delay = 0)
   invisible(TRUE)
 }
 
@@ -67,12 +78,15 @@ test_groups <- list(
     "test_data_pipeline_regressions.R", 
     "test_venues_tracking_extensions.R",
     "test_basic_upload.R", 
+    "test_upload_integrity.R",
     "test_upload_warnings.R", 
     "test_extensible_imports.R",
     "test_excel_templates.R", 
     "test_cross_page_consistency.R"
   )),
   list(files = "test_upload_realworld.R"),
+  # Broken copies of the sample workbooks: each data check must catch its fault.
+  list(files = "test_data_checks.R"),
   list(files = c(
     "test_forecasting.R", 
     "test_forecasting_simple.R", 
@@ -129,6 +143,19 @@ run_test_group <- function(group) {
 test_workers <- suppressWarnings(as.integer(Sys.getenv("MONASH_SPORT_TEST_WORKERS", unset = "")))
 if (is.na(test_workers)) {
   test_workers <- max(1L, min(8L, parallel::detectCores() - 1L, length(test_groups)), na.rm = TRUE)
+}
+
+# Running in this session uses the packages already loaded here. If an older
+# shiny was loaded before the project library was switched on, restart R.
+if (test_workers == 1L && "shiny" %in% loadedNamespaces()) {
+  installed <- utils::packageVersion("shiny", lib.loc = .libPaths()[[1L]])
+  if (getNamespaceVersion("shiny") != as.character(installed)) {
+    stop(
+      "shiny ", getNamespaceVersion("shiny"), " is loaded but the project uses ", installed,
+      ". Restart R (Session > Restart R) and run the tests again.",
+      call. = FALSE
+    )
+  }
 }
 
 if (test_workers > 1L) {

@@ -25,16 +25,7 @@ placeholder_chart <- function(
 }
 
 
-prototype_note <- function(
-  text = "Prototype values are placeholders for layout demonstration only"
-) {
-  span(
-    class = "prototype-note",
-    text
-  )
-}
-
-
+# Subtitle line under a chart card's title.
 chart_subtitle <- function(...) {
   div(
     class = "chart-header-subtitle",

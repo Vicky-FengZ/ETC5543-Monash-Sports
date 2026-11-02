@@ -230,20 +230,104 @@ shiny::testServer(
   }
 )
 
-# 5. A new report year (2026) reaches the year choices of the pages that
-# read their years from the data.
+# 4b. A Detailed Site Report whose file name does not name the business unit
+# (only the year, or extra words) takes the unit from the Finance sheet
+# title, with a warning, instead of failing or inventing a new unit.
+site_sample <- function(unit) {
+  sample_file(
+    "Business Unit Templates that feed master reports", "2025",
+    paste0(unit, if (unit == "Participation") " Program" else " Site", " Report 2025.xlsx")
+  )
+}
+unit_of <- function(result) unique(result$finance$report_unit)
+has_warning <- function(result, pattern) {
+  issues <- result$validation
+  any(issues$level == "warning" & grepl(pattern, issues$message, fixed = TRUE))
+}
+title_sheet <- function(...) {
+  sheet <- as.data.frame(list(...), stringsAsFactors = FALSE)
+  names(sheet) <- paste0("column_", seq_along(sheet))
+  sheet
+}
+stopifnot(
+  identical(business_unit_title_from_finance(
+    title_sheet(NA, NA, NA, NA, "AQUATICS (CLAYTON)")), "AQUATICS"),
+  identical(business_unit_title_from_finance(
+    title_sheet("Business unit", "New Sport")), "New Sport"),
+  identical(business_unit_title_from_finance(title_sheet("INCOME", "Budget")), ""),
+  identical(business_unit_title_from_finance(NULL), ""),
+  identical(resolve_business_unit_report_name("2025.xlsx",
+    title_sheet(NA, "PARTICIPATION PROGRAMS"))$unit, "Participation Programs"),
+  identical(resolve_business_unit_report_name("Tennis Site Report 2026.xlsx",
+    title_sheet(NA, "TENNIS"))$unit, "Tennis"),
+  is.null(resolve_business_unit_report_name("Tennis Site Report 2026.xlsx",
+    title_sheet(NA, "TENNIS"))$note),
+  inherits(tryCatch(resolve_business_unit_report_name("2025.xlsx", NULL),
+    error = identity), "error")
+)
+
+year_only <- parsers$site_detail(copy_as(site_sample("Aquatics"), "2025.xlsx"), "2025.xlsx")
+extra_words <- parsers$site_detail(
+  copy_as(site_sample("Caulfield"), "Final 2025.xlsx"), "Final 2025.xlsx"
+)
+mismatch <- parsers$site_detail(
+  copy_as(site_sample("Venues"), "Peninsula Site Report 2025.xlsx"),
+  "Peninsula Site Report 2025.xlsx"
+)
+named <- parsers$site_detail(site_sample("Health & Fitness"), basename(site_sample("Health & Fitness")))
+stopifnot(
+  !any(year_only$validation$level == "error"),
+  identical(unit_of(year_only), "Aquatics"),
+  has_warning(year_only, "taken from the Finance sheet title: Aquatics"),
+  identical(unit_of(extra_words), "Caulfield"),
+  has_warning(extra_words, "“Final” in the file name is not a known business unit"),
+  identical(unit_of(mismatch), "Peninsula"),
+  has_warning(mismatch, "the Finance sheet title says Venues"),
+  identical(unit_of(named), "Health & Fitness"),
+  !has_warning(named, "Finance sheet title")
+)
+
+# In the dashboard: "2025.xlsx" waits for a type, then counts as Aquatics,
+# so it cannot be added next to the Aquatics 2025 report.
+shiny::testServer(
+  mod_data_upload_server,
+  {
+    session$flushReact()
+    aquatics <- site_sample("Aquatics")
+    session$setInputs(all_reports = upload_frame(aquatics))
+    session$flushReact()
+    year_only_path <- copy_as(aquatics, "2025.xlsx")
+    session$setInputs(all_reports = upload_frame(year_only_path))
+    session$flushReact()
+    pending <- pending_files()
+    stopifnot(identical(pending$name, "2025.xlsx"))
+    session$setInputs(assign_file = list(id = pending$pending_id, action = "add", type = "site_detail"))
+    session$flushReact()
+    uploads <- session$returned()$uploads
+    row <- uploads[uploads$original_name == "2025.xlsx", , drop = FALSE]
+    stopifnot(
+      row$status == "failed",
+      grepl("Detailed Site Reports for Aquatics 2025 are already loaded", row$error_message, fixed = TRUE)
+    )
+  }
+)
+
+# 5. A new report year (2026) reaches the year choices of every page and the
+# forecast.
 shift_report_year <- function(report, from, to) {
   for (name in names(report)) {
     table <- report[[name]]
     if (!is.data.frame(table) || !"report_year" %in% names(table)) next
     rows <- !is.na(table$report_year) & table$report_year == from
     table$report_year[rows] <- to
+    # Dates move by the same number of years (a report can hold earlier
+    # years too, e.g. Venues wage history); 29 February becomes 1 March.
     for (column in names(table)) {
       if (inherits(table[[column]], "Date")) {
         dated <- rows & !is.na(table[[column]])
-        table[[column]][dated] <- as.Date(paste0(
-          to, substr(format(table[[column]][dated]), 5L, 10L)
-        ))
+        moved <- as.POSIXlt(table[[column]][dated])
+        moved$year <- moved$year + (to - from)
+        table[[column]][dated] <- as.Date(moved)
       }
     }
     report[[name]] <- table
@@ -274,6 +358,51 @@ shiny::testServer(
     session$flushReact()
     stopifnot(2026L %in% available_years())
   }
+)
+
+# The other pages take their years from the data too: with a 2026 report of
+# each kind, 2026 reaches every year choice and the forecast runs into 2027.
+# Nothing is fixed to 2021-2025.
+site_2025 <- parsers$site_detail(aquatics_2025, basename(aquatics_2025))
+venues_2025_report <- parsers$venues_tracking(venues_2025, basename(venues_2025))
+sites_two_years <- combine_basic_upload_results(
+  list(site_2025, shift_report_year(site_2025, 2025L, 2026L)),
+  "business_unit_template_report_data"
+)
+venues_two_years <- combine_basic_upload_results(
+  list(venues_2025_report, shift_report_year(venues_2025_report, 2025L, 2026L)),
+  "venues_tracking_report_data"
+)
+stopifnot(
+  identical(site_detail_available_years(sites_two_years), c(2025L, 2026L)),
+  any(grepl("Aquatics", site_detail_available_sites(sites_two_years, year = 2026))),
+  2026L %in% venues_operations_available_years(venues_two_years)
+)
+
+all_new_year_data <- shiny::reactiveVal(list(
+  monthly_reports = monthly_two_years, monthly = monthly_two_years,
+  site_reports = sites_two_years, venues_reports = venues_two_years
+))
+shiny::testServer(
+  mod_executive_dashboard_server,
+  args = list(data = all_new_year_data),
+  {
+    session$setInputs(dashboard_section = "finance")
+    session$flushReact()
+    overview_years <- available_executive_years()
+    session$setInputs(dashboard_section = "metrics")
+    session$flushReact()
+    stopifnot(2026L %in% overview_years, 2026L %in% available_executive_years())
+  }
+)
+
+new_year_history <- prepare_forecast_history(monthly_two_years, "Overall")
+new_year_forecast <- fit_finance_forecasts(new_year_history, horizon = 12L)
+stopifnot(
+  is.null(new_year_history$error),
+  max(new_year_history$training$date) == as.Date("2026-12-01"),
+  is.null(new_year_forecast$error),
+  all(format(new_year_forecast$forecast$date, "%Y") == "2027")
 )
 
 unlink(realworld_dir, recursive = TRUE)

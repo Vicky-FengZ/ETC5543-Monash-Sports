@@ -3,14 +3,6 @@
 IMPORT_METRIC_UNITS <- c("Unknown", "Count", "Currency", "Rate", "Hours", "Text")
 IMPORT_METRIC_AGGREGATIONS <- c("None", "Sum", "Last", "Mean")
 
-# Aggregations that make sense for a unit: none for text or unknown values, and no sum for
-# rates.
-import_allowed_aggregations <- function(unit) {
-  if (unit %in% c("Unknown", "Text")) return("None")
-  if (unit == "Rate") return(c("None", "Last", "Mean"))
-  IMPORT_METRIC_AGGREGATIONS
-}
-
 # Columns of a discount header row that hold discount types (not the label column or total
 # columns).
 discount_value_columns <- function(labels) {
@@ -58,8 +50,8 @@ import_metric_definition <- function(family, dataset, metrics, overrides = NULL)
   rules <- rules[!duplicated(normalise_excel_label(rules$metric), fromLast = TRUE), , drop = FALSE]
   index <- match(normalise_excel_label(metrics), normalise_excel_label(rules$metric))
   data.frame(
-    unit = ifelse(is.na(index), "Unknown", rules$unit[index]),
-    aggregation = ifelse(is.na(index), "None", rules$aggregation[index]),
+    unit = as.character(ifelse(is.na(index), "Unknown", rules$unit[index])),
+    aggregation = as.character(ifelse(is.na(index), "None", rules$aggregation[index])),
     stringsAsFactors = FALSE
   )
 }
@@ -97,22 +89,6 @@ define_import_report_metrics <- function(report, family, overrides = NULL) {
     report[[dataset]] <- define_import_metrics(report[[dataset]], family, dataset, overrides)
   }
   report
-}
-
-# One row per metric found in a report's configurable tables, with its unit and aggregation.
-import_metric_catalog <- function(report, family) {
-  records <- lapply(import_configurable_tables(family), function(dataset) {
-    data <- report[[dataset]]
-    if (!is.data.frame(data) || nrow(data) == 0L || !"metric" %in% names(data)) return(NULL)
-    metrics <- unique(as.character(data$metric))
-    definitions <- import_metric_definition(family, dataset, metrics)
-    if (all(c("unit", "aggregation") %in% names(data))) {
-      definitions <- data[match(metrics, data$metric), c("unit", "aggregation"), drop = FALSE]
-    }
-    data.frame(family = family, dataset = dataset, metric = metrics,
-      unit = definitions$unit, aggregation = definitions$aggregation, stringsAsFactors = FALSE)
-  })
-  bind_import_tables(records, IMPORT_METRIC_RULES[FALSE, ])
 }
 
 # Zero-row table for values kept as Additional data (found in a sheet but not mapped by a layout

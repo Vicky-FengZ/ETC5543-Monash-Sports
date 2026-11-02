@@ -221,6 +221,9 @@ mod_forecasting_ui <- function(id) {
   )
 }
 
+# Server for the Forecasting page: prepares the history from the uploaded
+# reports, fits the baseline once per history and horizon, and recalculates
+# the scenario, charts and tables when the plan changes.
 mod_forecasting_server <- function(id, data = NULL) {
   moduleServer(id, function(input, output, session) {
     default <- function(value, fallback) if (is.null(value) || !length(value)) fallback else value
@@ -397,7 +400,26 @@ mod_forecasting_server <- function(id, data = NULL) {
         selected = selected
       )
     })
+    # Typing a number sends an input event for every keystroke and spinner
+    # click. Waiting for a short pause (0.5 s) before recalculating means the
+    # charts are redrawn once per change instead of once per keystroke, and a
+    # field that is briefly empty while being retyped does not blank them.
+    # Tests set the option to 0 to update immediately.
+    plan_inputs <- reactive(list(
+      casual_wage_pct = input$casual_wage_pct,
+      monthly_payroll_adjustment = input$monthly_payroll_adjustment,
+      price_pct = input$price_pct,
+      price_share = input$price_share,
+      volume_pct = input$volume_pct
+    ))
+    plan_delay <- getOption("monash_sport.forecast_input_delay", 500)
+    plan <- if (is.numeric(plan_delay) && plan_delay > 0) {
+      debounce(plan_inputs, plan_delay)
+    } else {
+      plan_inputs
+    }
     scenario <- reactive({
+      values <- plan()
       tryCatch({
         selected_mode <- payroll_mode()
         if (!selected_mode %in% c("quick", "manual")) {
@@ -405,7 +427,7 @@ mod_forecasting_server <- function(id, data = NULL) {
         }
         mode <- if (selected_mode == "manual") "monthly_amount" else "casual_baseline"
         rise <- if (selected_mode == "manual") 0 else forecast_check_number(
-          default(input$casual_wage_pct, 0), "Casual pay increase (%)", 0, 100)
+          default(values$casual_wage_pct, 0), "Casual pay increase (%)", 0, 100)
         casual_change <- mode == "casual_baseline" && rise != 0
         partial_overall <- "uses the sum of available site summaries"
         if (casual_change && any(grepl(partial_overall, prepared()$notes, fixed = TRUE))) {
@@ -420,13 +442,13 @@ mod_forecasting_server <- function(id, data = NULL) {
           wage_pct = rise,
           casual_hours_pct = 0,
           wage_amount = if (mode == "monthly_amount") {
-            default(input$monthly_payroll_adjustment, NA_real_)
+            default(values$monthly_payroll_adjustment, NA_real_)
           } else {
             0
           },
-          price_pct = default(input$price_pct, 0),
-          price_share = default(input$price_share, 100),
-          volume_pct = default(input$volume_pct, 0),
+          price_pct = default(values$price_pct, 0),
+          price_share = default(values$price_share, 100),
+          volume_pct = default(values$volume_pct, 0),
           effective_month = as.integer(default(input$effective_month, 1)),
           casual_baseline = if (mode == "casual_baseline") casual_baseline() else NULL
         )

@@ -20,6 +20,12 @@ The test files run in groups on several R processes at once. To run
 everything in one R session, for example while debugging, first run
 `Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`.
 
+The download script also has a dependency-free JavaScript test:
+`node tests/test_browser_downloads.cjs`. It checks filenames, file bytes,
+failed requests and repeated clicks using in-memory browser APIs. GitHub
+Actions runs it after the R tests. It does not replace testing uploads and
+downloads in the actual Shinylive page.
+
 ## What each file checks
 
 **Importing and uploading reports**
@@ -31,14 +37,17 @@ everything in one R session, for example while debugging, first run
 | `test_extensible_imports.R` | New columns and categories in later reports pass through cleaning, validation, preview and export |
 | `test_excel_templates.R` | The blank Excel templates have the structure the importers expect |
 | `test_basic_upload.R` | Data page: one "Add data" entry, matching files to report types, choosing a type for unrecognised files, replacing and removing files, saving and loading parsed data |
+| `test_upload_integrity.R` | Same-size file updates, saved-data table contracts and rejected restores preserving current data, old saves without fingerprints, and lazy cleaned-data exports |
 | `test_upload_warnings.R` | Validation warnings are counted, grouped and shown without losing any |
-| `test_upload_realworld.R` | Situations met in practice, with the real importers: two files for one year, a wrong year in the file name, blank templates, damaged files, saved data that overlaps the session, a new report year |
+| `test_upload_realworld.R` | Situations met in practice, with the real importers: two files for one year, a wrong year in the file name, a Detailed Site Report named without its business unit, blank templates, damaged files, saved data that overlaps the session, a new report year |
+| `test_data_checks.R` | The data checks catch broken workbooks: copies of the sample reports with a total that no longer adds up, a missing month, section or sheet, a repeated month heading or a gap in the years must each give the right warning or error. Also checks that a new business unit reaches the Site Detail and Site Comparison choices |
 | `test_real_upload_parsers.R` | Every workbook in the report set parses (sample and full runs only) |
 
 **Dashboard pages**
 
 | File | Checks |
 |---|---|
+| `test_reporting_context.R` | Shared report years and site lists used by several pages, including years and sites added later |
 | `test_overview_charts.R` | Overview finance figures and charts |
 | `test_executive_dashboard.R` | Executive Dashboard visuals and how they behave with partial data |
 | `test_site_comparison.R` | Site Comparison calculations: site metrics, revenue opportunity, discount mix |
@@ -62,7 +71,7 @@ everything in one R session, for example while debugging, first run
 | File | Checks |
 |---|---|
 | `test_app_smoke.R` | Starts the app from `app.R` and renders every output on every page with no data, one report of each kind, a combined set and (sample and full runs) the whole set, also loaded from saved data |
-| `test_cross_page_consistency.R` | The same figure is the same on every page (Overview, Executive Dashboard, Forecasting, Site Comparison) |
+| `test_cross_page_consistency.R` | The same figure is the same on every page (Overview, Executive Dashboard, Forecasting, Site Comparison), including the Executive Financial Summary table, its year-on-year difference and the chart hover read-outs |
 | `test_key_numbers.R` | Site totals add up to the organisation summary; the annual figures match the accepted snapshot and any figures confirmed in the Excel reports (sample and full runs only) |
 
 ## Supporting files

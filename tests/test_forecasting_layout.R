@@ -87,3 +87,26 @@ shiny::testServer(mod_forecasting_server, args = list(data = layout_data), {
             !grepl("Predicted Casual Payroll|Scenario Casual Payroll", output$monthly_table))
 })
 cat("PASS direct settings, unchanged models, mode badges and quick/manual CSV downloads\n")
+
+# In the app, typing in the plan waits for a pause before recalculating, so
+# the charts are redrawn once per change rather than once per keystroke.
+old_delay <- options(monash_sport.forecast_input_delay = 300)
+shiny::testServer(mod_forecasting_server, args = list(data = layout_data), {
+  session$setInputs(horizon = "12", from_year = "2022", cutoff = "2025-12-01",
+    payroll_mode = "quick", casual_wage_pct = 0, price_pct = 0,
+    price_share = 100, volume_pct = 0, effective_month = "1")
+  session$elapse(400)
+  before <- scenario()$table$scenario_income
+  session$setInputs(price_pct = 5)
+  session$elapse(100)
+  stopifnot(is.null(scenario()$error), identical(scenario()$table$scenario_income, before))
+  # A field left empty mid-edit does not show an error before the pause.
+  session$setInputs(price_pct = NA_real_)
+  session$elapse(100)
+  session$setInputs(price_pct = 10)
+  session$elapse(400)
+  stopifnot(is.null(scenario()$error),
+            all(scenario()$table$scenario_income > before))
+})
+options(old_delay)
+cat("PASS plan inputs wait for a pause in typing before recalculating\n")

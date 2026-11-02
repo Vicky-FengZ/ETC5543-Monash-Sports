@@ -15,6 +15,8 @@ forecast_scenario_band <- function(table, metric) {
   band
 }
 
+# Actuals, baseline forecast and scenario for one metric ("income" or
+# "expenses"), with the scenario's 80% and 95% bands when available.
 plot_finance_forecast <- function(prepared, baseline, scenario, metric) {
   history <- prepared$history
   prediction <- baseline$forecast[baseline$forecast$metric == metric, , drop = FALSE]
@@ -82,6 +84,8 @@ plot_finance_forecast <- function(prepared, baseline, scenario, metric) {
   }
 }
 
+# Total plan income at each price increase against total scenario
+# expenses; the crossing point is the minimum price increase.
 plot_forecast_price_sensitivity <- function(scenario) {
   required <- scenario$min_price_increase * 100
   upper <- max(20, scenario$chosen_price_pct * 1.3,

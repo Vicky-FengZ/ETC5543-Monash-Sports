@@ -7,10 +7,12 @@ FORECAST_MODEL_NAMES <- c(
   holt_winters = "Holt-Winters (additive)"
 )
 
+# The `horizon` month-start dates that follow `last_date`.
 forecast_future_dates <- function(last_date, horizon) {
   seq(as.Date(last_date), by = "month", length.out = horizon + 1L)[-1L]
 }
 
+# Month labels such as "Jan 2026" (English month names whatever the locale).
 forecast_month_label <- function(date, separator = " ") {
   paste(month.abb[as.integer(format(as.Date(date), "%m"))],
         format(as.Date(date), "%Y"), sep = separator)
@@ -22,6 +24,7 @@ forecast_required_rate <- function(value) {
   paste0(formatC(max(0, ceiling(value * 1000 - 1e-9) / 10), format = "f", digits = 1), "%")
 }
 
+# Zero-row monthly history with the date, income and expenses columns.
 empty_forecast_history <- function() {
   data.frame(date = as.Date(character()), income = double(), expenses = double())
 }
@@ -37,6 +40,7 @@ forecast_final_zero_months <- function(history, columns) {
                  rowSums(values != 0, na.rm = TRUE) == 0L]
 }
 
+# The cleaned Monthly Site Reports from the dashboard data, or NULL.
 forecast_monthly_reports <- function(data) {
   if (is.null(data)) return(NULL)
   if (inherits(data, "monthly_site_report_data")) return(data)
@@ -45,6 +49,7 @@ forecast_monthly_reports <- function(data) {
   data$monthly
 }
 
+# The cleaned Venues Tracking Reports from the dashboard data, or NULL.
 forecast_venues_reports <- function(data) {
   if (is.null(data) || !is.list(data)) return(NULL)
   if (inherits(data, "venues_tracking_report_data")) return(data)
@@ -52,6 +57,9 @@ forecast_venues_reports <- function(data) {
   data$venues
 }
 
+# Monthly Actual Income and Expenses for the organisation (or one site),
+# limited to the chosen history, with the continuous run of months used to
+# fit the models. Returns `error` instead of data when the history is unusable.
 prepare_forecast_history <- function(
   reports, site = "Overall", cutoff = NULL, from_year = NULL,
   include_trailing_zeros = FALSE
@@ -234,6 +242,8 @@ forecast_model_predict <- function(y, horizon, method, intervals = TRUE) {
              upper80 = pmax(0, upper80), lower95 = pmax(0, lower95), upper95 = pmax(0, upper95))
 }
 
+# Rolling-origin test of the candidate models on the same folds; one row
+# per model with its RMSE and MAE, best first (empty when history is short).
 backtest_forecast_models <- function(y, horizon) {
   n <- length(y)
   models <- c("seasonal_naive", "naive")
@@ -268,6 +278,8 @@ backtest_forecast_models <- function(y, horizon) {
   result[order(result$rmse, match(result$method, names(FORECAST_MODEL_NAMES))), , drop = FALSE]
 }
 
+# Baseline Income and Expenses forecasts for the horizon, choosing each
+# model by backtest accuracy ("auto") or using the one named in `method`.
 fit_finance_forecasts <- function(prepared, horizon = 12L, method = "auto") {
   fail <- function(message) list(error = message, forecast = data.frame(), scores = data.frame(),
                                  models = character(), notes = character())
@@ -317,6 +329,7 @@ fit_finance_forecasts <- function(prepared, horizon = 12L, method = "auto") {
        models = selected, notes = unique(notes))
 }
 
+# One finite number within [minimum, maximum], or an error naming the input.
 forecast_check_number <- function(value, name, minimum = -Inf, maximum = Inf) {
   if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
       value < minimum || value > maximum) {
@@ -325,6 +338,8 @@ forecast_check_number <- function(value, name, minimum = -Inf, maximum = Inf) {
   as.numeric(value)
 }
 
+# Monthly Actual casual wages from the Venues Tracking Reports, aligned with
+# the finance history, for the quick pay-rise estimate.
 prepare_casual_wage_history <- function(
   reports, cutoff = NULL, from_year = NULL, include_trailing_zeros = FALSE
 ) {
@@ -499,6 +514,9 @@ prepare_casual_wage_baseline <- function(
        zero_months = prepared$zero_months)
 }
 
+# Applies the plan (payroll change, price and demand changes, start month)
+# to the baseline forecast. Returns the monthly table, the totals and the
+# minimum price increase that covers the plan's expenses.
 calculate_finance_scenario <- function(
   baseline, wage_mode = "annual_amount", wage_amount = 0, wage_pct = 0,
   employee_count = 1, wage_share = NA_real_, other_cost_pct = 0,

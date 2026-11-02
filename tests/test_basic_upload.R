@@ -67,7 +67,8 @@ make_fake_result <- function(
     )
   }
 
-  structure(
+  report_type <- names(BASIC_UPLOAD_RESULT_CLASSES)[match(result_class, BASIC_UPLOAD_RESULT_CLASSES)]
+  result <- structure(
     list(
       finance = data.frame(
         report_year = rep(c(2098L, 2099L), length.out = row_count),
@@ -96,6 +97,17 @@ make_fake_result <- function(
     ),
     class = result_class
   )
+  # Keep mock reports structurally valid so saved-data tests exercise the
+  # same contracts as results produced by the real Excel parsers.
+  prototypes <- basic_saved_report_tables(report_type)
+  for (name in setdiff(names(prototypes), names(result))) result[[name]] <- prototypes[[name]]
+  for (column in setdiff(names(prototypes$finance), names(result$finance))) {
+    result$finance[[column]] <- rep(prototypes$finance[[column]][NA_integer_], row_count)
+  }
+  years <- sort(unique(result$finance$report_year))
+  result$files <- data.frame(source_file = rep(source_name, length(years)),
+    report_year = years, report_unit = rep("Test Unit", length(years)))
+  result
 }
 
 first_fake_result <- make_fake_result("one.xlsx", "monthly_site_report_data")
@@ -1181,7 +1193,7 @@ shiny::testServer(
       grepl("Synthetic warning", paste(as.character(output$file_status), collapse = ""), fixed = TRUE)
     )
 
-    # The same workbook chosen again (same name and size) is not read again.
+    # The same workbook contents are not read again, including after restore.
     path <- tempfile(fileext = ".xlsx")
     writeBin(charToRaw("synthetic upload"), path)
     choose <- function(file) {
@@ -1199,7 +1211,7 @@ shiny::testServer(
     stopifnot(
       nrow(uploads) == 2L,
       is.na(uploads$stored_path[uploads$report_type == "monthly_site"]),
-      grepl("already loaded with the same name and size",
+      grepl("already loaded with the same name and contents",
         paste(as.character(output$upload_notice), collapse = ""), fixed = TRUE)
     )
 
