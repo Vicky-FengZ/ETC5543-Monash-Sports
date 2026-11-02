@@ -76,6 +76,8 @@ test_groups <- list(
     "test_cross_page_consistency.R"
   )),
   list(files = "test_upload_realworld.R"),
+  # Broken copies of the sample workbooks: each data check must catch its fault.
+  list(files = "test_data_checks.R"),
   list(files = c(
     "test_forecasting.R", 
     "test_forecasting_simple.R", 

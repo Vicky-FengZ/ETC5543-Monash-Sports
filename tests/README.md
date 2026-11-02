@@ -33,12 +33,14 @@ everything in one R session, for example while debugging, first run
 | `test_basic_upload.R` | Data page: one "Add data" entry, matching files to report types, choosing a type for unrecognised files, replacing and removing files, saving and loading parsed data |
 | `test_upload_warnings.R` | Validation warnings are counted, grouped and shown without losing any |
 | `test_upload_realworld.R` | Situations met in practice, with the real importers: two files for one year, a wrong year in the file name, a Detailed Site Report named without its business unit, blank templates, damaged files, saved data that overlaps the session, a new report year |
+| `test_data_checks.R` | The data checks catch broken workbooks: copies of the sample reports with a total that no longer adds up, a missing month, section or sheet, a repeated month heading or a gap in the years must each give the right warning or error. Also checks that a new business unit reaches the Site Detail and Site Comparison choices |
 | `test_real_upload_parsers.R` | Every workbook in the report set parses (sample and full runs only) |
 
 **Dashboard pages**
 
 | File | Checks |
 |---|---|
+| `test_reporting_context.R` | Shared report years and site lists used by several pages, including years and sites added later |
 | `test_overview_charts.R` | Overview finance figures and charts |
 | `test_executive_dashboard.R` | Executive Dashboard visuals and how they behave with partial data |
 | `test_site_comparison.R` | Site Comparison calculations: site metrics, revenue opportunity, discount mix |
