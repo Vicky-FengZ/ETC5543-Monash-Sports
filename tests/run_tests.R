@@ -1,3 +1,6 @@
+# Runs standard regression groups; optional real-file checks require an
+# explicit data root, and worker count can be set for easier debugging.
+
 # Regression tests. Run from the project root:
 #
 #   source("tests/run_tests.R")

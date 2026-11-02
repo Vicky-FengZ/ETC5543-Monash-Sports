@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Venues Operations module
+# This page supports one year and one area at a time. Its operational
+# totals must not add YTD summaries to the detailed rows they summarise.
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
@@ -520,6 +522,8 @@ venues_operations_workforce_annual_value <- function(
 }
 
 
+# Casual paid hours and wages are different units. Compare each with
+# its own source total before forming budget/actual summaries.
 venues_operations_workforce_kpis <- function(
     casual_hours,
     casual_wages
@@ -1044,6 +1048,8 @@ venues_operations_merchandise_annual_value <- function(
 }
 
 
+# The merchandise source can also contain equipment-related revenue;
+# use selected sections without double counting items and section totals.
 venues_operations_merchandise_kpis <- function(
     merchandise,
     section = "All Sections",
@@ -2647,6 +2653,8 @@ venues_operations_finance_by_fund <- function(finance) {
 # Facility Hire calculations
 # -------------------------------------------------------------------------
 
+# Use reported facility totals where available, not totals plus their
+# transaction details; revenue and transaction counts remain separate.
 venues_operations_facility_hire_kpis <- function(facility_hire) {
 
   empty_result <- list(
@@ -4386,6 +4394,8 @@ venues_operations_monthly_attendance <- function(attendance) {
 }
 
 
+# Prefer official attendance totals to a sum of activity/detail rows when
+# both are present in the same Venues Tracking Report.
 venues_operations_attendance_kpis <- function(attendance) {
 
   monthly <- venues_operations_monthly_attendance(
@@ -4904,10 +4914,7 @@ mod_venues_operations_ui <- function(id) {
           )
         ),
 
-        plotOutput(
-          ns("attendance_over_time"),
-          height = "440px"
-        )
+        dashboard_hover_plot(ns, "attendance_over_time", height = "440px")
       ),
 
       # Supporting views: one category breakdown plus one secondary analysis.
@@ -6558,6 +6565,39 @@ mod_venues_operations_server <- function(
             input$year
           )
         )
+      })
+
+
+      # This single plot slot changes with Operational area. Use the exact
+      # same filtered reactive as each chart; never include unselected funds,
+      # sections, facilities, or membership types in its hover values.
+      output$attendance_over_time_hover_value <- renderText({
+        if (is.null(input$attendance_over_time_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        area <- input$area
+        hover <- input$attendance_over_time_hover
+        if (is.null(area)) return("Select an operational area.")
+        if (identical(area, "Venue Finances")) {
+          return(dashboard_hover_text(hover, finance_monthly(), "date",
+            c(Income = "income_actual", Expenses = "expenses_actual"),
+            c(Income = "currency", Expenses = "currency")))
+        }
+        if (identical(area, "Workforce")) {
+          return(dashboard_hover_text(hover, workforce_hours_monthly(), "date",
+            c(Budget = "budget_hours", Paid = "paid_hours")))
+        }
+        data <- switch(area,
+          "Attendance" = monthly_attendance(),
+          "Facility Hire" = monthly_facility_hire_revenue(),
+          "Membership" = membership_active_trend(),
+          "Online Sales" = online_sales_monthly(),
+          "Merchandise" = merchandise_monthly_revenue(),
+          NULL)
+        kind <- if (area %in% c("Facility Hire", "Online Sales", "Merchandise"))
+          "currency" else "count"
+        dashboard_hover_text(hover, data, "date",
+          c(Value = "value"), c(Value = kind))
       })
 
       output$attendance_over_time <- renderPlot(

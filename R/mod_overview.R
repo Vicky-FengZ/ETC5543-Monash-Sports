@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Overview module
+# From/To Year denotes an inclusive reporting range, not a projection.
+# The snapshot KPI context is the selected To Year.
 # -------------------------------------------------------------------------
 
 # UI ----------------------------------------------------------------------
@@ -136,10 +138,7 @@ mod_overview_ui <- function(id) {
           )
         ),
 
-        plotOutput(
-          ns("monthly_income_expenses"),
-          height = "460px"
-        )
+        dashboard_hover_plot(ns, "monthly_income_expenses", height = "460px")
       ),
 
       br(),
@@ -178,10 +177,7 @@ mod_overview_ui <- function(id) {
             )
           ),
 
-          plotOutput(
-            ns("annual_performance_trend"),
-            height = "480px"
-          )
+          dashboard_hover_plot(ns, "annual_performance_trend", height = "480px")
         ),
 
         card(
@@ -199,10 +195,7 @@ mod_overview_ui <- function(id) {
             )
           ),
 
-          plotOutput(
-            ns("budget_vs_actual"),
-            height = "480px"
-          )
+          dashboard_hover_plot(ns, "budget_vs_actual", height = "480px")
         ),
 
         # Stacked full width: the monthly Budget vs Actual chart spans many
@@ -294,10 +287,7 @@ mod_overview_ui <- function(id) {
           )
         ),
 
-        plotOutput(
-          ns("revenue_capture_plot"),
-          height = "520px"
-        )
+        dashboard_hover_plot(ns, "revenue_capture_plot", height = "520px")
       )
     )
   )
@@ -307,6 +297,8 @@ mod_overview_ui <- function(id) {
 # Server ------------------------------------------------------------------
 # Handles period selection, Monthly Site Report calculations and plots.
 
+# The To Year controls headline KPIs; annual and monthly chart traces may
+# span the inclusive year range selected in the filters.
 mod_overview_server <- function(
   id,
   data = NULL
@@ -1030,6 +1022,64 @@ mod_overview_server <- function(
         res = 96,
         bg = "white"
       )
+
+
+      # Exact-value hover uses the chart's filtered datasets and the same
+      # selected metric. Missing years/months never become zero.
+      output$monthly_income_expenses_hover_value <- renderText({
+        if (is.null(input$monthly_income_expenses_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$monthly_income_expenses_hover,
+          filtered_monthly_finance(), "date",
+          c(Income = "income_actual", Expenses = "expenses_actual"),
+          c(Income = "currency", Expenses = "currency"))
+      })
+
+      output$annual_performance_trend_hover_value <- renderText({
+        if (is.null(input$annual_performance_trend_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        x <- filtered_annual_finance()
+        metric <- input$metric
+        if (is.null(metric) || length(metric) != 1L) return("Select a metric.")
+        x$hover_metric <- overview_metric_values(x, metric)
+        dashboard_hover_text(input$annual_performance_trend_hover,
+          x, "report_year", stats::setNames("hover_metric", metric),
+          stats::setNames("currency", metric))
+      })
+
+      output$budget_vs_actual_hover_value <- renderText({
+        if (is.null(input$budget_vs_actual_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$budget_vs_actual_hover,
+          filtered_monthly_finance(), "date",
+          c(Budget = "net_budget", Actual = "net_actual"),
+          c(Budget = "currency", Actual = "currency"))
+      })
+
+      output$revenue_capture_plot_hover_value <- renderText({
+        if (is.null(input$revenue_capture_plot_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        x <- filtered_annual_revenue()
+        complete <- is.finite(x$actual_income) &
+          is.finite(x$discount_opportunity) & is.finite(x$capture_rate)
+        x <- x[complete, , drop = FALSE]
+        if (nrow(x) == 0L) return("No reported opportunity values.")
+        # Match plot_revenue_capture_over_time(): grouped stacked bars have
+        # centres set by graphics::barplot(space=.75), not 1:nrow(x).
+        x$position <- as.numeric(graphics::barplot(
+          rbind(x$actual_income, x$discount_opportunity),
+          plot = FALSE, space = 0.75))
+        dashboard_hover_text(input$revenue_capture_plot_hover,
+          x, "position",
+          c(Income = "actual_income", Opportunity = "discount_opportunity",
+            Capture = "capture_rate"),
+          c(Income = "currency", Opportunity = "currency", Capture = "percent"),
+          label_col = "report_year")
+      })
 
       invisible(
         list(

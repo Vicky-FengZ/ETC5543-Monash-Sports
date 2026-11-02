@@ -1,3 +1,6 @@
+# Detailed unit reports combine financial flows with operational visits
+# and member/enrolment snapshots. Their time aggregation differs.
+
 # -------------------------------------------------------------------------
 # Business Unit Template report cleaning
 # -------------------------------------------------------------------------
@@ -856,6 +859,8 @@ canonical_business_unit_member_metric <- function(value) {
 
 
 # Cleaned memberships or enrollments table: metric by month.
+# Memberships and enrolments share a sheet shape but have different
+# definitions; preserve the source metric label and reporting month.
 clean_business_unit_template_member_sheet <- function(
   workbook,
   sheet_field,

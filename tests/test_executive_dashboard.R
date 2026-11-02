@@ -1,3 +1,7 @@
+# Executive reporting regression: Overview, Sites and Venues must retain
+# separate focus contexts while sharing year-selection controls.
+# Tests include both no-data guards and comparable-source calculations.
+
 suppressPackageStartupMessages({
   library(shiny)
   library(bslib)

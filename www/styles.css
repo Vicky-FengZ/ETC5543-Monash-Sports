@@ -3469,3 +3469,14 @@ tr > :not(:first-child) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Extra readout under detailed line charts. Keep text readable in card
+   fullscreen and on smaller laptop screens without shifting the axis. */
+.dashboard-time-series-hover-readout {
+  padding: 2px 15px 12px;
+  min-height: 30px;
+  color: #545b67;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

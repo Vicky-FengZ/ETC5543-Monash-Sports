@@ -1,3 +1,6 @@
+# Optional integration checks for user-provided real workbooks.
+# They are skipped when MONASH_SPORT_REAL_DATA_ROOT is not defined.
+
 real_data_root <- Sys.getenv("MONASH_SPORT_REAL_DATA_ROOT", unset = "")
 
 if (!nzchar(real_data_root)) {

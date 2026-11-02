@@ -1,3 +1,7 @@
+# Calculations distinguish unreported amounts (NA) from reported zero.
+# Respect reported source totals instead of adding their detail again.
+# Use shared reconciliation helpers across pages: each reporting section
+# has its own definition of a complete, valid total.
 # -------------------------------------------------------------------------
 # Overview calculations
 # -------------------------------------------------------------------------
@@ -52,6 +56,8 @@ overview_duplicate_report_years <- function(monthly_reports) {
 }
 
 
+# Organisation-wide annual totals are calculated from the Monthly Site
+# Report source tables, not by summing the Site Detail snapshots.
 calculate_overview_annual_finance <- function(monthly_reports) {
   if (is.null(monthly_reports)) {
     return(empty_overview_annual_finance())
@@ -615,6 +621,8 @@ empty_site_annual_finance <- function() {
 }
 
 
+# The site chart and site-ranking table share these annual finance rows;
+# avoid including any organisation-wide summary row as another site.
 calculate_site_annual_finance <- function(monthly_reports) {
 
   if (is.null(monthly_reports)) {
@@ -1302,6 +1310,8 @@ empty_facility_annual_finance <- function() {
 }
 
 
+# Facility-level values come from the detailed unit reports; do not treat
+# a facility total and its constituent detail rows as separate revenue.
 calculate_facility_annual_finance <- function(
     site_reports
 ) {

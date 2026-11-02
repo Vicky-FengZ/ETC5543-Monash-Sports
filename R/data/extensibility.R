@@ -1,3 +1,6 @@
+# Extension rules define which extra workbook columns are recognised.
+# Unknown fields must remain auditable rather than silently summed.
+
 # Extensible fields and metric definitions shared by the report importers.
 # Rules describe a metric; they never change its reported numeric value.
 IMPORT_METRIC_UNITS <- c("Unknown", "Count", "Currency", "Rate", "Hours", "Text")
@@ -237,6 +240,8 @@ audit_import_extensions <- function(report, workbooks, family) {
 
 # Last import step for every family: adds metric definitions, Additional data and the related
 # warnings.
+# Finalise only after preserving both known canonical fields and any
+# allowed extension values plus the issues raised while importing them.
 finalise_extensible_report <- function(report, workbooks, family) {
   report <- define_import_report_metrics(report, family)
   audit <- audit_import_extensions(report, workbooks, family)

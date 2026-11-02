@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Site Comparison module
+# Annual site/facility lines use calendar-year x coordinates, while
+# individual discount trends use actual monthly dates.
 # -------------------------------------------------------------------------
 
 # UI ----------------------------------------------------------------------
@@ -114,10 +116,7 @@ mod_site_comparison_ui <- function(id) {
           )
         ),
         
-        plotOutput(
-          ns("site_performance_trend"),
-          height = "520px"
-        )
+        dashboard_hover_plot(ns, "site_performance_trend", height = "520px")
       ),
       
       # Section 2: focus on the latest year (To Year) for ranking and budget.
@@ -375,10 +374,7 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              plotOutput(
-                ns("facility_performance_trend"),
-                height = "480px"
-              )
+              dashboard_hover_plot(ns, "facility_performance_trend", height = "480px")
           ),
 
             col_widths = c(6, 6)
@@ -424,10 +420,7 @@ mod_site_comparison_ui <- function(id) {
                 )
               ),
 
-              plotOutput(
-                ns("facility_discount_trend"),
-                height = "480px"
-              )
+              dashboard_hover_plot(ns, "facility_discount_trend", height = "480px")
             ),
 
             col_widths = c(6, 6)
@@ -492,6 +485,8 @@ mod_site_comparison_ui <- function(id) {
 # Maintains the shared comparison period and generates descriptive labels
 # for the site-level and facility-level views.
 
+# Cross-site annual trends are not month overlays. Use the reporting-year
+# coordinate on each annual line and retain gaps for unavailable years.
 mod_site_comparison_server <- function(
     id,
     data = NULL
@@ -1652,6 +1647,42 @@ mod_site_comparison_server <- function(
         res = 96,
         bg = "white"
       )
+
+
+      # The Year range selector is inclusive. Each point represents one
+      # reported year; hover reports the actual site/facility value rather
+      # than interpolating between years or combining business units.
+      output$site_performance_trend_hover_value <- renderText({
+        if (is.null(input$site_performance_trend_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        x <- filtered_site_finance()
+        x$hover_value <- site_finance_values(x, input$metric, "Actual")
+        dashboard_hover_text(input$site_performance_trend_hover, x,
+          "report_year", stats::setNames("hover_value", input$metric),
+          stats::setNames("currency", input$metric), group_col = "site")
+      })
+
+      output$facility_performance_trend_hover_value <- renderText({
+        if (is.null(input$facility_performance_trend_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        x <- filtered_facility_finance()
+        x$hover_value <- facility_finance_values(x, input$metric, "Actual")
+        dashboard_hover_text(input$facility_performance_trend_hover, x,
+          "report_year", stats::setNames("hover_value", input$metric),
+          stats::setNames("currency", input$metric), group_col = "business_unit")
+      })
+
+      output$facility_discount_trend_hover_value <- renderText({
+        if (is.null(input$facility_discount_trend_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$facility_discount_trend_hover,
+          snapshot_facility_monthly_discounts(), "date",
+          c(Discount = "total_discount"), c(Discount = "currency"),
+          group_col = "business_unit")
+      })
 
       output$facility_discount_trend_subtitle <- renderUI({
 

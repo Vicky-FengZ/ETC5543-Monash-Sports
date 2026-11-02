@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Executive Dashboard module
+# Overview, Site, and Venues share the same year controls but intentionally
+# have separate KPI definitions and presentation layouts.
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
@@ -201,6 +203,8 @@ executive_default_comparison_year <- function(
   candidates[[1L]]
 }
 
+# Each focus has a different data source: Overview from monthly finance,
+# Sites from monthly plus detailed reports, Venues from tracking reports.
 executive_available_years <- function(
     dashboard_data,
     focus
@@ -1318,6 +1322,8 @@ executive_site_insights_card_ui <- function(ns) {
 # Executive Venues: four-chart dashboard layout
 # -------------------------------------------------------------------------
 
+# Fixed chart cards deliberately use the same focus/year selection as the
+# KPIs. Per-chart hover readouts do not introduce additional filters.
 executive_venues_dashboard_ui <- function(ns, context_label, years) {
 
   years <- sort(unique(suppressWarnings(as.integer(years))))
@@ -1658,6 +1664,8 @@ mod_executive_dashboard_ui <- function(id) {
         )
       }
 
+# The visible Venues tab still uses the internal focus key "Metrics" for
+# backward compatibility with saved context and existing test helpers.
 mod_executive_dashboard_server <- function(
     id,
     data = NULL

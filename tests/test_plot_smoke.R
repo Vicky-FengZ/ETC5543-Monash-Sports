@@ -1,3 +1,6 @@
+# A successful draw only proves the plot can render at the tested size;
+# exact-value assertions belong in the data and hover regression tests.
+
 # Plot smoke tests: draw every Site Detail and Venues Operations chart to a
 # temporary PNG, at a wide and a narrow size, using the shared fixtures.
 # These charts are not otherwise exercised by the test suite; this catches

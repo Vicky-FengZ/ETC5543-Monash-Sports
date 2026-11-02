@@ -1,3 +1,7 @@
+# Finance, discounts and revenue are extracted as separate tables.
+# Merged Excel headers need inherited business-unit labels before totals
+# can be compared safely across sheets.
+
 # -------------------------------------------------------------------------
 # Monthly Site Report cleaning
 # -------------------------------------------------------------------------
@@ -228,6 +232,8 @@ fill_group_headers <- function(raw_sheet, header_row) {
 
 # Long table of one INCOME or EXPENSES block: one row per month, business unit and value type
 # (Budget, Actual, Variance), with the source cell of every value.
+# Keep Budget, Actual and Variance as separate value types; one displayed
+# "Total" row is not another independent business-unit contribution.
 extract_monthly_finance_section <- function(
   raw_sheet,
   report_year,

@@ -165,3 +165,47 @@ stopifnot(
 cat("PASS KPI rows give every value box its own grid item\n")
 
 cat("PASS test_chart_and_ui_helpers.R\n")
+
+
+# -------------------------------------------------------------------------
+# Shared hover helper: exact points only, missing periods stay unavailable
+# -------------------------------------------------------------------------
+hover_fixture <- data.frame(
+  date = as.Date(c("2024-01-01", "2024-03-01")),
+  income_actual = c(100.25, 275.5),
+  expenses_actual = c(25, NA_real_)
+)
+stopifnot(
+  identical(dashboard_hover_text(NULL, hover_fixture, "date",
+    c(Income = "income_actual")),
+    "Hover over a plotted period to inspect exact values."),
+  grepl("Jan 2024", dashboard_hover_text(
+    list(x = as.numeric(as.Date("2024-01-01"))), hover_fixture,
+    "date", c(Income = "income_actual"), c(Income = "currency")),
+    fixed = TRUE),
+  grepl("$100.25", dashboard_hover_text(
+    list(x = as.numeric(as.Date("2024-01-01"))), hover_fixture,
+    "date", c(Income = "income_actual"), c(Income = "currency")),
+    fixed = TRUE),
+  !grepl("$275.50", dashboard_hover_text(
+    list(x = as.numeric(as.Date("2024-02-01"))), hover_fixture,
+    "date", c(Income = "income_actual"), c(Income = "currency")),
+    fixed = TRUE)
+)
+
+hover_years <- data.frame(report_year = c(2023L, 2025L),
+                          value = c(100, 300))
+stopifnot(
+  grepl("2025", dashboard_hover_text(
+    list(x = 2025), hover_years, "report_year", c(Value = "value")),
+    fixed = TRUE),
+  identical(dashboard_hover_text(
+    list(x = 2024), hover_years, "report_year", c(Value = "value")),
+    "Hover over a plotted period to inspect exact values.")
+)
+
+hover_ui <- paste(as.character(dashboard_hover_plot(
+  shiny::NS("regression"), "example", height = "340px")), collapse = "")
+stopifnot(grepl("example_hover", hover_ui, fixed = TRUE),
+          grepl("example_hover_value", hover_ui, fixed = TRUE))
+cat("PASS shared detailed chart hover and missing-period safeguards\n")

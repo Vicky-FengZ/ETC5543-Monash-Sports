@@ -1,4 +1,6 @@
 # A short planning workflow; users enter business assumptions, not model choices.
+# Keep defaults and scenario-only inputs separate from the baseline so
+# the displayed comparison remains reproducible after changing assumptions.
 
 mod_forecasting_ui <- function(id) {
   ns <- NS(id)
@@ -157,7 +159,7 @@ mod_forecasting_ui <- function(id) {
             div(class = "chart-header-title", "Income: actuals, baseline & scenario"),
             uiOutput(ns("income_model"))
           )),
-          plotOutput(ns("income_plot"), height = "400px")
+          dashboard_hover_plot(ns, "income_plot", height = "400px")
         ),
         card(
           full_screen = TRUE,
@@ -165,7 +167,7 @@ mod_forecasting_ui <- function(id) {
             div(class = "chart-header-title", "Expenses: actuals, baseline & scenario"),
             uiOutput(ns("expenses_model"))
           )),
-          plotOutput(ns("expenses_plot"), height = "400px")
+          dashboard_hover_plot(ns, "expenses_plot", height = "400px")
         ),
         col_widths = breakpoints(xs = c(12, 12), lg = c(6, 6))
       ),
@@ -186,7 +188,7 @@ mod_forecasting_ui <- function(id) {
               class = "forecast-help",
               "Compare income at different prices using your current plan."
             ),
-            plotOutput(ns("price_plot"), height = "400px")
+            dashboard_hover_plot(ns, "price_plot", height = "400px")
           ),
           col_widths = breakpoints(xs = c(12, 12), lg = c(4, 8))
         )
@@ -224,6 +226,8 @@ mod_forecasting_ui <- function(id) {
 # Server for the Forecasting page: prepares the history from the uploaded
 # reports, fits the baseline once per history and horizon, and recalculates
 # the scenario, charts and tables when the plan changes.
+# The UI can change scenario inputs without changing the selected baseline
+# model or the history used to fit it.
 mod_forecasting_server <- function(id, data = NULL) {
   moduleServer(id, function(input, output, session) {
     default <- function(value, fallback) if (is.null(value) || !length(value)) fallback else value
@@ -667,6 +671,63 @@ mod_forecasting_server <- function(id, data = NULL) {
         }, res = 110)
       })
     }
+    # Hover on forecasts distinguishes observed history from forecasts; the
+    # baseline and scenario share a date but remain separate columns.
+    # Values here are inspected, never recomputed as additional KPI inputs.
+    forecast_hover_rows <- function(metric) {
+      p <- prepared()
+      b <- baseline()
+      scenario_data <- scenario()
+      if (!is.null(p$error) || !is.null(b$error) ||
+          !is.null(scenario_data$error)) return(NULL)
+      history <- tail(p$history, 36L)
+      forecast <- b$forecast[b$forecast$metric == metric, , drop = FALSE]
+      if (!is.data.frame(history) || !nrow(history) || !nrow(forecast))
+        return(NULL)
+      scenario_values <- scenario_data$table[[paste0("scenario_", metric)]]
+      if (is.null(scenario_values) || length(scenario_values) != nrow(forecast))
+        return(NULL)
+      rbind(
+        data.frame(date = as.Date(history$date),
+          Actual = as.numeric(history[[metric]]),
+          Baseline = NA_real_, Scenario = NA_real_),
+        data.frame(date = as.Date(forecast$date),
+          Actual = NA_real_, Baseline = as.numeric(forecast$baseline),
+          Scenario = as.numeric(scenario_values))
+      )
+    }
+
+    for (metric in c("income", "expenses")) {
+      local({
+        current_metric <- metric
+        id <- paste0(current_metric, "_plot")
+        output[[paste0(id, "_hover_value")]] <- renderText({
+          hover <- input[[paste0(id, "_hover")]]
+          if (is.null(hover))
+            return("Hover over a plotted period to inspect exact values.")
+          dashboard_hover_text(hover, forecast_hover_rows(current_metric),
+            "date", c(Actual = "Actual", Baseline = "Baseline",
+                      Scenario = "Scenario"),
+            c(Actual = "currency", Baseline = "currency",
+              Scenario = "currency"))
+        })
+      })
+    }
+
+    output$price_plot_hover_value <- renderText({
+      hover <- input$price_plot_hover
+      if (is.null(hover) || is.null(hover$x) ||
+          !is.finite(suppressWarnings(as.numeric(hover$x))))
+        return("Hover over the price line to inspect the modelled values.")
+      s <- scenario()
+      if (!is.null(s$error)) return("Complete your plan to see price values.")
+      pct <- as.numeric(hover$x)
+      income <- s$income_before_price + s$price_exposure * pct / 100
+      paste0("Price increase ", formatC(pct, format = "f", digits = 1),
+             "% | Modelled income ", format_compact_currency(income, digits = 2L),
+             " | Scenario expenses ", format_compact_currency(s$expenses, digits = 2L))
+    })
+
     output$price_plot <- renderPlot({
       plot_forecast_price_sensitivity(valid_scenario())
     }, res = 110)

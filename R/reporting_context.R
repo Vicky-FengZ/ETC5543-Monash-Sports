@@ -1,3 +1,6 @@
+# Reconcile site identities and selected years as files change.
+# A year reported by one source family does not imply every other family
+# reports that year; dynamic workbook discovery must preserve this distinction.
 # -------------------------------------------------------------------------
 # Shared reporting context
 # -------------------------------------------------------------------------
@@ -8,6 +11,8 @@
 # rather than maintaining their own fixed year lists.
 
 
+# Centralise year normalisation for all pages to keep missing and
+# out-of-order report years from changing selection behaviour.
 reporting_normalize_years <- function(years) {
 
   if (
@@ -235,6 +240,8 @@ reporting_site_identity_key <- function(
 }
 
 
+# A site identity combines reporting unit and campus so the same unit
+# name on different campuses is not accidentally merged.
 reporting_detailed_site_catalogue <- function(
     site_reports,
     year = NULL

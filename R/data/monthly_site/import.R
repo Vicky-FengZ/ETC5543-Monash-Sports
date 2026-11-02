@@ -247,6 +247,8 @@ read_monthly_site_report_file <- function(
 # tables.
 # Pass `paths` (with `source_names` for uploads) or a `data_dir` to search. With strict = TRUE
 # a validation error stops the import; with FALSE it is returned in the validation table.
+# Import one workbook per reporting year and retain its source identity.
+# Downstream pages use the validated collection, not workbook filenames.
 load_monthly_site_reports <- function(
   data_dir = file.path(
     "data",

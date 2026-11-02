@@ -1,3 +1,7 @@
+# Application entry point: register packages and source modules once, then
+# pass the same uploaded-data reactive to every reporting page.
+# Keep cross-page calculations in shared R/ helpers rather than app.R.
+
 library(shiny)
 library(bslib)
 library(bsicons)
@@ -120,6 +124,8 @@ ui <- page_navbar(
 # Server
 # -------------------------------------------------------------------------
 
+# Every module receives the shared upload state so that its figures use
+# the same validated, currently selected report files.
 server <- function(input, output, session) {
 
   # Uploaded workbooks are parsed once, then shared with the dashboard and

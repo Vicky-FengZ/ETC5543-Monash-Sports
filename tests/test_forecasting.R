@@ -1,3 +1,6 @@
+# Forecast invariants cover gaps, benchmark selection and preservation
+# of observed history when scenarios or model options change.
+
 # Business invariants and time-series edge cases, without an extra test package.
 
 make_forecast_fixture <- function(start = "2022-01-01", n = 48L) {

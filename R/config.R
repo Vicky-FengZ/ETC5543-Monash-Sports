@@ -46,6 +46,8 @@ CHART_CATEGORICAL <- c(
   "#FFBA00"  # Yellow (brand utility)
 )
 
+# Return a reproducible sequence of categorical colours across charts;
+# changes here affect legend-to-series consistency on multiple pages.
 chart_categorical_colours <- function(n) {
   rep_len(unname(CHART_CATEGORICAL), n)
 }

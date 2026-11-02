@@ -7,6 +7,8 @@
 # It does NOT calculate values or draw charts.
 #
 # Existing calculation and plot functions remain the source of truth.
+# Registry availability is presentation metadata, not evidence of a
+# non-missing calculated measure in every uploaded workbook.
 # The registry only describes:
 #   - what the visual is;
 #   - whether it belongs to Finance or Metrics;
@@ -715,6 +717,8 @@ executive_dataset_available_in_context <- function(
   TRUE
 }
 
+# A registered visual may be present in the input but unavailable for a
+# selected year; use source coverage checks before presenting a choice.
 executive_visual_availability <- function(
     dashboard_data,
     visual_id,

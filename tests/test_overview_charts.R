@@ -1,3 +1,6 @@
+# Overview visual regression: verify required plot data, controls and
+# rendering guards independent of the live Monash Sport workbooks.
+
 suppressPackageStartupMessages({
   library(shiny)
   library(bslib)

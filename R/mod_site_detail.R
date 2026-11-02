@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Site Detail module
+# Visits are flows; active memberships and enrolments are snapshots.
+# Do not sum snapshots across monthly reports.
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
@@ -554,6 +556,8 @@ site_detail_activity_totals <- function(visits) {
 # Membership calculations
 # -------------------------------------------------------------------------
 
+# Active membership is a point-in-time count. Pick the latest usable
+# reporting snapshot instead of summing monthly membership counts.
 site_detail_latest_membership_value <- function(
     memberships,
     metric
@@ -948,6 +952,8 @@ site_detail_membership_active_mix <- function(memberships) {
 # Enrolment calculations
 # -------------------------------------------------------------------------
 
+# Later blank/zero-filled months can be placeholders; pick the latest
+# meaningful reported enrolment metric for this definition.
 site_detail_latest_enrolment_metric <- function(
     enrollments,
     metric
@@ -1539,6 +1545,8 @@ mod_site_detail_ui <- function(id) {
 # Updates available analysis areas and switches KPI/chart labels according
 # to the selected Site Report content.
 
+# Site-specific visit flows, memberships and enrolments have distinct
+# aggregation rules and should not be combined into one shared total.
 mod_site_detail_server <- function(
   id,
   data = NULL
@@ -2313,28 +2321,19 @@ mod_site_detail_server <- function(
 
         if (identical(input$area, "Visits")) {
           return(
-            plotOutput(
-              ns("visits_over_time"),
-              height = "440px"
-            )
+            dashboard_hover_plot(ns, "visits_over_time", height = "440px")
           )
         }
 
         if (identical(input$area, "Memberships")) {
           return(
-            plotOutput(
-              ns("memberships_over_time"),
-              height = "440px"
-            )
+            dashboard_hover_plot(ns, "memberships_over_time", height = "440px")
           )
         }
 
         if (identical(input$area, "Enrolments")) {
           return(
-            plotOutput(
-              ns("enrolments_over_time"),
-              height = "440px"
-            )
+            dashboard_hover_plot(ns, "enrolments_over_time", height = "440px")
           )
         }
 
@@ -2343,6 +2342,33 @@ mod_site_detail_server <- function(
         )
       })
 
+
+
+      # Detail pages operate on one selected site and year. Values are
+      # snapshots for memberships/enrolments, not additive monthly totals.
+      output$visits_over_time_hover_value <- renderText({
+        if (is.null(input$visits_over_time_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$visits_over_time_hover,
+          monthly_visits(), "date",
+          c(Direct = "direct", Indirect = "indirect"))
+      })
+      output$memberships_over_time_hover_value <- renderText({
+        if (is.null(input$memberships_over_time_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$memberships_over_time_hover,
+          membership_trend(), "date", c(`Active members` = "total_active"))
+      })
+      output$enrolments_over_time_hover_value <- renderText({
+        if (is.null(input$enrolments_over_time_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$enrolments_over_time_hover,
+          enrolment_trend(), "date",
+          c(`Active enrolments` = "total_active", Target = "target"))
+      })
 
       output$visits_over_time <- renderPlot(
         {
@@ -2465,8 +2491,9 @@ mod_site_detail_server <- function(
 
         if (identical(input$area, "Memberships")) {
           return(
-            plotOutput(
-              ns("membership_movement"),
+            dashboard_hover_plot(
+              ns,
+              "membership_movement",
               height = "360px"
             )
           )

@@ -255,6 +255,8 @@ sheet_number_matrix <- function(raw_sheet) {
 # Read-once caches of every cell's text and number, attached to a sheet when
 # it is read from Excel. cell_as_text() and cell_as_number() then become
 # lookups, which keeps cell-by-cell parsing fast in the browser (Shinylive).
+# Cache raw cell conversions within a workbook parse. Cached cells are
+# import-time data only, not a replacement for reactive dashboard state.
 cache_sheet_cells <- function(raw_sheet) {
 
   attr(raw_sheet, "cell_text") <- sheet_text_matrix(raw_sheet)
@@ -320,6 +322,8 @@ find_month_header_row <- function(raw_sheet, minimum_months) {
 
 # Numeric value of one cell. Text such as "$1,200", "(350)" (negative) and "82.8%" (0.828) is
 # converted; NA when it is not a number.
+# Numeric import tolerates common spreadsheet display formats, but must
+# preserve missing cells as missing rather than manufacturing zeros.
 cell_as_number <- function(raw_sheet, row, column) {
 
   if (

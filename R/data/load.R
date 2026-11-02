@@ -1,3 +1,7 @@
+# Source-order contract for import helpers: shared cell parsing first,
+# followed by each family's reader, cleaning and validation scripts.
+# Do not change this load order without checking all parser dependencies.
+
 # -------------------------------------------------------------------------
 # Dashboard data layer loader
 # -------------------------------------------------------------------------

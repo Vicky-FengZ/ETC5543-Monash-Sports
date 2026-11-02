@@ -1,3 +1,6 @@
+# Preserve record group, period type and source row while flattening
+# sheets: monthly, YTD and detail totals must remain distinguishable.
+
 # -------------------------------------------------------------------------
 # Venues Tracking Report cleaning
 # -------------------------------------------------------------------------
@@ -833,6 +836,8 @@ facility_hire_records_for_row <- function(
 
 
 # Cleaned facility hire table: facility, hire category, revenue and transactions by month.
+# A facility summary and its hire-category details describe the same
+# underlying business. Keep both for drill-down, not for additive KPIs.
 clean_venues_tracking_report_facility_hire <- function(workbook) {
 
   raw_sheet <- workbook$facility_hire_sheet
@@ -1699,6 +1704,8 @@ merchandise_records_for_row <- function(
 
 
 # Cleaned merchandise table: section, item, unit cost and metric by period.
+# Merchandise sheets include section totals and item-level detail;
+# downstream calculations must select one level for any given metric.
 clean_venues_tracking_report_merchandise <- function(workbook) {
 
   raw_sheet <- workbook$merchandise_sheet
@@ -2667,6 +2674,8 @@ find_venues_casual_wages_layout <- function(raw_sheet, report_year) {
 
 
 # Cleaned casual wages table: budget, actual and variance per month of the report year.
+# Casual wages have budget, actual and variance columns. The reported
+# annual total must not be added to its constituent monthly records.
 clean_venues_tracking_report_casual_wages <- function(workbook) {
 
   raw_sheet <- workbook$casual_wages_sheet

@@ -1,3 +1,6 @@
+# Minimal forecasting scenarios check the standard/default workflow
+# against a small explicitly constructed wage history.
+
 # Default workflow and the recorded casual-payroll component.
 make_casual_wage_fixture <- function(n = 48L) {
   dates <- seq(as.Date("2022-01-01"), by = "month", length.out = n)

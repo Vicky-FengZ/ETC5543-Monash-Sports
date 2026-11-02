@@ -1,3 +1,6 @@
+# Exercises the upload registry state through imports, replacement,
+# deletion and saved-data restoration, not just the Excel parser.
+
 suppressPackageStartupMessages({
   library(shiny)
   library(bslib)

@@ -1,3 +1,7 @@
+# Regression coverage for alternative Venues Tracking workbook layouts.
+# Synthetic tables exercise optional and evolving source categories;
+# no confidential report data is required for this test.
+
 make_venues_raw_sheet <- function(rows, columns) {
   result <- as.data.frame(
     matrix(NA_character_, nrow = rows, ncol = columns),

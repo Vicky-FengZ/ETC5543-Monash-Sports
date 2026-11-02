@@ -1,3 +1,7 @@
+# Targeted parser regressions for spreadsheet number formats and totals.
+# Preserve source values and expected missing/zero semantics when updating
+# any of the three import families.
+
 numeric_cells <- data.frame(
   value = c("82.8%", "($1,234.50)", " 2,500 "),
   stringsAsFactors = FALSE

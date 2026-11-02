@@ -1,4 +1,6 @@
 # Visuals for monthly forecasts and the total-period pricing requirement.
+# Intervals are plotted only when complete; a missing bound is not a
+# zero-width prediction interval.
 
 # Scenario interval columns for one metric. Bands are shown only when every
 # forecast month has both the 80% and 95% bounds.
@@ -17,6 +19,8 @@ forecast_scenario_band <- function(table, metric) {
 
 # Actuals, baseline forecast and scenario for one metric ("income" or
 # "expenses"), with the scenario's 80% and 95% bands when available.
+# Historical observations, baseline forecasts and scenario forecasts are
+# distinct series. Shaded intervals belong to forecasts, not history.
 plot_finance_forecast <- function(prepared, baseline, scenario, metric) {
   history <- prepared$history
   prediction <- baseline$forecast[baseline$forecast$metric == metric, , drop = FALSE]
@@ -57,7 +61,8 @@ plot_finance_forecast <- function(prepared, baseline, scenario, metric) {
     fan(band$lower80, band$upper80, alpha80)
   }
   # NA months break the historical line; a missing year is never connected.
-  lines(history$date, history[[metric]], col = CHART_COLOURS[["muted"]], lwd = 2)
+  lines(break_line_gaps(history$date, history[[metric]]),
+        col = CHART_COLOURS[["muted"]], lwd = 2)
   first_forecast <- prediction$date[1L]
   abline(v = as.numeric(first_forecast) - 15, col = CHART_COLOURS[["light"]], lty = 3)
   lines(c(tail(prepared$training$date, 1L), prediction$date),

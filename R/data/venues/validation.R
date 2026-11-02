@@ -1,3 +1,6 @@
+# Validations compare reported source totals with reconstructed detail.
+# They must diagnose mismatches without overwriting source figures.
+
 # -------------------------------------------------------------------------
 # Venues Tracking Report validation
 # -------------------------------------------------------------------------
@@ -964,6 +967,8 @@ build_venues_merchandise_checks <- function(
 
 
 # Checks that Variance equals Actual minus Budget for each row and period.
+# Check the source convention Actual minus Budget within the import;
+# UI descriptions may display Budget minus Actual as savings separately.
 build_venues_variance_identity_checks <- function(
   data,
   dataset,

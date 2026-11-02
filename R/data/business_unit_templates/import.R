@@ -1,3 +1,6 @@
+# Reporting unit and campus are inferred from workbook metadata and
+# checked names; this identity prevents cross-campus totals merging.
+
 # -------------------------------------------------------------------------
 # Business Unit Template report import
 # -------------------------------------------------------------------------
@@ -198,6 +201,8 @@ business_unit_title_from_finance <- function(finance_sheet) {
 #    only "2025.xlsx", or "Copy of Aquatics Site Report 2025.xlsx", is still
 #    read as the right unit.
 # 3. Otherwise the file name text, for a new unit (as before).
+# Prefer a recognised reporting unit from workbook content/metadata;
+# do not treat a convenient filename label as a guaranteed identity.
 resolve_business_unit_report_name <- function(source_name, finance_sheet) {
 
   file_label <- business_unit_label_from_file(source_name)

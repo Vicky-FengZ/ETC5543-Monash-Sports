@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Overview plots
+# Missing months and missing years should create visible gaps in lines,
+# rather than implying that an unreported period contained activity.
 # -------------------------------------------------------------------------
 
 format_compact_currency <- function(values, digits = 1L) {
@@ -81,6 +83,8 @@ overview_plot_limits <- function(values) {
 # point wherever consecutive x values are further apart than `max_gap`, so
 # lines() breaks there. Points are still drawn from the original data.
 # Monthly dates use the default (45 days); annual years use max_gap = 1.
+# Plot-only gap handling does not impute missing months or years.
+# Non-consecutive reporting dates must not appear connected by a line.
 break_line_gaps <- function(dates, values, max_gap = 45) {
   order_index <- order(dates)
   dates <- dates[order_index]
@@ -4767,8 +4771,7 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
   )
 
   lines(
-    dates,
-    direct,
+    break_line_gaps(dates, direct),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -4784,8 +4787,7 @@ plot_site_detail_visits_over_time <- function(monthly_visits) {
   )
 
   lines(
-    dates,
-    indirect,
+    break_line_gaps(dates, indirect),
     col = CHART_COLOURS[["tertiary"]],
     lwd = 2.6
   )
@@ -5463,8 +5465,7 @@ plot_site_detail_memberships_over_time <- function(membership_data) {
   )
 
   lines(
-    dates,
-    values,
+    break_line_gaps(dates, values),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.8
   )
@@ -5647,8 +5648,7 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
   )
 
   lines(
-    dates,
-    total_active,
+    break_line_gaps(dates, total_active),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -5664,8 +5664,7 @@ plot_site_detail_enrolments_over_time <- function(enrolment_data) {
   )
 
   lines(
-    dates,
-    target,
+    break_line_gaps(dates, target),
     col = CHART_COLOURS[["secondary"]],
     lwd = 2.6
   )
@@ -5878,8 +5877,7 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
   )
 
   lines(
-    dates,
-    total_active,
+    break_line_gaps(dates, total_active),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -5895,8 +5893,7 @@ plot_site_detail_enrolment_breakdown <- function(enrolment_data) {
   )
 
   lines(
-    dates,
-    active_students,
+    break_line_gaps(dates, active_students),
     col = CHART_COLOURS[["tertiary"]],
     lwd = 2.6
   )
@@ -6291,8 +6288,7 @@ plot_site_detail_membership_movement <- function(movement_data) {
   )
 
   lines(
-    dates,
-    new_members,
+    break_line_gaps(dates, new_members),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -6308,8 +6304,7 @@ plot_site_detail_membership_movement <- function(movement_data) {
   )
 
   lines(
-    dates,
-    expired,
+    break_line_gaps(dates, expired),
     col = CHART_COLOURS[["secondary"]],
     lwd = 2.6
   )
@@ -6504,8 +6499,7 @@ plot_venues_attendance_over_time <- function(attendance_data) {
   )
 
   lines(
-    dates,
-    values,
+    break_line_gaps(dates, values),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -6656,8 +6650,7 @@ plot_venues_facility_hire_revenue_over_time <- function(revenue_data) {
   )
 
   lines(
-    dates,
-    values,
+    break_line_gaps(dates, values),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.6
   )
@@ -7430,8 +7423,7 @@ plot_workforce_hours_over_time <- function(
   )
 
   lines(
-    dates,
-    budget,
+    break_line_gaps(dates, budget),
     col = CHART_COLOURS[["subtle"]],
     lwd = 2.4,
     lty = 2
@@ -7448,8 +7440,7 @@ plot_workforce_hours_over_time <- function(
   )
 
   lines(
-    dates,
-    paid,
+    break_line_gaps(dates, paid),
     col = CHART_COLOURS[["primary"]],
     lwd = 2.8
   )
@@ -7997,6 +7988,8 @@ plot_executive_site_enrolments <- function(site_enrolments) {
 # Shared data preparation for attendance, hire revenue and merchandise.
 # Preserve source labels; require one resolved value per category and year.
 # Returned row/category order is also used by the module's hover readouts.
+# Chart and hover must use identical category ordering and top-N logic;
+# "Other Facilities" carries the remaining reported hire revenue.
 executive_venues_chart_rows <- function(data, category_col, value_col,
                                         description, top_n = 8L) {
   required <- c("report_year", category_col, value_col)
@@ -8210,6 +8203,8 @@ plot_executive_venues_facility_hire <- function(facility_data) {
 # Workforce source: venues_operations_workforce_annual_value() for both
 # "Budget" and "Actual" in each reporting year. Do not infer missing budget.
 # Expected columns: report_year, budget, actual, [paid_hours].
+# Wage values are currency, while paid hours are separate measures;
+# plot budget and actual consistently across both selected years.
 plot_executive_venues_wages <- function(wages_data) {
   required <- c("report_year", "budget", "actual")
   if (!is.data.frame(wages_data) ||

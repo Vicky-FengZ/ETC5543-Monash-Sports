@@ -1,3 +1,6 @@
+# Upload warnings are non-fatal unless their impact prevents use of
+# a required metric. Tests distinguish guidance from hard validation.
+
 suppressPackageStartupMessages({
   library(shiny)
   library(bslib)

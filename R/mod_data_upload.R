@@ -1,5 +1,7 @@
 # -------------------------------------------------------------------------
 # Basic Data Upload module
+# Files should be validated before they influence shared report data.
+# Deletion and replacement must invalidate all dependent reactive views.
 # -------------------------------------------------------------------------
 # Session-only upload, parsing progress and file deletion. Parsed data can be
 # saved to a file on the user's own computer and loaded again later (see
@@ -220,6 +222,8 @@ empty_basic_upload_registry <- function() {
 
 # A content fingerprint avoids mistaking an edited, same-size workbook for
 # an unchanged upload. If a file cannot be fingerprinted, it must be parsed.
+# File names are not unique identities: content fingerprints support
+# safe replacement and prevent stale parsed data from surviving uploads.
 basic_upload_content_hash <- function(paths) {
   vapply(as.character(paths), function(path) {
     if (is.na(path) || !nzchar(path)) return(NA_character_)
@@ -879,6 +883,8 @@ basic_upload_result_issues <- function(result) {
 
 
 # Plain-language note on what a warning means for the dashboard figures.
+# Explain warnings by their effect on available data, rather than treating
+# every non-fatal workbook issue as a complete upload failure.
 basic_upload_warning_impact <- function(message) {
   text <- tolower(message)
 
@@ -2544,6 +2550,8 @@ mod_data_upload_ui <- function(id) {
 
 # Server ------------------------------------------------------------------
 
+# All page modules depend on this upload registry. Keep replacement,
+# deletion, and restored saved-data paths consistent with reactive refresh.
 mod_data_upload_server <- function(
   id,
   parsers = basic_upload_parsers()

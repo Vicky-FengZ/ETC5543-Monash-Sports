@@ -1,3 +1,6 @@
+# Validate workbook shape and arithmetic separately. A missing reported
+# amount is not the same as a legitimate zero within a total.
+
 # -------------------------------------------------------------------------
 # Monthly Site Report validation
 # -------------------------------------------------------------------------
@@ -182,6 +185,8 @@ validate_monthly_total_revenue_table <- function(total_revenue) {
 
 
 # Warnings across all uploaded years: two files for one year, or missing years in the series.
+# Collection checks detect year-level collisions across active files;
+# never silently choose one duplicate annual workbook as authoritative.
 validate_monthly_site_report_collection <- function(workbooks) {
 
   if (length(workbooks) == 0L) {

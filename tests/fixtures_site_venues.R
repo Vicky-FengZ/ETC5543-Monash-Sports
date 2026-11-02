@@ -1,3 +1,6 @@
+# Intentionally small fixture values make YTD versus monthly preferences
+# and summary-versus-detail safeguards easy to check by hand.
+
 # Small, hand-checkable fixtures for the Site Detail and Venues Operations
 # pages, shared by their calculation tests and the plot smoke tests. Values
 # are chosen so preference rules are visible (e.g. a reported YTD total that

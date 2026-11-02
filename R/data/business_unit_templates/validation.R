@@ -1,3 +1,6 @@
+# Checks respect source-level group totals and do not treat total rows
+# as additional data when reconciling detail rows.
+
 # -------------------------------------------------------------------------
 # Business Unit Template report validation
 # -------------------------------------------------------------------------
@@ -720,6 +723,8 @@ business_unit_group_rows <- function(data, columns) {
 
 
 # Checks that the audience rows add up to the reported Total visits in every period.
+# Audience rows can reconcile to one reported visit total per period;
+# Direct and Indirect visit streams are checked independently.
 build_business_unit_visit_checks <- function(
   visits,
   validation_tolerance = 0.01

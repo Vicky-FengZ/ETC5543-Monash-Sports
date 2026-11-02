@@ -1,5 +1,7 @@
 # Forecast preparation, benchmark models and business scenarios.
 # Uses already-cleaned reports; never reads Excel in a render.
+# Baseline estimates are intentionally separate from user scenario inputs.
+# Any scenario change must leave the observed history unchanged.
 
 FORECAST_MODEL_NAMES <- c(
   seasonal_naive = "Seasonal naive",
@@ -60,6 +62,8 @@ forecast_venues_reports <- function(data) {
 # Monthly Actual Income and Expenses for the organisation (or one site),
 # limited to the chosen history, with the continuous run of months used to
 # fit the models. Returns `error` instead of data when the history is unusable.
+# Prepare a continuous time index before model selection. Reported zero
+# and missing/unconfirmed values are not interchangeable observations.
 prepare_forecast_history <- function(
   reports, site = "Overall", cutoff = NULL, from_year = NULL,
   include_trailing_zeros = FALSE
@@ -517,6 +521,8 @@ prepare_casual_wage_baseline <- function(
 # Applies the plan (payroll change, price and demand changes, start month)
 # to the baseline forecast. Returns the monthly table, the totals and the
 # minimum price increase that covers the plan's expenses.
+# Scenario adjustments apply to the already prepared baseline; never
+# mutate the historical source records when users change assumptions.
 calculate_finance_scenario <- function(
   baseline, wage_mode = "annual_amount", wage_amount = 0, wage_pct = 0,
   employee_count = 1, wage_share = NA_real_, other_cost_pct = 0,

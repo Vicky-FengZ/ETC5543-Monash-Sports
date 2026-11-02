@@ -1,3 +1,6 @@
+# Reader accepts the family-specific sheet layouts and keeps provenance;
+# cleaning and arithmetic validation are handled by separate modules.
+
 # -------------------------------------------------------------------------
 # Venues Tracking Report import
 # -------------------------------------------------------------------------
@@ -135,6 +138,8 @@ read_venues_tracking_sheet <- function(path, sheet_name) {
 # Hours")
 # or a year comparison suffix ("Court Hire 2024 vs 2025"). NA when absent; stops when several
 # match.
+# Match source worksheets by their accepted names, not by hard-coded
+# sheet positions that might shift in a revised workbook.
 find_venues_tracking_sheet <- function(
   sheet_names,
   expected_name,
