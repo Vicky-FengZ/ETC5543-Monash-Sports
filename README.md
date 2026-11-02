@@ -51,7 +51,7 @@ compared without navigating the files by hand.
 
 | Page | What it shows | Data needed |
 |---|---|---|
-| Executive Dashboard | One-page, presentation-ready summary of finance KPIs and charts you choose, with a full-screen Presentation View | Monthly Site Reports; Detailed Site Reports add facility charts |
+| Executive Dashboard | One-page, presentation-ready summary in three views: Overview (finance KPIs, four standard charts whose exact values show on hover, a Financial Summary table and key insights), Site and Metrics (charts you choose); a year can be reviewed alone or compared with another, and Presentation View shows it full screen | Monthly Site Reports; Detailed Site Reports add facility charts |
 | Overview | Organisation-wide income, expenses, budget variance and revenue opportunity over time | Monthly Site Reports |
 | Site Comparison | Sites side by side, then a facility breakdown for one site | Monthly Site Reports, Detailed Site Reports |
 | Detailed Analysis → Site Detail | Visits, memberships and enrolments for one site and year | Detailed Site Reports |

@@ -7,6 +7,14 @@
 # MONASH_SPORT_TEST_WORKERS=1 to run everything in this R session, one file
 # after another, for example when debugging a failing test.
 
+# Use the project's package library (renv) even when this R session was not
+# started in the project (for example after setwd()). Otherwise the tests
+# run on whatever versions are installed elsewhere, which can be older than
+# the ones recorded in renv.lock.
+if (file.exists(file.path("renv", "activate.R")) && !nzchar(Sys.getenv("RENV_PROJECT"))) {
+  source(file.path("renv", "activate.R"))
+}
+
 required <- c("shiny", "bslib", "bsicons", "readxl", "writexl")
 missing <- required[!vapply(required, requireNamespace, logical(1L), quietly = TRUE)]
 
@@ -134,6 +142,19 @@ run_test_group <- function(group) {
 test_workers <- suppressWarnings(as.integer(Sys.getenv("MONASH_SPORT_TEST_WORKERS", unset = "")))
 if (is.na(test_workers)) {
   test_workers <- max(1L, min(8L, parallel::detectCores() - 1L, length(test_groups)), na.rm = TRUE)
+}
+
+# Running in this session uses the packages already loaded here. If an older
+# shiny was loaded before the project library was switched on, restart R.
+if (test_workers == 1L && "shiny" %in% loadedNamespaces()) {
+  installed <- utils::packageVersion("shiny", lib.loc = .libPaths()[[1L]])
+  if (getNamespaceVersion("shiny") != as.character(installed)) {
+    stop(
+      "shiny ", getNamespaceVersion("shiny"), " is loaded but the project uses ", installed,
+      ". Restart R (Session > Restart R) and run the tests again.",
+      call. = FALSE
+    )
+  }
 }
 
 if (test_workers > 1L) {

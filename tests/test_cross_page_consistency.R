@@ -4,7 +4,8 @@
 # - Overview snapshot, Executive Dashboard KPIs and the shared calculation;
 # - Overview monthly totals against its annual totals;
 # - Forecasting history (Overall) against Overview monthly Actuals;
-# - Executive Dashboard for one site against Site Comparison for that site.
+# - Executive Dashboard for one site against Site Comparison for that site;
+# - Executive Financial Summary and chart hover read-outs against the KPIs.
 
 consistency_files <- c(
   file.path("data", "sample", "Monthly Site Report", "Monthly Site Report 2024 -December.xlsx"),
@@ -121,6 +122,57 @@ shiny::testServer(mod_executive_dashboard_server, args = list(data = consistency
       "Executive Dashboard Site focus and site calculation for",
       consistency_site
     )
+  )
+})
+
+# Executive Overview: the Financial Summary table and the chart hover
+# read-outs show the same figures as the KPI cards and the Overview page.
+money <- function(value, show_plus = FALSE) {
+  value <- round(value, 2)
+  paste0(
+    if (value < 0) "-" else if (show_plus && value > 0) "+" else "",
+    "$", formatC(abs(value), format = "f", digits = 2, big.mark = ",")
+  )
+}
+previous <- annual[annual$report_year == 2024L, , drop = FALSE]
+january <- monthly_2025[as.integer(format(as.Date(monthly_2025$date), "%m")) == 1L, , drop = FALSE]
+stopifnot(nrow(previous) == 1L, nrow(january) == 1L)
+
+shiny::testServer(mod_executive_dashboard_server, args = list(data = consistency_data), {
+  session$setInputs(
+    dashboard_section = "finance", view_mode = "Year Review", year = "2025",
+    comparison_year = "2024", site = "All Monash Sport"
+  )
+  session$flushReact()
+  summary <- paste(output$financial_summary_table, collapse = "")
+  stopifnot(
+    grepl("Total Income", summary, fixed = TRUE),
+    grepl(money(expected$income_actual), summary, fixed = TRUE),
+    grepl(money(expected$expenses_actual), summary, fixed = TRUE),
+    grepl(money(expected$net_actual), summary, fixed = TRUE)
+  )
+
+  # Hovering over a year or a month reads out that year's or month's values.
+  years <- sort(unique(executive_annual_finance()$report_year))
+  session$setInputs(executive_hover_annual_performance_trend = list(x = which(years == 2025L)))
+  annual_readout <- output$executive_hover_value_annual_performance_trend
+  session$setInputs(executive_hover_monthly_income_expenses = list(x = 1))
+  monthly_readout <- output$executive_hover_value_monthly_income_expenses
+  stopifnot(
+    grepl(paste0("2025: Income ", money(expected$income_actual)), annual_readout, fixed = TRUE),
+    grepl(money(january$income_actual), monthly_readout, fixed = TRUE),
+    grepl("Jan", monthly_readout, fixed = TRUE)
+  )
+
+  # Comparison view: both years and the difference between them.
+  session$setInputs(view_mode = "Comparison", year = "2025", comparison_year = "2024")
+  session$flushReact()
+  summary <- paste(output$financial_summary_table, collapse = "")
+  stopifnot(
+    grepl(money(previous$income_actual), summary, fixed = TRUE),
+    grepl(money(expected$income_actual), summary, fixed = TRUE),
+    grepl(money(expected$income_actual - previous$income_actual, show_plus = TRUE), summary, fixed = TRUE),
+    grepl("Difference", summary, fixed = TRUE)
   )
 })
 

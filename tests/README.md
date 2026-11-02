@@ -64,7 +64,7 @@ everything in one R session, for example while debugging, first run
 | File | Checks |
 |---|---|
 | `test_app_smoke.R` | Starts the app from `app.R` and renders every output on every page with no data, one report of each kind, a combined set and (sample and full runs) the whole set, also loaded from saved data |
-| `test_cross_page_consistency.R` | The same figure is the same on every page (Overview, Executive Dashboard, Forecasting, Site Comparison) |
+| `test_cross_page_consistency.R` | The same figure is the same on every page (Overview, Executive Dashboard, Forecasting, Site Comparison), including the Executive Financial Summary table, its year-on-year difference and the chart hover read-outs |
 | `test_key_numbers.R` | Site totals add up to the organisation summary; the annual figures match the accepted snapshot and any figures confirmed in the Excel reports (sample and full runs only) |
 
 ## Supporting files
