@@ -207,6 +207,7 @@ empty_basic_upload_registry <- function() {
     original_name = character(),
     stored_path = character(),
     size = double(),
+    content_hash = character(),
     status = character(),
     progress = double(),
     detail = character(),
@@ -214,6 +215,19 @@ empty_basic_upload_registry <- function() {
     error_message = character(),
     stringsAsFactors = FALSE
   )
+}
+
+
+# A content fingerprint avoids mistaking an edited, same-size workbook for
+# an unchanged upload. If a file cannot be fingerprinted, it must be parsed.
+basic_upload_content_hash <- function(paths) {
+  vapply(as.character(paths), function(path) {
+    if (is.na(path) || !nzchar(path)) return(NA_character_)
+    tryCatch(
+      suppressWarnings(unname(tools::md5sum(path))[[1L]]),
+      error = function(error) NA_character_
+    )
+  }, character(1L), USE.NAMES = FALSE)
 }
 
 
@@ -552,6 +566,11 @@ basic_saved_data_file_table <- function(rows, results) {
       character(1)
     ),
     size = as.numeric(rows$size),
+    content_hash = if ("content_hash" %in% names(rows)) {
+      as.character(rows$content_hash)
+    } else {
+      rep(NA_character_, nrow(rows))
+    },
     warning_count = as.integer(rows$warning_count),
     detail = as.character(rows$detail),
     stringsAsFactors = FALSE
@@ -655,6 +674,85 @@ basic_saved_data_days_old <- function(saved_at, today = Sys.time(), utc_offset =
 }
 
 
+# Table contracts come from the same prototypes as the Excel importers.
+# Extra columns are allowed; required columns and their types must survive.
+basic_saved_report_tables <- function(report_type) {
+  tables <- switch(report_type,
+    monthly_site = list(
+      finance = empty_monthly_finance_table(),
+      discounts = empty_monthly_discount_table(),
+      total_revenue = empty_monthly_total_revenue_table()
+    ),
+    site_detail = list(
+      finance = empty_business_unit_template_finance_table(),
+      discounts = empty_business_unit_template_discount_table(),
+      total_revenue = empty_business_unit_template_total_revenue_table(),
+      visits = empty_business_unit_template_visit_table(),
+      memberships = empty_business_unit_template_member_table(),
+      enrollments = empty_business_unit_template_member_table()
+    ),
+    venues_tracking = list(
+      finance = empty_venues_finance_table(),
+      attendance = empty_venues_attendance_table(),
+      facility_hire = empty_venues_facility_hire_table(),
+      court_hire = empty_venues_court_hire_table(),
+      membership = empty_venues_membership_table(),
+      online_sales = empty_venues_online_sales_table(),
+      merchandise = empty_venues_merchandise_table(),
+      casual_hours = empty_venues_casual_hours_table(),
+      casual_wages = empty_venues_casual_wages_table()
+    )
+  )
+  c(tables, list(validation = empty_import_issue_table()))
+}
+
+
+basic_saved_table_matches <- function(table, prototype) {
+  if (!is.data.frame(table) || anyDuplicated(names(table)) ||
+      !all(names(prototype) %in% names(table))) return(FALSE)
+  all(vapply(names(prototype), function(column) {
+    expected <- prototype[[column]]
+    actual <- table[[column]]
+    if (inherits(expected, "Date")) return(inherits(actual, "Date"))
+    if (is.numeric(expected)) return(is.numeric(actual) && !inherits(actual, "Date") &&
+      (column != "value" || all(is.na(actual) | is.finite(actual))))
+    if (is.logical(expected)) return(is.logical(actual))
+    # Earlier parser versions produced logical(0) for empty metric labels.
+    if (is.character(expected)) return(is.character(actual) ||
+      (length(actual) == 0L && is.logical(actual)))
+    identical(class(actual), class(expected))
+  }, logical(1L)))
+}
+
+
+basic_saved_result_is_valid <- function(result, report_type, source_name) {
+  if (!is.list(result) ||
+      !inherits(result, BASIC_UPLOAD_RESULT_CLASSES[[report_type]])) return(FALSE)
+  prototypes <- basic_saved_report_tables(report_type)
+  if (!all(vapply(names(prototypes), function(name) {
+    basic_saved_table_matches(result[[name]], prototypes[[name]])
+  }, logical(1L)))) return(FALSE)
+  if (!is.null(result$additional_data) &&
+      !basic_saved_table_matches(result$additional_data, empty_additional_import_data())) return(FALSE)
+  files <- result$files
+  if (!is.data.frame(files) || !nrow(files) || anyDuplicated(names(files)) ||
+      !all(c("source_file", "report_year") %in% names(files)) ||
+      !is.character(files$source_file) || anyNA(files$source_file) ||
+      any(files$source_file != source_name) || !is.numeric(files$report_year) ||
+      any(!is.finite(files$report_year) | files$report_year != trunc(files$report_year))) return(FALSE)
+  if (report_type == "site_detail" &&
+      (!is.character(files$report_unit) || anyNA(files$report_unit) ||
+       length(files$report_unit) != nrow(files) || any(!nzchar(trimws(files$report_unit))))) return(FALSE)
+  if (!all(result$validation$level %in% c("warning", "error"))) return(FALSE)
+  tables <- Filter(is.data.frame, unclass(result))
+  if (!all(vapply(tables, function(table) {
+    !"report_year" %in% names(table) || all(table$report_year %in% files$report_year)
+  }, logical(1L)))) return(FALSE)
+  if (basic_upload_result_issues(result)$errors > 0L) return(FALSE)
+  basic_upload_reported_values(result, report_type) > 0L
+}
+
+
 # Reads and checks a saved-data file. Stops with a message written for the
 # person who chose the file.
 read_basic_saved_data <- function(path) {
@@ -674,7 +772,8 @@ read_basic_saved_data <- function(path) {
     error = function(error) "an unknown date"
   )
 
-  if (length(version) != 1L || is.na(version)) {
+  if (!is.numeric(saved$version) || length(version) != 1L || is.na(version) ||
+      !is.finite(saved$version) || saved$version != version) {
     stop(not_saved_data, call. = FALSE)
   }
   if (version > BASIC_SAVED_DATA_VERSION) {
@@ -695,23 +794,51 @@ read_basic_saved_data <- function(path) {
 
   files <- saved$files
   required <- c("original_name", "report_type", "years", "size", "warning_count")
-  complete <- is.data.frame(files) &&
+  complete <- is.data.frame(files) && nrow(files) > 0L && !anyDuplicated(names(files)) &&
     all(required %in% names(files)) &&
+    is.character(files$original_name) && !anyNA(files$original_name) &&
+    all(nzchar(trimws(files$original_name))) &&
+    is.character(files$report_type) &&
     all(files$report_type %in% names(BASIC_UPLOAD_RESULT_CLASSES)) &&
+    is.character(files$years) && !anyNA(files$years) &&
+    is.numeric(files$size) && all(is.finite(files$size) & files$size >= 0) &&
+    is.numeric(files$warning_count) &&
+    all(is.finite(files$warning_count) & files$warning_count >= 0 &
+        files$warning_count == trunc(files$warning_count)) &&
+    !anyDuplicated(paste(files$report_type, tolower(trimws(files$original_name)))) &&
     is.list(saved$results) &&
     length(saved$results) == nrow(files) &&
+    is.list(saved$warnings) &&
     length(saved$warnings) == nrow(files) &&
     inherits(saved$saved_at, c("POSIXct", "Date")) &&
+    length(saved$saved_at) == 1L && is.finite(as.numeric(saved$saved_at)) &&
     all(vapply(
       seq_len(nrow(files)),
       function(index) {
-        inherits(
-          saved$results[[index]],
-          BASIC_UPLOAD_RESULT_CLASSES[[files$report_type[[index]]]]
-        )
+        result <- saved$results[[index]]
+        notes <- saved$warnings[[index]]
+        basic_saved_result_is_valid(result, files$report_type[[index]], files$original_name[[index]]) &&
+          identical(files$years[[index]], paste(basic_saved_result_years(result), collapse = ", ")) &&
+          basic_upload_result_issues(result)$warnings == files$warning_count[[index]] &&
+          (is.null(notes) || basic_saved_table_matches(notes,
+            data.frame(sheet = character(), message = character(), impact = character()))) &&
+          (if (is.null(notes)) 0L else nrow(notes)) == files$warning_count[[index]]
       },
       logical(1)
     ))
+
+  # Old saved files lack fingerprints. They remain readable, but an Excel
+  # file selected later is reparsed until its contents can be verified.
+  if (isTRUE(complete)) {
+    if (!"content_hash" %in% names(files)) files$content_hash <- rep(NA_character_, nrow(files))
+    complete <- is.character(files$content_hash) &&
+      all(is.na(files$content_hash) | grepl("^[a-f0-9]{32}$", files$content_hash))
+    coverage <- unlist(lapply(seq_len(nrow(files)), function(index) {
+      names(basic_upload_coverage(saved$results[[index]], files$report_type[[index]],
+        files$original_name[[index]]))
+    }), use.names = FALSE)
+    complete <- isTRUE(complete) && !anyDuplicated(coverage)
+  }
 
   if (!isTRUE(complete)) {
     stop(
@@ -721,6 +848,7 @@ read_basic_saved_data <- function(path) {
     )
   }
 
+  saved$files <- files
   saved
 }
 
@@ -2538,6 +2666,7 @@ mod_data_upload_server <- function(
             original_name = as.character(upload_info$name[[index]]),
             stored_path = if (copied) stored_path else NA_character_,
             size = as.numeric(upload_info$size[[index]]),
+            content_hash = if (copied) basic_upload_content_hash(stored_path) else NA_character_,
             status = status,
             progress = if (copied) 0 else 1,
             detail = detail,
@@ -2750,7 +2879,7 @@ mod_data_upload_server <- function(
 
       # One entry point for everything the user chooses: saved data files are
       # loaded first, so newer workbooks in the same selection replace their
-      # saved copies; workbooks already loaded with the same name and size are
+      # saved copies; workbooks already loaded with the same name and contents are
       # skipped; the rest are parsed by the report type their name matches.
       process_all_reports <- function(upload_info) {
         on.exit(finish_upload(), add = TRUE)
@@ -2776,19 +2905,21 @@ mod_data_upload_server <- function(
 
         ready <- registry()
         ready <- ready[ready$status == "ready", , drop = FALSE]
-        file_key <- function(type, name, size) {
-          paste(type, tolower(trimws(name)), round(as.numeric(size)), sep = "|")
+        hashes <- rep(NA_character_, nrow(upload_info))
+        hashes[excel & !repeated] <- basic_upload_content_hash(upload_info$datapath[excel & !repeated])
+        file_key <- function(type, name, hash) {
+          paste(type, tolower(trimws(name)), hash, sep = "|")
         }
-        unchanged <- matched &
-          file_key(types, names, upload_info$size) %in%
-            file_key(ready$report_type, ready$original_name, ready$size)
+        unchanged <- matched & !is.na(hashes) &
+          file_key(types, names, hashes) %in%
+            file_key(ready$report_type, ready$original_name, ready$content_hash)
         to_parse <- matched & !unchanged
         unrecognised <- excel & is.na(types) & !repeated
         # An unrecognised workbook that was given a type earlier (or came
         # from saved data) and has not changed is not asked about again.
-        known <- unrecognised &
-          file_key("", names, upload_info$size) %in%
-            file_key("", ready$original_name, ready$size)
+        known <- unrecognised & !is.na(hashes) &
+          file_key("", names, hashes) %in%
+            file_key("", ready$original_name, ready$content_hash)
         unrecognised <- unrecognised & !known
         add_pending_files(upload_info[unrecognised, , drop = FALSE])
 
@@ -2999,9 +3130,6 @@ mod_data_upload_server <- function(
           tolower(trimws(current$original_name))
         )
         saved_keys <- paste(files$report_type, tolower(trimws(files$original_name)))
-        replaced_ids <- current$file_id[current_keys %in% saved_keys]
-        remove_session_files(replaced_ids)
-
         saved_on <- format(
           basic_saved_local_date(saved$saved_at, client_utc_offset()),
           "%d %b %Y"
@@ -3012,6 +3140,7 @@ mod_data_upload_server <- function(
           original_name = files$original_name,
           stored_path = NA_character_,
           size = as.numeric(files$size),
+          content_hash = files$content_hash,
           status = "ready",
           progress = 1,
           detail = paste("Loaded from saved data (saved", paste0(saved_on, ")")),
@@ -3022,27 +3151,32 @@ mod_data_upload_server <- function(
 
         # A saved file whose year is already provided by another file in the
         # session (under a different name) is not used, as for uploads.
-        current <- registry()
         current <- current[current$status == "ready", , drop = FALSE]
         current_results <- parsed_results()
-        conflicts <- vapply(
-          seq_len(nrow(files)),
-          function(index) {
-            message <- basic_upload_conflict(
-              saved$results[[index]],
-              files$report_type[[index]],
-              files$original_name[[index]],
-              current[current$report_type == files$report_type[[index]], , drop = FALSE],
-              current_results
-            )
-            if (is.null(message)) NA_character_ else message
-          },
-          character(1)
-        )
+        conflicts <- rep(NA_character_, nrow(files))
+        replaced_ids <- character()
+        original_rows <- registry()
+        for (index in seq_len(nrow(files))) {
+          candidate_replacements <- original_rows$file_id[current_keys %in% saved_keys[[index]]]
+          others <- current[!current$file_id %in% candidate_replacements, , drop = FALSE]
+          message <- basic_upload_conflict(
+            saved$results[[index]], files$report_type[[index]], files$original_name[[index]],
+            others[others$report_type == files$report_type[[index]], , drop = FALSE], current_results
+          )
+          if (!is.null(message)) {
+            conflicts[[index]] <- message
+          } else {
+            replaced_ids <- union(replaced_ids, candidate_replacements)
+            current <- rbind(others, new_rows[index, , drop = FALSE])
+            current_results[[file_ids[[index]]]] <- saved$results[[index]]
+          }
+        }
         used <- is.na(conflicts)
         new_rows$status[!used] <- "failed"
         new_rows$detail[!used] <- "Same report year already loaded"
         new_rows$error_message[!used] <- conflicts[!used]
+        # Commit only the accepted replacements, after every check has run.
+        remove_session_files(replaced_ids)
         registry(rbind(registry(), new_rows))
 
         results <- parsed_results()
@@ -3261,7 +3395,7 @@ mod_data_upload_server <- function(
               p(paste0(
                 notice$unchanged,
                 if (notice$unchanged == 1L) " workbook was" else " workbooks were",
-                " already loaded with the same name and size, so ",
+                " already loaded with the same name and contents, so ",
                 if (notice$unchanged == 1L) "it was" else "they were",
                 " not read again."
               ))
@@ -3789,21 +3923,25 @@ mod_data_upload_server <- function(
         )
       })
 
+      preview_export_data <- reactive({
+        filter_basic_preview_table(
+          preview_table_data(), year = selected_preview_years(),
+          measures = selected_preview_measures(), value_types = selected_preview_value_types(),
+          search = input$preview_search
+        )
+      })
+
       preview_export_sheets <- reactive({
         basic_cleaned_export_sheets(
-          data = preview_table_data(),
+          data = preview_export_data(),
           source_sheets = preview_source_sheets(),
-          years = selected_preview_years(),
-          measures = selected_preview_measures(),
-          value_types = selected_preview_value_types(),
-          search = input$preview_search,
           sort_column = input$preview_sort_column,
           sort_direction = input$preview_sort_direction
         )
       })
 
       output$preview_download_ui <- renderUI({
-        if (length(preview_export_sheets()) == 0L) {
+        if (is.null(preview_export_data()) || nrow(preview_export_data()) == 0L) {
           return(tags$button(
             type = "button",
             class = paste(

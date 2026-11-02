@@ -78,6 +78,7 @@ test_groups <- list(
     "test_data_pipeline_regressions.R", 
     "test_venues_tracking_extensions.R",
     "test_basic_upload.R", 
+    "test_upload_integrity.R",
     "test_upload_warnings.R", 
     "test_extensible_imports.R",
     "test_excel_templates.R", 

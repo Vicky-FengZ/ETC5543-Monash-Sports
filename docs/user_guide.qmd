@@ -484,7 +484,7 @@ case, contact the person who looks after the dashboard (see the
 | *"The file name says 2026, but the workbook holds 2025 figures"* | The year in the file name is wrong | Rename the file with the correct year and add it again |
 | *"This workbook has no figures yet; it looks like a blank template"* | The file has no figures filled in | Add it once at least one month has been filled in |
 | A file is listed with a **Choose report type** box | The file name does not match any report type | Choose the right type and click **Add**, or click **Dismiss**. Renaming the file to follow the rules in section 3 also works |
-| *"... already loaded with the same name and size ..."* | The file has not changed since it was loaded | Nothing. The dashboard skips it to save time |
+| *"... already loaded with the same name and contents ..."* | The file has not changed since it was loaded | Nothing. The dashboard skips it to save time |
 | A **READY** file with warnings | Something in the report may need checking, such as a missing month or a total that does not match its parts. The figures are still used as reported | Click **View details**, read the warnings, and check the original Excel file |
 | *"This saved file is incomplete or damaged, so nothing was loaded"* | The saved data file cannot be read | Add the original Excel reports instead, then save a new copy |
 | *"This file was saved ... by an older version of the dashboard"* | The dashboard has been updated since the file was saved | Add the original Excel reports again, then save a new copy |

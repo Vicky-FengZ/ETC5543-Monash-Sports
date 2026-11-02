@@ -155,8 +155,11 @@ time after.
   **Choose report type** box: pick the type and select **Add**, or
   **Dismiss** it. If the chosen type does not fit the workbook, the error says
   so.
-- A workbook that is already loaded with the same name and size is skipped,
+- A workbook that is already loaded with the same name and contents is skipped,
   so choosing the whole folder again only reads new or changed reports.
+  Content fingerprints are also kept in saved data. Older saves without a
+  fingerprint still load; selecting the Excel file again checks it by parsing
+  it once.
 - Other files in the selection are ignored, and a summary under the buttons
   lists what was matched, skipped, left for a type or ignored.
 
@@ -220,7 +223,7 @@ cleaned data can be kept in a file and loaded again:
   data saved more than 30 days ago is flagged as possibly out of date.
 - The saved file can be chosen together with the reports, for example by
   choosing the report folder that holds it. The saved data is loaded first;
-  reports with the same name and size are skipped, and newer versions replace
+  reports with the same name and contents are skipped, and changed versions replace
   their saved copies.
 - Loaded files behave like uploads: they can be removed, and the session can
   be saved again.

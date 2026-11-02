@@ -9,12 +9,13 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,3 +35,6 @@ jobs:
 
       - name: Run the sample test suite
         run: Rscript -e 'source("tests/run_sample_tests.R")'
+
+      - name: Check browser download behaviour
+        run: node tests/test_browser_downloads.cjs
