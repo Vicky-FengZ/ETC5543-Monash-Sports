@@ -144,28 +144,6 @@ business_unit_label_from_file <- function(source_name) {
 }
 
 
-# Business unit from the file name, without the year and "Site/Program Report",
-# e.g. "Aquatics Site Report 2025.xlsx" -> "Aquatics"; known units get their standard name.
-extract_business_unit_report_name <- function(source_name) {
-
-  label <- business_unit_label_from_file(source_name)
-  known <- known_business_unit_name(label)
-
-  if (!is.na(known)) {
-    return(known)
-  }
-
-  if (!nzchar(label)) {
-    stop(
-      paste0("Could not identify report unit from file name: ", source_name),
-      call. = FALSE
-    )
-  }
-
-  label
-}
-
-
 # Business unit named in the title at the top of the Finance sheet, e.g.
 # "AQUATICS (CLAYTON)" -> "AQUATICS". The blank template has a "Business
 # unit" label instead, so the cell after that label is used. "" when the

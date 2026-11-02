@@ -1287,15 +1287,6 @@ body {
   color: var(--ms-grey-1);
 }
 
-.prototype-note {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: var(--ms-surface-muted);
-  color: var(--ms-grey-1);
-  font-size: 0.78rem;
-}
 
 .data-source-note {
   display: inline-block;
