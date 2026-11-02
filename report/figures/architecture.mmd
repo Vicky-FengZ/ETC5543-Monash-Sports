@@ -1,0 +1,23 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Liberation Sans, Arial, DejaVu Sans, sans-serif","fontSize":"15px","primaryColor":"#FFFFFF","primaryBorderColor":"#006DAE","primaryTextColor":"#121256","lineColor":"#5B6670","clusterBkg":"#F4F7FA","clusterBorder":"#9AA5B1"}}}%%
+flowchart LR
+  GH["GitHub Pages<br/>(app code only)"]
+  subgraph PC["User's computer"]
+    XL["Excel workbooks<br/>Monthly Site Reports<br/>Detailed Site Reports<br/>Venues Tracking Reports"]
+    subgraph BR["Web browser: dashboard running in R (Shinylive)"]
+      UP["Upload and review<br/>(Data page)"]
+      DL["Data layer<br/>import → cleaning → validation"]
+      LT[("Cleaned long tables<br/>with source cell of every value")]
+      CA["Shared calculations<br/>(KPIs and totals)"]
+      PG["Dashboard pages<br/>Executive Dashboard<br/>Overview<br/>Site Comparison<br/>Site Detail<br/>Venues Operations"]
+      FC["Forecasting and<br/>scenario planning"]
+    end
+    RDS["Saved data file (.rds)"]
+  end
+  GH -. "loads once" .-> BR
+  XL --> UP --> DL --> LT
+  LT --> CA --> PG
+  LT --> FC
+  LT -. "save" .-> RDS
+  RDS -. "reload" .-> UP
+  classDef accent fill:#121256,stroke:#121256,color:#FFFFFF;
+  class LT accent;
