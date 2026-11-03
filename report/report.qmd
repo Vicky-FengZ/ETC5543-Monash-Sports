@@ -56,7 +56,13 @@ The data side also has to be reusable. Monash Sport will keep producing reports 
 
 ## Dashboard objectives {#sec-obj-dashboard}
 
-<!--Owner: Ayush-->
+The first dashboard objective is to consolidate separate reports into a coherent view of Monash Sport's performance. Managers should be able to assess whether income exceeds expenditure, compare actual results with budgets, and identify changes across sites, facilities and activities. Clear metric definitions and separation of organisation totals, site summaries and detailed observations are essential to prevent misleading visualisations, even when the charts appear visually convincing.
+
+The second objective is to support both executive reporting and detailed investigation without duplicating the reporting process. Managers need a concise presentation view that highlights key results without requiring repeated navigation or scrolling. When a result raises questions, the detailed pages should allow users to examine monthly trends, site performance, programs and operational measures. Both levels should present consistent information at different levels of detail, allowing managers to move from an overall result to its underlying components.
+
+The third objective is to enable comparisons at a meaningful level with those who are not analysts. Filters need to be clearly defined as to the reporting year and scope, chart legends, titles and labels need to be clearly differentiated between Income and Expenses; Actual and Budget; and monthly and year-to-date. Missing reporting periods should be identified as unavailable rather than represented as zero values. If it is not possible to see the labels rounded off in a graph, the user should be able to view the underlying reported data.
+
+Finally, it needs to be user-friendly following the handover. The pages, calculations and chart functions must be modularized and the interface must be sensible even if upload of only one report family or a new reporting year is possible. The objectives are evaluated in @sec-evaluation and limited by the limits in @sec-limitations.
 
 ## Forecasting objectives {#sec-obj-forecast}
 
@@ -126,7 +132,7 @@ The workbooks also differ from each other in many small ways, and the difference
 
 The data also have limitations that shape what the dashboard can show. The workbooks are summary reports: they record monthly totals by site, facility and program, but no individual transactions, bookings or customers, so the dashboard cannot analyse behaviour below that level or estimate how customers respond to price changes. The history is short, covering 2021 to 2025 at monthly frequency, and the Venues Tracking Reports start only in 2022. Casual salaries in the Venues Tracking Reports are the only wage data available, and it is not known whether they cover every casual employee. Some workbooks also contain missing months or totals that do not match their components, which the dashboard reports rather than corrects (@sec-cleaning).
 
-The reports are confidential and are not included in the project repository. All figures and examples in this report use synthetic workbooks that copy the layout of the originals but contain randomly generated numbers.
+The original Monash Sport workbooks are confidential and are not included in the public repository. Dashboard figures and worked examples presented in this report use synthetic workbooks that reproduce the source layouts with randomly generated values. Evaluation results concerning import success, validation checks and processing times were obtained from the original workbooks; only aggregated test results are reported, without disclosing confidential financial or operational figures.
 
 ## Import, cleaning and validation {#sec-cleaning}
 
@@ -156,7 +162,7 @@ Checks operate within and across workbooks (@tbl-validation). Within a workbook,
 | Across files | Two reports for the same year, or a file name whose year differs from the year inside the workbook | Error | Using the file would count figures twice or assign them to the wrong year |
 
 : Main validation checks, the level at which each is reported, and why. {#tbl-validation}
-
+ 
 For example, Total Revenue in the Monthly Site Reports is checked against Actual Income plus revenue opportunity, the income given up through student, staff and other discounts. A mismatch produces a warning with the source location. The reported figure is retained for staff review because the importer cannot determine which source value should change.
 
 ## Upload workflow {#sec-upload}
@@ -177,19 +183,68 @@ Loading this file restores the cleaned data without reading the workbooks again.
 
 ## Extending to future years {#sec-extend}
 
-Because the project team will not be available to update the code each year, the importers accept future reporting years within the supported layouts (@sec-cleaning). The report year is read from the file name and checked against the contents. Within these layouts, new columns and categories, such as discount types, facilities or membership groups, pass through to the cleaned tables. Retaining these additions avoids data disappearing unnoticed, and new measures can be described in the configuration file.
+Future-proofing was treated as an explicit design requirement, recognising that Monash Sport's reporting processes may continue to evolve. The team wanted to give staff the flexibility to add ordinary reporting years and supported categories without having to request the original developers to edit the app every time. The importers use the file names and the headings of the relevant workbooks to guess the reporting years and verify that the guessed years match with the ones provided by the source if available. The available years in the reporting controls are not hard coded, but rather are based on data that is successfully uploaded. The reporting-context helpers also identify available sites and report families, which, if a new period is added or a partial upload, does not need to be configured manually for every page. This behaviour is important because the person who is preparing the meeting might be receiving some reports, but not others.
 
-Blank templates for each report family include a guide to the required structure and are available on the Data page. They help new staff prepare compatible reports. A substantial redesign of a workbook still requires an update to that family's importer.
+The import pipeline is intentionally designed to be extensible in known Excel layouts. The newly defined audience categories, new lines in the source fields, new labelled discount types and other source fields can remain in the cleaned tables, and the metric-definition file `config/metric_definitions.csv` contains central rules for the units and aggregation of recognised or newly defined measures. Unrecognised values within supported worksheet areas are retained, where possible, in additional_data, together with their source locations and warnings. Unsupported worksheets are flagged for review and require additional extraction rules before their contents can be incorporated into the cleaned tables. They are not shown on already existing KPIs or charts as totals. This separation ensures that subsequent additions don't assume an unknown number's business usage. Even if new business relationships or a significantly different workbook structure, explicit extraction and validation rules still need to be applied.
+
+The R Shiny implementation also considered some future maintenance issues. The individual pages exist in individual modules and share reporting-context, calculation and plotting helpers. This will limit the range of a changed KPI, category selector or chart, but will not eliminate dependency testing of the changed KPI, category selector or chart between pages. Source-file, worksheet, row and column identifiers enable the replacement developer to find the source of unexpected values in the dashboard. Blank Excel templates, synthetic sample workbooks, the data dictionary, `tests/README.md` and the developer maintainer guide provide examples and instructions without distributing confidential Monash Sport data. The guides explain how to update importers when report templates change, verify calculations, run regression tests and deploy updated versions.
+
+These are measures that enhance the ability of the system to adapt, but they do not ensure that the system can always be compatible. They were tested using future-year and extensibility tests in @sec-eval-reuse, and are discussed in @sec-limitations for their untested boundaries.
 
 # The dashboard {#sec-dashboard}
 
-<!--Owner: Ayush-->
+The dashboard transforms validated reporting data into views that help managers answer specific performance questions. It contains six reporting and analysis pages, alongside the Data page described in @sec-upload. Rather than reproducing the structure of individual workbooks, the pages follow different management needs, progressing from organisation-wide results to site comparisons, operational detail and forward planning. @tbl-pages summarises the purpose of each page.
 
+| Page | Main question | Reporting view |
+|---|---|---|
+| Executive Dashboard | What should management focus on during meetings? | Overview, Site and Venues summaries, with Year Review, Comparison and Presentation View |
+| Overview | How has Monash Sport's financial performance changed over time? | Organisation-wide Income, Expenses, Net Result and Budget Variance |
+| Site Comparison | How does financial performance differ across sites? | Site-level comparisons and facility financial breakdowns |
+| Site Detail | How are visits, memberships and enrolments changing? | Site activities, audiences, memberships and enrolments |
+| Venues Operations | Which activities and costs contribute to venue operations? | Attendance, facility hire, memberships, sales, casual hours and wages |
+| Forecasting | How could payroll, pricing and demand changes affect future performance? | Baseline forecasts and scenario planning |
 
+: Dashboard pages and the management questions they support. The Data page provides workbook uploads, validation and cleaned-data review. {#tbl-pages}
 
+## Executive Dashboard: reporting for meetings {#sec-dashboard-executive}
 
+The Executive Dashboard was created based on the feedback that the detailed pages were useful for investigation, but not convenient for presentation. The manager who is providing results in a meeting should not have to repeatedly switch pages or explain that the chart on the screen is for a different year than the headline figures. Four headline indicators, a consistent array of charts and an explanatory summary are gathered in the revised executive page, all with consistent year controls and a full-screen Presentation View.
 
+It is broken down into three viewpoints. The total Income, Expenses, Net Result and Budget Variance are highlighted in **Overview**. There are four charts that display the monthly income and expenses, annual performance trends, budget vs actual expenses and income, and a Financial Summary and Key Insights. **Site** emphasizes the difference between the reporting units. This information is displayed on its charts, which include Income, Expenses and Net Result, Direct and Indirect visits, Active Memberships and Enrolments against targets, with financial rankings and site-level insights following. **Venues** include operational activity (attendance by activity, facility-hire revenue, Casual Wages Budget / Actual, merchandise / equipment related sales). Those charts are linked to the headline measures through a Venues Operational Summary and Key Insights. The basic visual structure remains the same, with each perspective addressing a distinct management question.
 
+For example, a negative Net Result on the Executive Overview indicates that reported expenses exceed income for the selected period, but does not explain the underlying causes. The Site view helps managers identify which reporting units contribute to the overall result, while the Venues view highlights operational activities and costs that can be investigated further. This progression from headline results to supporting measures provides a clearer basis for discussion than presenting unrelated charts without a defined hierarchy. The Key Insights summarise observed patterns rather than establish causal relationships; for instance, an increase in attendance alongside higher wages does not demonstrate that one caused the other.
+
+**Year Review** looks at one year selected and **Comparison** compares that year to another year. These are all presented separately to minimise unintentional comparisons between non-compatible time periods. Both modes have the same reporting context for the title, values and charts. Presentation View expands the selected Executive Dashboard summary for display on a projected screen, while more detailed analysis remains available on the other dashboard pages. Legends stay close to their titles, and hover read-outs indicate the exact number when a presenter wants to know if a number is a visual estimate or the actual value. These features have been added in response to problems of overcrowding, poor legibility of the legends and excessive scrolling required to see a full summary.
+
+## Organisation-wide financial overview {#sec-dashboard-overview}
+
+The Overview page provides a longer time perspective that might not be shown in a one year presentation. Users choose the years for which they wish to analyse and view the latest year in that period summarised by four indicators: Total Income, Total Expenses, Net Result and Budget Variance. Monthly charts show if a change is persistent, seasonal or limited to specific months, and annual charts are able to show overall direction for the year. Net Result is calculated as Actual Income minus Actual Expenses and indicates whether income exceeds expenditure. Budget Variance compares actual performance with budgeted values, and its interpretation depends on the measure: higher-than-budgeted income and higher-than-budgeted expenses have different implications. Keeping these measures separate prevents users from interpreting a positive numerical variance as necessarily favourable.
+
+One of the design challenges was the relationship between an organisation total and the site values that make up the total. The finance workbooks contain both, so adding all the rows you have would double count the same thing. The page avoids combining organisation summary rows with their underlying site-level detail, preventing double counting. Shared calculation functions ensure that financial measures remain consistent across the Overview, Executive Dashboard, Site Comparison and Forecasting pages. This is essential for reliable reporting because double-counted income could produce misleading comparisons and affect the interpretation of subsequent financial analyses. The cross page consistency checks are described by @sec-eval-accuracy, the same definitions are reused by the site and forecasting pages.
+
+## Site Comparison and Site Detail {#sec-dashboard-sites}
+
+Site Comparison is designed to address issues like which facility contributed to a site's actual financial performance versus another facility, or which site has performed better than the other. The page displays similar financial metrics at the reporting unit level, and a detailed facility-level view for a selected facility. This "apples to apples" methodology and year selection prevents comparisons between the Income at one site and the Net Result at another. If more than one facility is located under a single site, the interface is designed to prevent the same totals from being interpreted as separate observations in the site level comparison.
+
+Site Detail is used to answer questions about the site beyond the scope of finance. Direct and indirect visits, activities and audience groups, membership metrics, and targets and/or enrolment results can be examined. These are not interchangeable measures; a visit is an occurrence of attendance, a membership a balance at a moment in time, and enrolments participation in programs. The dashboard will thus not feed in various types of indicators under a generic count of 'activity'. Not all business units provide each measure or measure type; the page shows the information but does not consider data not available to be zero.
+
+The operational pages needed special attention to make for easier readability on chart. Initial efforts to include all subcategories on one graph obscured differences in the audience or differences in activity types, with labels overlapping one another. The detailed views were easier to read when the information was broken up into focused charts; the original category labels from the reports were left on the charts and only used selectors where they clarified the comparison made. Hover information was added to supported charts to allow for the checking of a point without having to use the height of a bar or the approximate position of the line.
+
+## Venues Operations {#sec-dashboard-venues}
+
+A separate page is necessary for venues as they have more detailed operating measures in their tracking workbooks than the other site reports. Attendance, facility and court hire, memberships, online sales, merchandise activity/equipment, casual hours/casual wages are included on the page. These measures are various parts of operations and cannot be summarized into one financial chart. The ability to group them into related views enables management to look at an attendance pattern one way, with a different view of the same pattern of hire revenue, if any.
+
+The Venues worksheets also differ in the operational categories they report. Space Hire and related sections contain fewer activity categories than Tennis, while student and customer classifications vary between operational areas. Applying a fixed category list across all sections would create empty or misleading groups. The dashboard therefore updates its selection options according to the chosen operational area, while retaining the original category labels for attendance and transaction measures. Although this approach adds complexity to the interface, it preserves the distinctions present in the source data and supports more meaningful comparisons.
+
+The Venues dashboard displays budgeted and actual casual wages together so that managers can assess whether expenditure is above or below budget and examine the size of the difference. The direction of the variance is interpreted in the context of expenditure rather than assumed to be favourable whenever the numerical value is positive. Monthly and year-to-date attendance and facility-hire values are also kept separate because combining them would double count activity. These decisions preserve the reporting distinctions established during data cleaning and validation in @sec-cleaning.
+
+## Shared interactions and interpretation {#sec-dashboard-interactions}
+
+Common navigation, filters and visual language are used on the pages. Contrasting series are distinguished by colour and the title of the chart and the legend tell what they are. The value of the KPI is rounded for faster reading; the detailed values are available on chart hover or in the cleaned-data review. Near charts, the report year and the scope for comparison are displayed in order to avoid having to recall a choice made in another part of the app.
+
+Reporting coverage is not complete for every measure or period. Where a reporting year or month is missing, charts preserve the gap rather than displaying an invented zero or drawing a continuous trend across unobserved periods. Measures that are not available for a particular reporting unit are also treated as unavailable rather than as zero. Together with source-cell traceability, these rules ensure that the visualisations remain faithful to the information recorded in the original workbooks.
+
+The dashboard is thus organized as a path of explanation: begin with the result, look at the units or periods to see if there's a problem, check the detailed measure, and then review the original report if necessary. This is a defensible basis to discuss, not an automatic recommendation for the program or facility that Monash Sport should expand or cut.
 
 # Forecasting and scenario planning {#sec-forecast}
 
@@ -306,9 +361,21 @@ The same fault can lead to different results in different report families, follo
 
 Separate tests run the real importers on problem files: two reports for the same year, a file name whose year differs from the year inside the workbook, a blank template, a damaged file, and a saved data file that overlaps reports already loaded. In every case the file was blocked or handled as designed, and the data already loaded stayed unchanged. Traceability is built into the data structure rather than tested separately: every row of every cleaned table carries its source file, sheet, row and column, and the View Cleaned Data tab shows these alongside each value (@fig-before-after).
 
-## Reusable over time {#sec-eval-reuse}
+## Dashboard functionality and stakeholder feedback {#sec-eval-dashboard}
 
-Several tests imitate supported additions to future reports (@sec-extend). They load a Venues Tracking Report for a future year, with year-named worksheets and new sections, as well as reports with new columns and categories, and check that these pass through cleaning, validation, the cleaned-data preview and the Excel export. Another test checks that the blank Excel templates on the Data page match the structure expected by the importers. The synthetic workbooks and all the tests are published with the code, so anyone can rerun this evaluation without the real data.
+The dashboard objectives in @sec-obj-dashboard were evaluated through cross-page numerical checks, application-level rendering tests and manual interaction testing in R using uploaded report data. Cross-page tests compare Income, Expenses, Net Result and Budget Variance across the relevant reporting views, helping identify inconsistencies introduced by changes to calculations or charts. Application-level tests also verify that pages render when only some report families are available, reflecting situations in which staff have not yet received every workbook for a reporting period.
+
+All dashboard pages and their principal interactions were manually tested in R using uploaded data. This included filters, charts, hover readouts, and the Executive Dashboard's Year Review, Comparison and full-screen Presentation View. These checks helped identify and resolve layout, labelling and readability issues during development and confirmed that the implemented controls behaved as intended in the R application. However, the evaluation did not measure task-completion times, accessibility compliance or consistent behaviour across different browsers and devices.
+
+Industry mentors Alicia Stack and Darren McLeod reviewed the dashboard concept, responded positively to the proposed approach and communicated the reporting features they considered important. Their feedback informed subsequent development, particularly the presentation-oriented Executive Dashboard. In response, the team implemented consistent reporting-year controls, headline indicators, supporting charts, contextual summaries and a dedicated Presentation View. This provides qualitative evidence that the design responded to stakeholder requirements, although it does not constitute formal usability testing or acceptance during routine management operations.
+
+The executive and detailed pages serve complementary purposes. The Executive Dashboard prioritises information suitable for management presentations, while detailed pages allow users to investigate sites, facilities and operational categories underlying the headline results. Earlier attempts to display numerous membership, activity or facility categories in individual charts caused overcrowding and overlapping labels. Dividing these measures into more focused visualisations improved readability, although it introduced additional navigation between views. Different aggregation rules were also required for monthly activity counts, financial totals, year-to-date measures and point-in-time membership balances. These distinctions increase implementation complexity but reduce the risk of misleading summaries. Independent task-based usability testing and evaluation during routine management reporting have not yet been conducted.
+
+## Future-proofing and reproducibility {#sec-eval-reuse}
+
+The future-proofing objective described in @sec-extend was evaluated using test cases beyond the original 2021–2025 reporting period. These tests introduced future-dated reports, additional metric names, new labelled fields and unrecognised worksheet values. They verified that supported additions could pass through the import, cleaning and validation pipeline, while unrecognised data were retained for inspection with their source references rather than silently incorporated into existing calculations. Additional tests examined future-year Venues worksheets, incomplete reporting coverage and compatibility between the supplied Excel templates and their respective importers.
+
+These results demonstrate extensibility within the supported workbook structures, rather than compatibility with every possible future change. Adding a metric to a cleaned table does not automatically make it available in an existing chart. Significant changes to workbook layouts, reporting relationships or KPI definitions still require maintainer review, code modifications and regression testing. Synthetic sample workbooks, documented table structures, automated tests and the maintainer guide provide a reproducible starting point for making and verifying such changes.
 
 ## Functional robustness and runtime performance {#sec-eval-performance}
 
@@ -341,22 +408,55 @@ dashboard evaluation) can be added or removed without rewording the others.
 
 The tests show that the dashboard agrees with Monash Sport's workbooks, but they cannot show whether the workbooks themselves are correct. Validation flags internal inconsistencies, such as a total that differs from its parts, while an error entered consistently in a workbook would pass every check.
 
-Monash Sport staff have not yet used the dashboard in routine work, and no one outside the project team has tested its usability. The design follows the mentors' requirements but still needs feedback from real use.
+The dashboard was developed in response to requirements and feedback from Monash Sport mentors. However, its usability and effectiveness have not yet been formally evaluated during routine management reporting.
 
 Forecast accuracy has not yet been evaluated on Monash Sport's real reports. The current tests establish computational correctness, not predictive performance.
 
 The synthetic examples demonstrate how the dashboard behaves, but provide no evidence about Monash Sport's actual financial or operational performance.
 
+Systematic cross-browser, cross-device and accessibility testing was not undertaken. Browser import-time measurements indicate processing performance but do not establish how easily users can interpret projected charts, navigate between pages or complete reporting tasks independently. The effects of category density, screen size and presentation conditions should therefore be evaluated with Monash Sport staff in their normal working environment.
+
+Future-year and extensibility tests address expected changes within recognised workbook structures and do not guarantee compatibility with every future layout or measure. Additional source fields can be retained in the cleaned data without automatically becoming inputs to existing charts or calculations. Significant changes to report templates, business definitions or reporting relationships will require corresponding updates to the importers, calculations and regression tests. Although modular code and documentation support handover, the project has not yet evaluated whether a new maintainer can independently implement and deploy such changes.
+
 # Discussion and conclusion {#sec-conclusion}
 
-<!--Owner: Ayush-->
+The project addressed a practical reporting challenge at Monash Sport: substantial financial and operational information was distributed across Excel workbooks that were difficult to compare and present consistently. The central challenge extended beyond producing visualisations. It required a defensible method for extracting information from heterogeneous workbook structures, applying consistent definitions and presenting measures that management could interpret and verify.
+
+The completed system addresses this challenge through three interconnected components. The existing report families are converted into common tables in the import and validation pipeline, but their source locations are intact. Second, the interactive pages provide organisation level performance, site comparisons and detailed operational measures at an appropriate level to the question being asked. Thirdly, forecasting and scenario planning take the same reporting base, but apply it to questions of future income, expenses, payroll and pricing. One of the key outcomes of the iterative design process in particular is the Executive Dashboard: feedback on the difficulty of presentation resulted in a clearer distinction between a summary experience that is suitable for a meeting, and the detailed pages required for it.
+
+The technical evaluation demonstrates that the system can process the supplied report structures consistently. All 38 original workbooks were imported without blocking errors. Across 20,172 reconciliation checks, 283 differences were identified between reported totals and their components, showing that the validation process can reveal inconsistencies rather than assume that all source figures are correct. Automated tests also assessed numerical consistency across pages, error handling, and compatibility with future reporting years. Import optimisation and the option to save cleaned data improved the practicality of browser-based delivery. These findings support the reliability of the system within the tested report structures, but do not establish that every original workbook value is accurate or that management decisions based on the dashboard will necessarily improve.
+
+Three broader lessons emerged from development. First, data quality and traceability must be treated as part of the analytical output rather than concealed behind visually appealing charts. Validation warnings and source-cell references help users investigate unexpected results. Second, reporting measures require appropriate aggregation and comparison rules. Financial totals, monthly attendance, year-to-date activity and point-in-time membership balances represent different types of information and should not be treated interchangeably. Third, privacy and usability involve practical trade-offs. Browser-based execution keeps uploaded reports on the user's computer but can be slower than desktop R. Explicitly saving cleaned data gives users control over the storage of confidential information while reducing repeated processing.
+
+The principal limitations arise from the available data and the scope of evaluation. The reports contain aggregated monthly information rather than individual customer or transaction records, limiting more detailed behavioural analysis. Wage information is restricted to the casual salary measures available in the Venues Tracking Reports. Forecasting models were selected for transparency and computational simplicity, but their accuracy has not yet been evaluated against subsequent actual Monash Sport results. The pricing and demand scenarios also depend on user-defined assumptions rather than estimated customer responses. Although the dashboard was developed using requirements and feedback from Monash Sport mentors and its principal interactions were manually tested in R, formal usability testing during routine management reporting has not been conducted. Synthetic data support public demonstration and reproducibility but cannot be used to infer Monash Sport's actual financial or operational performance.
+
+The next priority should be evaluating the dashboard during routine Monash Sport reporting before introducing further features. Over several reporting cycles, staff could assess whether they can upload new workbooks, interpret validation warnings, investigate unexpected figures and present results without developer support. Task-based usability testing would provide evidence about whether the page hierarchy, category selectors and presentation controls support actual management workflows. Forecast accuracy should also be assessed against observations that become available after the forecasts are produced. As report templates evolve, maintainers should update the relevant importers, metric definitions and tests together. The shared calculations, source-cell traceability, regression suite and maintainer documentation provide a foundation for checking that future changes remain consistent across executive and detailed reporting views.
+
+## Contributions and handover {#sec-contributions}
+
+Requirements and feedback from Monash Sport mentors Alicia Stack and Darren McLeod, and academic guidance from Minh Huynh, were integrated into the project. As outlined in this report, this is a shared system, with the reporting interface relying on the import and validation pipeline and the data layer being of little use to managers unless it could be accessed through a clear reporting interface.
+
+Ayush's main contribution was the design and development of the R Shiny reporting and visualisation interface. This included the layout of the reporting pages, comparisons of sites and venues, operational charts and selectors, the presentation-oriented design of the Executive Dashboard, and incremental enhancements to chart readability, responsive layout and hover interactions. The key decisions were how to structure the various management queries into pages, how to maintain the meaning of management categories and timelines and how to strike a balance between executive succinctness and detailed inspection. Ayush also helped in integration, debugging and documentation of these interfaces. 
+
+<!--Owner: Vicky -->
+The report import and validation workflow, forecasting and scenario functionality, and automated checks and related technical documentation were the main features contributed by Ziqi. Both authors participated in the review of the integrated dashboard and in the handover.
+
+<!-- common for both us decribed -->
+
+The full source code, synthetic sample workbooks, tests and documentation are available at [the project GitHub repository](https://github.com/Vicky-FengZ/ETC5543-Monash-Sports), and the [live dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/) demonstrates the browser version. The README file tells new users to check the user guide and the developers to check the maintainer guide, data dictionary and tests. The original confidential Monash Sport workbooks are excluded from the public repository. This handover is critical as it will allow Monash Sport to utilise and modify the system without the original team.
+
+Overall, the project delivers a browser-accessible reporting and planning tool that transforms existing Excel workbooks into a more consistent basis for management discussions. Its principal contribution is not any individual chart or forecasting model, but the integration of traceable source data, meaningful comparisons and interactive decision-support features within a single application. The next measure of success will be its reliability and usefulness during Monash Sport's regular reporting activities.
 
 # Use of generative AI {.unnumbered}
 
 <!-- Owner: Both -->
-## Ayush
+## Ayush {.unnumbered}
 
-## Vicky
+I used ChatGPT during development and report preparation to explore R Shiny implementation approaches, troubleshoot coding and formatting issues, review chart behaviour and edge cases, and improve the clarity of documentation and written explanations. I also used it to review draft report sections and identify possible inconsistencies. 
+
+I assessed the suggested changes against the application code, available test results and project requirements, and made the final decisions about the reporting interface and its design. I reviewed the final written content to ensure that it accurately reflected the implemented functionality, evaluation evidence and limitations. Numerical results and technical claims were checked against the project materials and tests rather than accepted solely from AI-generated responses.
+
+## Vicky {.unnumbered}
 
 I used Claude to support parts of this project. The assistance mainly involved improving the data extraction logic, checking edge cases in the file upload process, and fixing bugs. I also used AI to refine the CSS styling of the dashboard and website, add tests for boundary conditions, and improve the grammar, clarity and flow of my report and project documentation.
 

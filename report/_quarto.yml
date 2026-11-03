@@ -2,7 +2,7 @@
 # report.qmd; this file holds everything about how it is rendered.
 #
 # Render both versions from the project root (RStudio Terminal):
-#   quarto render report/report.qmd
+#   quarto::quarto_render("report/report.qmd")
 # The PDF (report.pdf) and the website (index.html) are written next to
 # report.qmd, in the report/ folder.
 
@@ -37,6 +37,7 @@ format:
   # PDF: Monash report format (quarto-monash/report, Typst version, in
   # _extensions/report). Typst ships with Quarto, so no LaTeX is needed.
   report-typst:
+    fig-format: png
     output-file: report.pdf
     toc-title: Contents
     section-numbering: "1.1"
