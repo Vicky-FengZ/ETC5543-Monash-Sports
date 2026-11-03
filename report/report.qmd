@@ -317,7 +317,7 @@ A manager needs only a few inputs to build a plan. The main controls (forecast h
 
 ## Approach {#sec-eval-approach}
 
-The system was evaluated against the objectives in @sec-objectives using two kinds of evidence. The first is a set of automated tests, written as R scripts, that run the importers, the calculations and the whole app on the synthetic workbooks and on the real workbooks that Monash Sport provided for 2021 to 2025. The tests on synthetic data run through GitHub Actions every time the code changes. The tests on real data were run locally, because those files cannot leave the project team. The second kind of evidence is timing measurements of the importers and the dashboard, in desktop R and in the browser. The 26 R test scripts are summarised by area in @tbl-tests in the appendix, and a separate JavaScript test checks the download helper described in @sec-upload.
+The system was evaluated against the objectives in @sec-objectives using two kinds of evidence. The first is a set of automated tests, written as R scripts, that run the importers, the calculations and the whole app on the synthetic workbooks and on the real workbooks that Monash Sport provided for 2021 to 2025. The tests on synthetic data run through GitHub Actions every time the code changes. The tests on real data were run locally, because those files cannot leave the project team. The second kind of evidence is timing measurements of the importers and the dashboard, in desktop R and in the browser. The 27 R test scripts are summarised by area in @tbl-tests in the appendix, and a separate JavaScript test checks the download helper described in @sec-upload.
 
 ## Accurate and consistent figures {#sec-eval-accuracy}
 
@@ -517,7 +517,7 @@ The data layer turns each report family into a set of long tables with one row p
 | Area | Scripts | What they check |
 |---|---|---|
 | Importing and uploading reports | 10 | Cell parsing and worksheet selection, future-year layouts, new columns and categories, the Excel templates, the upload workflow and its warnings, saved-data checks, problem files, deliberately broken workbooks, and every real workbook |
-| Dashboard pages | 8 | Shared report years and site lists, the figures and charts on each page, behaviour with partial data, and every chart at wide and narrow sizes |
+| Dashboard pages | 9 | Shared report years and site lists, the figures and charts on each page, the values shown on hover, behaviour with partial data, and every chart at wide and narrow sizes |
 | Forecasting | 5 | Models, backtests, prediction intervals, scenarios, manual adjustments, safeguards, downloads and page layout |
 | Whole app and key figures | 3 | Rendering every page with seven combinations of data, consistency across pages, and key figures against an accepted snapshot |
 

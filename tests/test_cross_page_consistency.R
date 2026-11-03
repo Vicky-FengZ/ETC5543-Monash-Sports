@@ -92,53 +92,53 @@ shiny::testServer(mod_executive_dashboard_server, args = list(data = consistency
     output$kpi_net_result == format_compact_currency(expected$net_actual)
   )
 
-# Executive Sites now compares all reporting sites together.
-# Verify its per-site financial data against shared calculations.
+  # Executive Sites now compares all reporting sites together.
+  # Verify its per-site financial data against shared calculations.
 
-session$setInputs(dashboard_section = "site")
-session$flushReact()
+  session$setInputs(dashboard_section = "site")
+  session$flushReact()
 
-session$setInputs(
-  view_mode = "Year Review",
-  year = "2025"
-)
-session$flushReact()
-
-stopifnot(
-  identical(executive_context()$site, "All Monash Sport")
-)
-
-executive_site_rows <- executive_site_financial_rows()
-
-stopifnot(
-  nrow(executive_site_rows) > 0L,
-  all(executive_site_rows$report_year == 2025L),
-  consistency_site %in% executive_site_rows$site
-)
-
-executive_site_row <- executive_site_rows[
-  executive_site_rows$site == consistency_site,
-  , drop = FALSE
-]
-
-expected_site_row <- site_finance_2025[
-  site_finance_2025$site == consistency_site,
-  , drop = FALSE
-]
-
-stopifnot(
-  nrow(executive_site_row) == 1L,
-  nrow(expected_site_row) == 1L
-)
-
-same_values(
-  executive_site_row,
-  expected_site_row,
-  paste(
-    "Executive Sites financial chart data and site calculation for",
-    consistency_site
+  session$setInputs(
+    view_mode = "Year Review",
+    year = "2025"
   )
-)
+  session$flushReact()
+
+  stopifnot(
+    identical(executive_context()$site, "All Monash Sport")
+  )
+
+  executive_site_rows <- executive_site_financial_rows()
+
+  stopifnot(
+    nrow(executive_site_rows) > 0L,
+    all(executive_site_rows$report_year == 2025L),
+    consistency_site %in% executive_site_rows$site
+  )
+
+  executive_site_row <- executive_site_rows[
+    executive_site_rows$site == consistency_site,
+    , drop = FALSE
+  ]
+
+  expected_site_row <- site_finance_2025[
+    site_finance_2025$site == consistency_site,
+    , drop = FALSE
+  ]
+
+  stopifnot(
+    nrow(executive_site_row) == 1L,
+    nrow(expected_site_row) == 1L
+  )
+
+  same_values(
+    executive_site_row,
+    expected_site_row,
+    paste(
+      "Executive Sites financial chart data and site calculation for",
+      consistency_site
+    )
+  )
 })
 
 # Executive Overview: the Financial Summary table and the chart hover

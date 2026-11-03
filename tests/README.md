@@ -54,6 +54,7 @@ downloads in the actual Shinylive page.
 | `test_site_detail.R` | Site Detail filters, KPIs and trends |
 | `test_venues_operations.R` | Venues Operations attendance, facility hire, workforce and finance values |
 | `test_chart_and_ui_helpers.R` | Shared chart and interface helpers (gaps in lines, legends, palettes, month labels) |
+| `test_hover_readouts.R` | Hovering over a chart on the Overview, Site Comparison, Site Detail, Venues Operations and Forecasting pages shows the exact value the chart draws, and nothing away from the data |
 | `test_plot_smoke.R` | Every Site Detail and Venues chart draws at a wide and a narrow size |
 
 **Forecasting**

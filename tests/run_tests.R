@@ -105,7 +105,8 @@ test_groups <- list(
     "test_chart_and_ui_helpers.R", 
     "test_site_detail.R", 
     "test_venues_operations.R",
-    "test_plot_smoke.R"
+    "test_plot_smoke.R",
+    "test_hover_readouts.R"
   )),
   # Whole app on every page. The full report set (and the real-workbook
   # tests) run only when MONASH_SPORT_REAL_DATA_ROOT is set, as

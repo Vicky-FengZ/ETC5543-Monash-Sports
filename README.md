@@ -11,8 +11,8 @@ dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** ·
 [User guide](docs/user_guide.html) · [Developer maintainer
 guide](docs/maintainer_guide.md)
 
-**Project team:** Ayush Pandia and Ziqi Feng\
-**Monash Sport mentors:** Alicia Stack and Darren McLeod\
+**Project team:** Ayush Pandia and Ziqi Feng  
+**Monash Sport mentors:** Alicia Stack and Darren McLeod  
 **Academic mentor:** Minh Huynh (Monash University)
 
 The deployed application uses **Shinylive**, so R runs in the user’s
@@ -159,8 +159,8 @@ source("tests/run_sample_tests.R")
 
 For sequential debugging, first run
 `Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`. Authorised maintainers
-can use `tests/run_full_tests.R` with confidential workbooks stored
-locally in `data/raw/`. See [Testing
+can use `tests/run_full_tests.R` with the confidential workbooks kept on
+their own computer, never in the repository. See [Testing
 instructions](docs/maintainer_guide.md#testing) for expected coverage
 and how to update intentional snapshot changes.
 

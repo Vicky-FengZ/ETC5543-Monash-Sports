@@ -2369,6 +2369,15 @@ mod_site_detail_server <- function(
           enrolment_trend(), "date",
           c(`Active enrolments` = "total_active", Target = "target"))
       })
+      output$membership_movement_hover_value <- renderText({
+        if (is.null(input$membership_movement_hover)) {
+          return("Hover over a plotted period to inspect exact values.")
+        }
+        dashboard_hover_text(input$membership_movement_hover,
+          membership_movement(), "date",
+          c(`New Members` = "new_members",
+            `Expired / Cancelled` = "expired_cancelled"))
+      })
 
       output$visits_over_time <- renderPlot(
         {

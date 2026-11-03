@@ -1,5 +1,7 @@
 ---
-output: github_document
+output:
+  github_document:
+    html_preview: false
 ---
 
 # Monash Sport Performance Dashboard
@@ -156,8 +158,8 @@ source("tests/run_sample_tests.R")
 
 For sequential debugging, first run
 `Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`. Authorised maintainers can use
-`tests/run_full_tests.R` with confidential workbooks stored locally in
-`data/raw/`. See [Testing instructions](docs/maintainer_guide.md#testing)
+`tests/run_full_tests.R` with the confidential workbooks kept on their own
+computer, never in the repository. See [Testing instructions](docs/maintainer_guide.md#testing)
 for expected coverage and how to update intentional snapshot changes.
 
 GitHub Actions tests and builds the Shinylive site; the deployment workflow
