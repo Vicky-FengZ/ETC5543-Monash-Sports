@@ -1,28 +1,27 @@
 ---
-output:
-  github_document:
-    html_preview: false
+output: github_document
 ---
 
 # Monash Sport Performance Dashboard
 
-An interactive R Shiny application built with **Monash Sport** for the ETC5543
-Business Analytics Creative Activity. It brings financial and operational
-Excel reports into a consistent dashboard and provides forecasting and
-pricing-planning tools.
+An interactive R Shiny application built with **Monash Sport** for the
+ETC5543 Business Analytics Creative Activity. It brings financial and
+operational Excel reports into a consistent dashboard and provides
+forecasting and pricing-planning tools.
 
-**[Open the live dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** ·
-[User guide](docs/user_guide.html) ·
-[Developer maintainer guide](docs/maintainer_guide.md)
+**[Open the live
+dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** ·
+[User guide](docs/user_guide.html) · [Developer maintainer
+guide](docs/maintainer_guide.md)
 
 **Project team:** Ayush Pandia and Ziqi Feng  
 **Monash Sport mentors:** Alicia Stack and Darren McLeod  
 **Academic mentor:** Minh Huynh (Monash University)
 
-The deployed application uses **Shinylive**, so R runs in the user's browser.
-Uploaded reports are processed locally in that browser session; the published
-site does not receive or store report data. Monash Sport's confidential source
-workbooks are **not included** in this repository.
+The deployed application uses **Shinylive**, so R runs in the user’s
+browser. Uploaded reports are processed locally in that browser session;
+the published site does not receive or store report data. Monash Sport’s
+confidential source workbooks are **not included** in this repository.
 
 ## Contents
 
@@ -38,7 +37,7 @@ workbooks are **not included** in this repository.
 ## Dashboard features
 
 | Page | What it provides | Source reports |
-|---|---|---|
+|----|----|----|
 | **Executive Dashboard** | Three fixed presentation-ready sections: **Overview** (financial KPIs, four charts, summary and insights), **Site** (visits, memberships, growth, site finances and rankings) and **Venues** (attendance, facility hire, casual wages, merchandise/equipment revenue and insights). Includes **Year Review**, two-year **Comparison**, chart hover readouts and full-screen **Presentation View**. | Monthly Site, Detailed Site and Venues Tracking reports, depending on section |
 | **Overview** | Organisation-wide income, expenses, budget variance and revenue performance | Monthly Site Reports |
 | **Site Comparison** | Site-level financial comparisons and facility breakdowns | Monthly Site and Detailed Site Reports |
@@ -48,55 +47,60 @@ workbooks are **not included** in this repository.
 | **Data** | Workbook upload and validation, warning review, saved data and cleaned-table export | Supported `.xlsx`, `.xls` and dashboard `.rds` files |
 
 The three Executive sections use **fixed charts**, not the old *Choose
-Visuals* workflow. Detailed pages retain their own filters. Missing reported
-months or years remain gaps rather than being treated as zero; supported charts
-show exact values on hover. For design decisions see
+Visuals* workflow. Detailed pages retain their own filters. Missing
+reported months or years remain gaps rather than being treated as zero;
+supported charts show exact values on hover. For design decisions see
 [Dashboard design](docs/dashboard_design.md).
 
 ## Quick start
 
+**GitHub repository:** [Monash Sport Performance Dashboard](https://github.com/vicky-fengz/ETC5543-Monash-Sports)
+
 **Use the live application:** Open the
-[dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/), go to **Data**,
-and upload supported workbooks. To try it without confidential reports, use
-the **synthetic** workbooks in `data/sample/`.
+[dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/), go to
+**Data**, and upload supported workbooks. To try it without confidential
+reports, use the **synthetic** workbooks in `data/sample/`.
 
 **Run locally:** Install R 4.4 (the project was built with R 4.4.3) and
 RStudio. Clone/download the repository and run from its root:
 
-```r
+``` r
 renv::restore()
 shiny::runApp()
 ```
 
-The package versions are recorded in `renv.lock`. For the full import and
-upload workflow, file naming, warnings, saved-data format and templates, see
-[Maintainer guide: data upload](docs/maintainer_guide.md#data-upload-and-review-workflow)
-and the [user guide](docs/user_guide.html).
+The package versions are recorded in `renv.lock`. For the full import
+and upload workflow, file naming, warnings, saved-data format and
+templates, see [Maintainer guide: data
+upload](docs/maintainer_guide.md#data-upload-and-review-workflow) and
+the [user guide](docs/user_guide.html).
 
 ## Data sources and privacy
 
 The application supports three report families:
 
 | Report family | Main outputs |
-|---|---|
+|----|----|
 | **Monthly Site Reports** | Income, expenses, budgets, discounts and revenue reconciliations |
 | **Detailed Site / Business Unit Reports** | Site finance, Direct/Indirect visits, memberships and enrolments |
 | **Venues Tracking Reports** | Attendance, hire revenue and transactions, workforce hours/wages, online sales and merchandise/equipment measures |
 
-Uploads are validated before being used in charts. Imported records retain
-source-file, worksheet and cell-position metadata to help reconcile figures.
-The [data dictionary](docs/data_dictionary.md) defines the cleaned tables;
-[Excel templates](docs/excel_templates.md) document required workbook layouts.
+Uploads are validated before being used in charts. Imported records
+retain source-file, worksheet and cell-position metadata to help
+reconcile figures. The [data dictionary](docs/data_dictionary.md)
+defines the cleaned tables; [Excel templates](docs/excel_templates.md)
+document required workbook layouts.
 
-The workbooks under `data/sample/` use artificial figures and must **never**
-be treated as actual Monash Sport results. Don't commit original reports,
-exported confidential `.rds` files or screenshots containing real values.
-The live app does not keep uploads between sessions; **Save current data**
-produces a local `.rds` file that must be handled as confidential data.
+The workbooks under `data/sample/` use artificial figures and must
+**never** be treated as actual Monash Sport results. Don’t commit
+original reports, exported confidential `.rds` files or screenshots
+containing real values. The live app does not keep uploads between
+sessions; **Save current data** produces a local `.rds` file that must
+be handled as confidential data.
 
 ## Architecture at a glance
 
-```text
+``` text
 Excel workbooks → import → cleaning and validation → standardised data
                                                    ↓
                        shared calculations and reporting context
@@ -105,7 +109,7 @@ Excel workbooks → import → cleaning and validation → standardised data
 ```
 
 | Location | Responsibility |
-|---|---|
+|----|----|
 | [`app.R`](app.R) | Starts the application, connects navigation and shares uploaded data across pages |
 | [`R/data/`](R/data/) | Source-specific Excel extraction, cleaning, validation and extensible metric handling |
 | [`R/calculations.R`](R/calculations.R) and [`R/reporting_context.R`](R/reporting_context.R) | Shared financial calculations, reporting years, sites and source context |
@@ -116,18 +120,20 @@ Excel workbooks → import → cleaning and validation → standardised data
 | [`tests/`](tests/) | Regression, parser, cross-page and chart checks |
 | [`deploy/`](deploy/) and [`.github/workflows/`](.github/workflows/) | Browser build, continuous integration and GitHub Pages deployment |
 
-**For the full file-by-file map**, including `mod_executive_dashboard.R`,
-all data importers and the tests to update for each change, use the
-[developer handover and file map](docs/maintainer_guide.md#developer-handover-and-file-map).
+**For the full file-by-file map**, including
+`mod_executive_dashboard.R`, all data importers and the tests to update
+for each change, use the [developer handover and file
+map](docs/maintainer_guide.md#developer-handover-and-file-map).
 
 ## Maintaining the application
 
-This repository is designed for an incoming Monash Sport developer to take
-over. Start with [`docs/maintainer_guide.md`](docs/maintainer_guide.md)
-before changing data aggregation rules or source templates.
+This repository is designed for an incoming Monash Sport developer to
+take over. Start with
+[`docs/maintainer_guide.md`](docs/maintainer_guide.md) before changing
+data aggregation rules or source templates.
 
-| If you need to... | Where to start |
-|---|---|
+| If you need to… | Where to start |
+|----|----|
 | **Upload the next reporting year** | [New reporting years](docs/maintainer_guide.md#adding-future-report-years) (normally no code change) |
 | **Support a changed Excel template** | [Importer maintenance steps](docs/maintainer_guide.md#b-an-excel-workbook-changes-its-column-names-or-structure) |
 | **Add a site, facility or new measure** | [Adding reporting categories](docs/maintainer_guide.md#c-add-a-new-site-business-unit-facility-or-activity) |
@@ -136,41 +142,43 @@ before changing data aggregation rules or source templates.
 | **Diagnose incorrect totals** | [Calculation safeguards](docs/maintainer_guide.md#important-calculation-and-reporting-rules) |
 | **Release an update** | [Troubleshooting and release checklist](docs/maintainer_guide.md#troubleshooting-and-release-checklist) |
 
-The most important safeguards are to distinguish **unreported data from zero**,
-avoid summing YTD totals together with their monthly/detail components, and
-avoid summing successive membership snapshots. A wage budget difference must
-use a clearly stated sign convention. More detail and exceptions are in the
-maintainer guide.
+The most important safeguards are to distinguish **unreported data from
+zero**, avoid summing YTD totals together with their monthly/detail
+components, and avoid summing successive membership snapshots. A wage
+budget difference must use a clearly stated sign convention. More detail
+and exceptions are in the maintainer guide.
 
 ## Testing and deployment
 
 Run the basic regression suite from the project root:
 
-```r
+``` r
 source("tests/run_tests.R")
 ```
 
 Run the synthetic-workbook end-to-end checks before releasing:
 
-```r
+``` r
 source("tests/run_sample_tests.R")
 ```
 
 For sequential debugging, first run
-`Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`. Authorised maintainers can use
-`tests/run_full_tests.R` with the confidential workbooks kept on their own
-computer, never in the repository. See [Testing instructions](docs/maintainer_guide.md#testing)
-for expected coverage and how to update intentional snapshot changes.
+`Sys.setenv(MONASH_SPORT_TEST_WORKERS = "1")`. Authorised maintainers
+can use `tests/run_full_tests.R` with the confidential workbooks kept on
+their own computer, never in the repository. See [Testing
+instructions](docs/maintainer_guide.md#testing) for expected coverage
+and how to update intentional snapshot changes.
 
-GitHub Actions tests and builds the Shinylive site; the deployment workflow
-publishes changes from `main` to GitHub Pages. Review the code diff, run tests,
-and check the deployed application with **synthetic** reports. See the
-[deployment guide](docs/maintainer_guide.md#3-publish-a-new-version).
+GitHub Actions tests and builds the Shinylive site; the deployment
+workflow publishes changes from `main` to GitHub Pages. Review the code
+diff, run tests, and check the deployed application with **synthetic**
+reports. See the [deployment
+guide](docs/maintainer_guide.md#3-publish-a-new-version).
 
 ## Project documentation
 
 | Document | Intended audience |
-|---|---|
+|----|----|
 | [User guide (HTML)](docs/user_guide.html) | Monash Sport staff using the app |
 | [User guide source](docs/user_guide.qmd) | Updating staff instructions and generating the HTML/PDF guide |
 | [Maintainer guide](docs/maintainer_guide.md) | New developers: project files, report schemas, safe changes, tests and deployment |
@@ -187,16 +195,22 @@ Commit both files after reviewing the result. Folder-specific READMEs
 
 ## Report, presentation and licence
 
-The project report and presentation are Quarto files. To rebuild them from
-the project root with Quarto installed:
+The final project report and presentation are available below:
 
-```bash
+- [Project report (PDF)](report/report.pdf)
+- [Project report (HTML)](report/index.html)
+- [Project presentation](slides/slides.html)
+
+The project report and presentation are Quarto files. To rebuild them
+from the project root with Quarto installed:
+
+``` bash
 quarto render report/report.qmd
 quarto render slides/slides.qmd
 ```
 
 The report files live in [`report/`](report/) and the slides in
 [`slides/`](slides/). The application code and documentation use the
-[MIT Licence](LICENSE). Monash University/Monash Sport names, logos, brand
-assets and confidential reporting data are **not** covered by that licence;
-bundled third-party Quarto resources retain their own licences.
+[MIT Licence](LICENSE). Monash University/Monash Sport names, logos,
+brand assets and confidential reporting data are **not** covered by that
+licence; bundled third-party Quarto resources retain their own licences.

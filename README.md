@@ -11,8 +11,8 @@ dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/)** ·
 [User guide](docs/user_guide.html) · [Developer maintainer
 guide](docs/maintainer_guide.md)
 
-**Project team:** Ayush Pandia and Ziqi Feng  
-**Monash Sport mentors:** Alicia Stack and Darren McLeod  
+**Project team:** Ayush Pandia and Ziqi Feng\
+**Monash Sport mentors:** Alicia Stack and Darren McLeod\
 **Academic mentor:** Minh Huynh (Monash University)
 
 The deployed application uses **Shinylive**, so R runs in the user’s
@@ -50,6 +50,9 @@ supported charts show exact values on hover. For design decisions see
 [Dashboard design](docs/dashboard_design.md).
 
 ## Quick start
+
+**GitHub repository:** [Monash Sport Performance
+Dashboard](https://github.com/vicky-fengz/ETC5543-Monash-Sports)
 
 **Use the live application:** Open the
 [dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/), go to
@@ -189,6 +192,12 @@ Commit both files after reviewing the result. Folder-specific READMEs
 (`tests/`, `report/`) remain independent.
 
 ## Report, presentation and licence
+
+The final project report and presentation are available below:
+
+- [Project report (PDF)](report/report.pdf)
+- [Project report (HTML)](report/index.html)
+- [Project presentation](slides/slides.html)
 
 The project report and presentation are Quarto files. To rebuild them
 from the project root with Quarto installed:
