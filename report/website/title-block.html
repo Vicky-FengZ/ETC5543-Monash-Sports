@@ -16,6 +16,9 @@
         $if(organization)$
         <div><dt>Partner</dt><dd>$organization$</dd></div>
         $endif$
+        $if(mentors)$
+        <div><dt>Mentors</dt><dd>$for(mentors)$$it.name$$sep$, $endfor$</dd></div>
+        $endif$
         $if(date)$
         <div><dt>Published</dt><dd>$date$</dd></div>
         $endif$

@@ -38,6 +38,9 @@
   // Project edit: when the authors have email addresses, the cover lists
   // them instead of the department's phone, email and ABN.
   author-emails: (),
+  // Project edit: mentors and the code repository, shown on the cover.
+  mentors: (),
+  repo-url: none,
   margin: (top: 2.4cm, bottom: 2.4cm, left: 2.5cm, right: 2.5cm),
   paper: "a4",
   lang: "en",
@@ -165,7 +168,16 @@
           }
         }
       }
-      #v(2cm)
+      #if mentors.len() > 0 {
+        v(0.7cm)
+        set par(leading: 0.45em)
+        text(font: heading-family, size: 11pt, weight: "bold")[Mentors]
+        for m in mentors {
+          linebreak()
+          text(font: heading-family, size: 11pt)[#m.name, #m.role]
+        }
+      }
+      #v(1.2cm)
       #if organization != none {
         text(font: heading-family, size: 12pt)[Report for]
         linebreak()
@@ -174,6 +186,11 @@
       #v(0.7cm)
       #if date != none {
         text(font: heading-family, size: 13pt, weight: "bold")[#date]
+      }
+      #if repo-url != none {
+        v(0.5cm)
+        let url = content-to-string(repo-url)
+        text(font: heading-family, size: 10pt)[Code and documentation: \ #link(url)[#url]]
       }
       #v(2cm)
     ],
@@ -227,6 +244,8 @@
     block(above: 0em, below: 2em)[
       #outline(title: toc-heading, depth: toc_depth, indent: toc_indent)
     ]
+    // Project edit: start the abstract on its own page after the contents.
+    pagebreak()
   }
 
   doc

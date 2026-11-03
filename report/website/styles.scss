@@ -220,7 +220,8 @@ body {
   font-size: 1.2rem;
   font-weight: 400;
   margin-bottom: 2rem;
-  max-width: 40ch;
+  // Wide enough for the subtitle to fit on one line on desktop screens.
+  max-width: 60ch;
 }
 
 .site-actions {
@@ -291,6 +292,40 @@ body {
     margin: 2px 0 0;
     font-weight: 500;
     color: #FFFFFF;
+  }
+}
+
+// On wide screens the fact cards stay on one row. The row may run past the
+// text column into the empty right side of the banner; narrower screens wrap.
+@media (min-width: 992px) {
+  .site-facts {
+    flex-wrap: nowrap;
+    width: max-content;
+    gap: 10px;
+
+    > div {
+      padding: 10px 14px;
+    }
+
+    dd {
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+  }
+}
+
+// Between 992px and 1199px the row needs slightly smaller cards to fit.
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .site-facts {
+    gap: 8px;
+
+    > div {
+      padding: 9px 12px;
+    }
+
+    dd {
+      font-size: 0.86rem;
+    }
   }
 }
 

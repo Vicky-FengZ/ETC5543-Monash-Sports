@@ -10,6 +10,13 @@ author:
     email: vfen0001@student.monash.edu
 organization: Monash Sport
 date: 2026-11-03
+mentors:
+  - name: Alicia Stack
+    role: Industry mentor, Monash Sport
+  - name: Darren McLeod
+    role: Industry mentor, Monash Sport
+  - name: Minh Huynh
+    role: Academic mentor, Monash University
 
 unit: ETC5543 Business Analytics Creative Activity
 repo-url: https://github.com/Vicky-FengZ/ETC5543-Monash-Sports
@@ -29,7 +36,7 @@ knitr::write_bib(cited, file = "references/packages.bib")
 
 # Abstract {.unnumbered}
 
-<!--Owner: Vicky -->
+Monash Sport records financial and operational performance in separate Excel workbooks with inconsistent layouts, making comparisons and planning difficult. This project developed an R Shiny dashboard that imports these workbooks, checks their structure and totals, and converts them into consistent tables linked to their source cells. Its pages support comparisons across sites and years and provide an Executive Dashboard for meetings. A forecasting tool uses benchmark models selected through rolling-origin evaluation and allows managers to explore payroll, price and demand scenarios. The application runs in the browser through Shinylive, keeping uploaded reports on the user’s computer. Evaluation on 38 original workbooks from 2021 to 2025 found no blocking import errors. Of 20,172 reconciliation checks, 283 identified differences between reported totals and their components. Desktop R import tests recorded speed-ups of six to thirteen times, while saved data loaded in the browser in about three seconds. Forecast accuracy and usability during routine management reporting remain to be evaluated.
 
 # Introduction {#sec-intro}
 
@@ -401,11 +408,6 @@ Tests with gaps, overlapping files, short series, unconfirmed zero months and in
 
 ## Limits of this evaluation {#sec-limitations}
 
-<!--
-Owner: Both. Each limit is its own paragraph, so new ones (e.g. from Ayush's
-dashboard evaluation) can be added or removed without rewording the others.
--->
-
 The tests show that the dashboard agrees with Monash Sport's workbooks, but they cannot show whether the workbooks themselves are correct. Validation flags internal inconsistencies, such as a total that differs from its parts, while an error entered consistently in a workbook would pass every check.
 
 The dashboard was developed in response to requirements and feedback from Monash Sport mentors. However, its usability and effectiveness have not yet been formally evaluated during routine management reporting.
@@ -438,10 +440,9 @@ Requirements and feedback from Monash Sport mentors Alicia Stack and Darren McLe
 
 Ayush's main contribution was the design and development of the R Shiny reporting and visualisation interface. This included the layout of the reporting pages, comparisons of sites and venues, operational charts and selectors, the presentation-oriented design of the Executive Dashboard, and incremental enhancements to chart readability, responsive layout and hover interactions. The key decisions were how to structure the various management queries into pages, how to maintain the meaning of management categories and timelines and how to strike a balance between executive succinctness and detailed inspection. Ayush also helped in integration, debugging and documentation of these interfaces. 
 
-<!--Owner: Vicky -->
-The report import and validation workflow, forecasting and scenario functionality, and automated checks and related technical documentation were the main features contributed by Ziqi. Both authors participated in the review of the integrated dashboard and in the handover.
+Ziqi's main contribution was the data and planning layer beneath the dashboard and its delivery in the browser. This covered the import, cleaning and validation pipeline for the three report families, the upload workflow and saved data, the Shinylive deployment and import optimisation, and the forecasting and scenario tool. Ziqi also wrote much of the automated test suite, including the tests on the real reports and deliberately broken workbooks, and prepared the synthetic workbooks, templates, data dictionary and user guide. The key decisions were how to make figures traceable without changing what Monash Sport reported, and how to keep confidential data on the user's computer without making the tool impractical. Through the project, Ziqi learned to turn irregular spreadsheets into reliable tidy data, to treat validation and testing as part of the analysis rather than an afterthought, and to choose methods that non-specialist users can understand and trust.
 
-<!-- common for both us decribed -->
+Both authors participated in the review of the integrated dashboard and in the handover.
 
 The full source code, synthetic sample workbooks, tests and documentation are available at [the project GitHub repository](https://github.com/Vicky-FengZ/ETC5543-Monash-Sports), and the [live dashboard](https://vicky-fengz.github.io/ETC5543-Monash-Sports/) demonstrates the browser version. The README file tells new users to check the user guide and the developers to check the maintainer guide, data dictionary and tests. The original confidential Monash Sport workbooks are excluded from the public repository. This handover is critical as it will allow Monash Sport to utilise and modify the system without the original team.
 
@@ -449,7 +450,6 @@ Overall, the project delivers a browser-accessible reporting and planning tool t
 
 # Use of generative AI {.unnumbered}
 
-<!-- Owner: Both -->
 ## Ayush {.unnumbered}
 
 I used ChatGPT during development and report preparation to explore R Shiny implementation approaches, troubleshoot coding and formatting issues, review chart behaviour and edge cases, and improve the clarity of documentation and written explanations. I also used it to review draft report sections and identify possible inconsistencies. 

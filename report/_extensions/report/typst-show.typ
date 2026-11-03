@@ -28,6 +28,17 @@ $endif$
 $if(date)$
   date: [$date$],
 $endif$
+$if(mentors)$
+  // Project edit: mentors and repository on the cover.
+  mentors: (
+$for(mentors)$
+    ( name: [$it.name$], role: [$it.role$] ),
+$endfor$
+  ),
+$endif$
+$if(repo-url)$
+  repo-url: [$repo-url$],
+$endif$
 $if(organization)$
   organization: [$organization$],
 $endif$
