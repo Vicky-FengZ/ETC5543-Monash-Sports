@@ -1,4 +1,6 @@
 
+<!-- README.md is generated from README.Rmd. Please edit that file. -->
+
 # Monash Sport Performance Dashboard
 
 An interactive R Shiny application built with **Monash Sport** for the
